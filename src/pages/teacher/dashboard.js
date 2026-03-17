@@ -1,0 +1,436 @@
+// ========================================
+// Teacher Dashboard
+// ========================================
+import {
+    getCurrentTeacher, logoutTeacher, getClassesByTeacher,
+    createClass, getStudentsByClass, deleteClass, addStudent,
+    addStudentsBatch, showToast, formatDate
+} from '../../store.js';
+import { parseExcelFile } from '../../utils/excelImport.js';
+
+export function renderTeacherDashboard(container) {
+    const teacher = getCurrentTeacher();
+    if (!teacher) {
+        window.location.hash = '/teacher/login';
+        return;
+    }
+
+    let classes = getClassesByTeacher(teacher.id);
+
+    function render() {
+        classes = getClassesByTeacher(teacher.id);
+
+        container.innerHTML = `
+      <div class="teacher-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar animate-slide-left">
+          <div class="sidebar-header">
+            <div class="sidebar-logo">
+              <div class="sidebar-logo-icon">G</div>
+              <div>
+                <div class="sidebar-logo-text">Genie Class</div>
+              </div>
+            </div>
+          </div>
+          <div class="sidebar-classes">
+            <div class="sidebar-section-title">내 클래스</div>
+            ${classes.map(cls => `
+              <div class="sidebar-class-item" data-class-id="${cls.id}">
+                <div class="sidebar-class-icon" style="background:${cls.color}">${cls.name.charAt(0)}</div>
+                <span>${cls.name}</span>
+              </div>
+            `).join('')}
+            <div class="sidebar-class-item" id="sidebar-add-class" style="color:var(--primary-light);margin-top:var(--space-sm)">
+              <div class="sidebar-class-icon" style="background:var(--bg-card);color:var(--primary-light);font-size:1.2rem">+</div>
+              <span>클래스 추가</span>
+            </div>
+          </div>
+          <div class="sidebar-footer">
+            <div class="sidebar-user">
+              <div class="sidebar-user-avatar">${teacher.name.charAt(0)}</div>
+              <div>
+                <div class="sidebar-user-name">${teacher.name}</div>
+                <div class="sidebar-user-role">교사</div>
+              </div>
+            </div>
+            <button class="btn btn-ghost btn-sm w-full" id="btn-logout" style="margin-top:var(--space-sm)">로그아웃</button>
+          </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+          <div class="dashboard-header animate-fade-in-down">
+            <h1 class="dashboard-greeting">안녕하세요, <span>${teacher.name}</span> 선생님! 👋</h1>
+            <p class="dashboard-subtitle">오늘도 좋은 수업 되세요</p>
+          </div>
+
+          <div class="section-header">
+            <h2 class="section-title">내 클래스</h2>
+            <button class="btn btn-primary btn-sm" id="btn-add-class">+ 새 클래스</button>
+          </div>
+
+          <div class="class-grid stagger-children">
+            ${classes.map(cls => {
+            const students = getStudentsByClass(cls.id);
+            return `
+                <div class="card card-clickable class-card" data-class-id="${cls.id}">
+                  <div class="class-card-banner" style="background:${cls.color}"></div>
+                  <div class="class-card-body">
+                    <div class="class-card-name">${cls.name}</div>
+                    <div class="class-card-info">
+                      <span>👤 ${students.length}명</span>
+                      <span>•</span>
+                      <span>${formatDate(cls.createdAt)}</span>
+                    </div>
+                    <div class="class-card-actions">
+                      <button class="btn btn-primary btn-sm class-enter-btn" data-class-id="${cls.id}">입장</button>
+                      <button class="btn btn-ghost btn-sm class-manage-btn" data-class-id="${cls.id}">학생관리</button>
+                      <button class="btn btn-ghost btn-sm class-delete-btn" data-class-id="${cls.id}" style="color:var(--red)">삭제</button>
+                    </div>
+                  </div>
+                </div>
+              `;
+        }).join('')}
+            <div class="card add-class-card" id="add-class-card">
+              <div class="add-class-icon">+</div>
+              <span>새 클래스 만들기</span>
+            </div>
+          </div>
+        </main>
+      </div>
+
+      <!-- Create Class Modal -->
+      <div class="modal-backdrop" id="create-class-modal">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3 class="modal-title">새 클래스 만들기</h3>
+            <button class="modal-close" id="close-create-modal">✕</button>
+          </div>
+          <form id="create-class-form">
+            <div class="form-group">
+              <label class="input-label">클래스 이름</label>
+              <input type="text" class="input-field" id="class-name-input" placeholder="예: 3학년 1반" required autocomplete="off" />
+            </div>
+            <button type="submit" class="btn btn-primary w-full">클래스 생성</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Student Management Modal -->
+      <div class="modal-backdrop" id="student-manage-modal">
+        <div class="modal-content" style="max-width:700px">
+          <div class="modal-header">
+            <h3 class="modal-title" id="manage-modal-title">학생 관리</h3>
+            <button class="modal-close" id="close-manage-modal">✕</button>
+          </div>
+          <div id="student-manage-content"></div>
+        </div>
+      </div>
+
+      <!-- Mode Selection Modal -->
+      <div class="modal-backdrop" id="mode-select-modal">
+        <div class="modal-content" style="max-width:600px;background:transparent;border:none;box-shadow:none;">
+          <div class="mode-selection" id="mode-selection-btns"></div>
+        </div>
+      </div>
+    `;
+
+        bindEvents();
+    }
+
+    function bindEvents() {
+        // Logout
+        document.getElementById('btn-logout').addEventListener('click', () => {
+            logoutTeacher();
+            window.location.hash = '/teacher/login';
+        });
+
+        // Add class buttons
+        const addClassBtns = [
+            document.getElementById('btn-add-class'),
+            document.getElementById('add-class-card'),
+            document.getElementById('sidebar-add-class'),
+        ];
+        addClassBtns.forEach(btn => {
+            if (btn) btn.addEventListener('click', () => openModal('create-class-modal'));
+        });
+
+        // Close modals
+        document.getElementById('close-create-modal').addEventListener('click', () => closeModal('create-class-modal'));
+        document.getElementById('close-manage-modal').addEventListener('click', () => closeModal('student-manage-modal'));
+
+        // Click backdrop to close
+        ['create-class-modal', 'student-manage-modal', 'mode-select-modal'].forEach(id => {
+            document.getElementById(id).addEventListener('click', (e) => {
+                if (e.target.classList.contains('modal-backdrop')) closeModal(id);
+            });
+        });
+
+        // Create class form
+        document.getElementById('create-class-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const name = document.getElementById('class-name-input').value.trim();
+            if (!name) return;
+            createClass(name, teacher.id);
+            showToast(`'${name}' 클래스가 생성되었습니다!`);
+            closeModal('create-class-modal');
+            render();
+        });
+
+        // Class card actions
+        document.querySelectorAll('.class-enter-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const classId = btn.dataset.classId;
+                openModeSelection(classId);
+            });
+        });
+
+        document.querySelectorAll('.class-manage-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openStudentManagement(btn.dataset.classId);
+            });
+        });
+
+        document.querySelectorAll('.class-delete-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (confirm('정말 이 클래스를 삭제하시겠습니까? 관련된 모든 데이터가 삭제됩니다.')) {
+                    deleteClass(btn.dataset.classId);
+                    showToast('클래스가 삭제되었습니다.');
+                    render();
+                }
+            });
+        });
+
+        // Sidebar class click
+        document.querySelectorAll('.sidebar-class-item[data-class-id]').forEach(item => {
+            item.addEventListener('click', () => {
+                openModeSelection(item.dataset.classId);
+            });
+        });
+
+        // Class card click
+        document.querySelectorAll('.class-card[data-class-id]').forEach(card => {
+            card.addEventListener('click', () => {
+                openModeSelection(card.dataset.classId);
+            });
+        });
+    }
+
+    function openModal(id) {
+        document.getElementById(id).classList.add('active');
+    }
+
+    function closeModal(id) {
+        document.getElementById(id).classList.remove('active');
+    }
+
+    function openModeSelection(classId) {
+        const cls = classes.find(c => c.id === classId);
+        if (!cls) return;
+
+        const modalBtns = document.getElementById('mode-selection-btns');
+        modalBtns.innerHTML = `
+      <div class="mode-card card card-clickable" id="mode-lesson-btn">
+        <span class="mode-card-icon">📚</span>
+        <div class="mode-card-title">수업 모드</div>
+        <div class="mode-card-desc">학생 캐릭터를 보며<br/>칭찬과 발표를 기록합니다</div>
+      </div>
+      <div class="mode-card card card-clickable" id="mode-assign-btn">
+        <span class="mode-card-icon">📝</span>
+        <div class="mode-card-title">과제 모드</div>
+        <div class="mode-card-desc">과제, 공지사항, 자료를<br/>관리합니다</div>
+      </div>
+    `;
+
+        openModal('mode-select-modal');
+
+        document.getElementById('mode-lesson-btn').addEventListener('click', () => {
+            closeModal('mode-select-modal');
+            window.location.hash = `/teacher/class/${classId}/lesson`;
+        });
+
+        document.getElementById('mode-assign-btn').addEventListener('click', () => {
+            closeModal('mode-select-modal');
+            window.location.hash = `/teacher/class/${classId}/assign`;
+        });
+    }
+
+    function openStudentManagement(classId) {
+        const cls = classes.find(c => c.id === classId);
+        if (!cls) return;
+
+        document.getElementById('manage-modal-title').textContent = `${cls.name} - 학생 관리`;
+        const content = document.getElementById('student-manage-content');
+
+        function renderStudentList() {
+            const students = getStudentsByClass(classId);
+            content.innerHTML = `
+        <div class="tabs">
+          <div class="tab active" data-tab="list">학생 목록</div>
+          <div class="tab" data-tab="add">추가</div>
+          <div class="tab" data-tab="excel">엑셀 임포트</div>
+        </div>
+
+        <div id="tab-list">
+          ${students.length === 0 ? `
+            <div class="empty-state">
+              <div class="empty-state-icon">👤</div>
+              <div class="empty-state-text">아직 학생이 없습니다</div>
+            </div>
+          ` : `
+            <table class="student-table">
+              <thead>
+                <tr>
+                  <th>이름</th>
+                  <th>고유코드</th>
+                  <th>레벨</th>
+                  <th>칭찬</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                ${students.map(s => `
+                  <tr>
+                    <td>${s.name}</td>
+                    <td><span class="student-code">${s.uniqueCode}</span></td>
+                    <td><span class="badge badge-primary">Lv.${s.characterLevel}</span></td>
+                    <td><span class="badge badge-gold">⭐ ${s.praiseCount}</span></td>
+                    <td><button class="btn btn-ghost btn-sm delete-student-btn" data-student-id="${s.id}" style="color:var(--red);font-size:0.8rem">삭제</button></td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          `}
+        </div>
+
+        <div id="tab-add" class="hidden">
+          <div class="form-group">
+            <label class="input-label">학생 이름</label>
+            <input type="text" class="input-field" id="add-student-name" placeholder="학생 이름을 입력하세요" autocomplete="off" />
+          </div>
+          <button class="btn btn-primary w-full" id="btn-add-single-student">학생 추가</button>
+          <div class="divider"></div>
+          <div class="form-group">
+            <label class="input-label">여러 학생 추가 (줄바꿈으로 구분)</label>
+            <textarea class="input-field" id="add-students-batch" rows="5" placeholder="홍길동&#10;김철수&#10;이영희" style="resize:vertical"></textarea>
+          </div>
+          <button class="btn btn-primary w-full" id="btn-add-batch-students">일괄 추가</button>
+        </div>
+
+        <div id="tab-excel" class="hidden">
+          <div class="drop-zone" id="excel-drop-zone">
+            <div class="drop-zone-icon">📄</div>
+            <div>엑셀 파일을 드래그하거나 클릭하여 업로드</div>
+            <div style="font-size:0.8rem;margin-top:var(--space-sm);color:var(--text-tertiary)">.xlsx, .xls 파일 지원</div>
+            <input type="file" id="excel-file-input" accept=".xlsx,.xls" style="display:none" />
+          </div>
+          <div id="excel-preview" class="hidden" style="margin-top:var(--space-lg)">
+            <div class="section-header">
+              <h4 class="section-title">읽어온 학생 목록</h4>
+              <span class="badge badge-green" id="excel-count"></span>
+            </div>
+            <div id="excel-names-list" style="margin-bottom:var(--space-lg)"></div>
+            <button class="btn btn-primary w-full" id="btn-import-excel">학생 추가</button>
+          </div>
+        </div>
+      `;
+
+            // Tab switching
+            content.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    content.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    ['list', 'add', 'excel'].forEach(t => {
+                        document.getElementById(`tab-${t}`).classList.toggle('hidden', t !== tab.dataset.tab);
+                    });
+                });
+            });
+
+            // Add single student
+            document.getElementById('btn-add-single-student')?.addEventListener('click', () => {
+                const name = document.getElementById('add-student-name').value.trim();
+                if (!name) { showToast('이름을 입력해주세요.', 'error'); return; }
+                addStudent(name, classId);
+                showToast(`${name} 학생이 추가되었습니다!`);
+                renderStudentList();
+            });
+
+            // Add batch students
+            document.getElementById('btn-add-batch-students')?.addEventListener('click', () => {
+                const text = document.getElementById('add-students-batch').value;
+                const names = text.split('\n').map(n => n.trim()).filter(n => n);
+                if (names.length === 0) { showToast('학생 이름을 입력해주세요.', 'error'); return; }
+                addStudentsBatch(names, classId);
+                showToast(`${names.length}명의 학생이 추가되었습니다!`);
+                renderStudentList();
+            });
+
+            // Excel drop zone
+            const dropZone = document.getElementById('excel-drop-zone');
+            const fileInput = document.getElementById('excel-file-input');
+            let pendingNames = [];
+
+            if (dropZone) {
+                dropZone.addEventListener('click', () => fileInput.click());
+                dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+                dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+                dropZone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    dropZone.classList.remove('drag-over');
+                    handleExcelFile(e.dataTransfer.files[0]);
+                });
+                fileInput.addEventListener('change', (e) => {
+                    if (e.target.files[0]) handleExcelFile(e.target.files[0]);
+                });
+            }
+
+            async function handleExcelFile(file) {
+                try {
+                    const names = await parseExcelFile(file);
+                    if (names.length === 0) {
+                        showToast('파일에서 학생 이름을 찾을 수 없습니다.', 'error');
+                        return;
+                    }
+                    pendingNames = names;
+                    document.getElementById('excel-preview').classList.remove('hidden');
+                    document.getElementById('excel-count').textContent = `${names.length}명`;
+                    document.getElementById('excel-names-list').innerHTML = names.map(n =>
+                        `<span class="badge badge-primary" style="margin:2px">${n}</span>`
+                    ).join('');
+                } catch (err) {
+                    showToast(err.message, 'error');
+                }
+            }
+
+            document.getElementById('btn-import-excel')?.addEventListener('click', () => {
+                if (pendingNames.length > 0) {
+                    addStudentsBatch(pendingNames, classId);
+                    showToast(`${pendingNames.length}명의 학생이 추가되었습니다!`);
+                    pendingNames = [];
+                    renderStudentList();
+                }
+            });
+
+            // Delete student
+            content.querySelectorAll('.delete-student-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const { deleteStudent } = require('../../store.js');
+                    // Use dynamic import workaround
+                    import('../../store.js').then(store => {
+                        store.deleteStudent(btn.dataset.studentId);
+                        showToast('학생이 삭제되었습니다.');
+                        renderStudentList();
+                    });
+                });
+            });
+        }
+
+        renderStudentList();
+        openModal('student-manage-modal');
+    }
+
+    render();
+}
