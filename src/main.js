@@ -13,6 +13,8 @@ import { renderLessonMode } from './pages/teacher/lessonMode.js';
 import { renderAssignMode } from './pages/teacher/assignMode.js';
 import { renderStudentLogin } from './pages/student/login.js';
 import { renderStudentDashboard } from './pages/student/dashboard.js';
+import { auth } from './firebase.js';
+import { onAuthStateChanged } from 'firebase/auth';
 
 // Register routes
 addRoute('/', (container) => renderLanding(container));
@@ -23,7 +25,12 @@ addRoute('/teacher/class/:id/assign', (container, params) => renderAssignMode(co
 addRoute('/student/login', (container) => renderStudentLogin(container));
 addRoute('/student/dashboard', (container) => renderStudentDashboard(container));
 
-// Initialize router
-initRouter();
-
-console.log('✨ Genie Class initialized');
+// Initialize application after Auth state is determined
+let isInitialized = false;
+onAuthStateChanged(auth, (user) => {
+    if (!isInitialized) {
+        initRouter();
+        isInitialized = true;
+        console.log('✨ Genie Class initialized (Auth ready)');
+    }
+});

@@ -14,15 +14,19 @@ export function renderAssignMode(container, params) {
   if (!teacher) { window.location.hash = '/teacher/login'; return; }
 
   const classId = params.id;
-  const cls = getClassById(classId);
-  if (!cls) { window.location.hash = '/teacher/dashboard'; return; }
-
+  let cls = null;
   let activeTab = 'announcements';
 
-  function render() {
-    const assignments = getAssignmentsByClass(classId);
-    const announcements = getAnnouncementsByClass(classId);
-    const students = getStudentsByClass(classId);
+  async function init() {
+    cls = await getClassById(classId);
+    if (!cls) { window.location.hash = '/teacher/dashboard'; return; }
+    await render();
+  }
+
+  async function render() {
+    const assignments = await getAssignmentsByClass(classId);
+    const announcements = await getAnnouncementsByClass(classId);
+    const students = await getStudentsByClass(classId);
 
     container.innerHTML = `
       <div class="teacher-layout">
@@ -83,11 +87,6 @@ export function renderAssignMode(container, params) {
                     <span>${formatDate(ann.createdAt)}</span>
                   </div>
                   <div style="font-size:0.85rem;color:var(--text-secondary);line-height:1.6;white-space:pre-line">${ann.content}</div>
-                  ${ann.files && ann.files.length > 0 ? `
-                    <div class="flex gap-sm" style="margin-top:var(--space-sm);flex-wrap:wrap">
-                      ${ann.files.map(f => `<span class="badge badge-primary">📎 ${f.name}</span>`).join('')}
-                    </div>
-                  ` : ''}
                 </div>
               `).join('')}
             </div>
@@ -122,13 +121,8 @@ export function renderAssignMode(container, params) {
                   </div>
                 </div>
               </div>
-              ${assignments.length === 0 ? `
-                <div class="empty-state">
-                  <div class="empty-state-icon">📝</div>
-                  <div class="empty-state-text">과제가 없습니다</div>
-                </div>
-              ` : assignments.map(a => {
-      const subs = getSubmissionsByAssignment(a.id);
+              ${(await Promise.all(assignments.map(async a => {
+      const subs = await getSubmissionsByAssignment(a.id);
       return `
                   <div class="assign-item">
                     <div class="flex justify-between items-center">
@@ -145,39 +139,22 @@ export function renderAssignMode(container, params) {
                       <div style="margin-top:var(--space-md)">
                         <div style="font-size:0.8rem;color:var(--text-tertiary);margin-bottom:var(--space-xs)">제출한 학생:</div>
                         <div class="flex gap-sm" style="flex-wrap:wrap">
-                          ${subs.map(s => {
-        const student = getStudentById(s.studentId);
+                          ${(await Promise.all(subs.map(async s => {
+        const student = await getStudentById(s.studentId);
         return student ? `<span class="badge badge-green">${student.name}</span>` : '';
-      }).join('')}
+      }))).join('')}
                         </div>
                       </div>
                     ` : ''}
                   </div>
                 `;
-    }).join('')}
+    }))).join('')}
             </div>
 
             <!-- 자료 -->
             <div id="tab-files" class="${activeTab !== 'files' ? 'hidden' : ''}">
               <div class="section-header">
                 <h3 class="section-title">수업 자료</h3>
-                <button class="btn btn-primary btn-sm" id="btn-upload-material">+ 자료 업로드</button>
-              </div>
-              <div id="material-form" class="hidden" style="margin-bottom:var(--space-lg)">
-                <div class="card" style="padding:var(--space-lg)">
-                  <div class="form-group">
-                    <label class="input-label">자료 제목</label>
-                    <input type="text" class="input-field" id="material-title" placeholder="자료 제목" autocomplete="off" />
-                  </div>
-                  <div class="form-group">
-                    <label class="input-label">파일</label>
-                    <input type="file" id="material-files" multiple style="color:var(--text-secondary)" />
-                  </div>
-                  <div class="flex gap-sm">
-                    <button class="btn btn-primary btn-sm" id="btn-submit-material">업로드</button>
-                    <button class="btn btn-ghost btn-sm" id="btn-cancel-material">취소</button>
-                  </div>
-                </div>
               </div>
               <div class="empty-state">
                 <div class="empty-state-icon">📁</div>
@@ -193,11 +170,10 @@ export function renderAssignMode(container, params) {
   }
 
   function bindEvents() {
-    document.getElementById('btn-back-dashboard').addEventListener('click', () => {
+    document.getElementById('btn-back-dashboard')?.addEventListener('click', () => {
       window.location.hash = '/teacher/dashboard';
     });
 
-    // Tab switching
     document.querySelectorAll('.tab').forEach(tab => {
       tab.addEventListener('click', () => {
         activeTab = tab.dataset.tab;
@@ -205,7 +181,6 @@ export function renderAssignMode(container, params) {
       });
     });
 
-    // Announcement
     document.getElementById('btn-new-announcement')?.addEventListener('click', () => {
       document.getElementById('announcement-form').classList.remove('hidden');
     });
@@ -224,28 +199,22 @@ export function renderAssignMode(container, params) {
           const saved = await saveFile(file);
           files.push({ id: saved.id, name: saved.name });
         }
-        createAnnouncement(classId, { title, content, files });
-        showToast('공지사항이 게시되었습니다!');
-        render();
-      } catch (err) {
-        console.error(err);
-        showToast('파일 업로드 중 오류가 발생했습니다. 용량이 부족할 수 있습니다.', 'error');
-      }
+        await createAnnouncement(classId, { title, content, files });
+        showToast('공지사항 게시 완료!');
+        await render();
+      } catch (err) { showToast('오류 발생', 'error'); }
     });
 
-    // Delete announcement
     document.querySelectorAll('.delete-ann-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (confirm('이 공지사항을 삭제하시겠습니까?')) {
-          deleteAnnouncement(btn.dataset.id);
-          showToast('공지사항이 삭제되었습니다.');
-          render();
+      btn.addEventListener('click', async (e) => {
+        if (confirm('삭제하시겠습니까?')) {
+          await deleteAnnouncement(btn.dataset.id);
+          showToast('삭제됨');
+          await render();
         }
       });
     });
 
-    // Assignment
     document.getElementById('btn-new-assignment')?.addEventListener('click', () => {
       document.getElementById('assignment-form').classList.remove('hidden');
     });
@@ -256,8 +225,7 @@ export function renderAssignMode(container, params) {
       const title = document.getElementById('assign-title').value.trim();
       const description = document.getElementById('assign-desc').value.trim();
       const dueDate = document.getElementById('assign-due').value;
-      if (!title) { showToast('제목을 입력해주세요.', 'error'); return; }
-
+      if (!title) return;
       const fileInput = document.getElementById('assign-files');
       const files = [];
       try {
@@ -265,54 +233,22 @@ export function renderAssignMode(container, params) {
           const saved = await saveFile(file);
           files.push({ id: saved.id, name: saved.name });
         }
-        createAssignment(classId, { title, description, dueDate, files });
-        showToast('과제가 생성되었습니다!');
-        render();
-      } catch (err) {
-        console.error(err);
-        showToast('과제 생성 중 오류가 발생했습니다. (파일 저장 실패 등)', 'error');
-      }
+        await createAssignment(classId, { title, description, dueDate, files });
+        showToast('과제 생성 완료!');
+        await render();
+      } catch (err) { showToast('오류 발생', 'error'); }
     });
 
-    // Delete assignment
     document.querySelectorAll('.delete-assign-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (confirm('이 과제를 삭제하시겠습니까?')) {
-          deleteAssignment(btn.dataset.id);
-          showToast('과제가 삭제되었습니다.');
-          render();
+      btn.addEventListener('click', async () => {
+        if (confirm('삭제하시겠습니까?')) {
+          await deleteAssignment(btn.dataset.id);
+          showToast('삭제됨');
+          await render();
         }
       });
     });
-
-    // Material (uses announcement system)
-    document.getElementById('btn-upload-material')?.addEventListener('click', () => {
-      document.getElementById('material-form').classList.remove('hidden');
-    });
-    document.getElementById('btn-cancel-material')?.addEventListener('click', () => {
-      document.getElementById('material-form').classList.add('hidden');
-    });
-    document.getElementById('btn-submit-material')?.addEventListener('click', async () => {
-      const title = document.getElementById('material-title').value.trim();
-      if (!title) { showToast('제목을 입력해주세요.', 'error'); return; }
-
-      const fileInput = document.getElementById('material-files');
-      const files = [];
-      try {
-        for (const file of fileInput.files) {
-          const saved = await saveFile(file);
-          files.push({ id: saved.id, name: saved.name });
-        }
-        createAnnouncement(classId, { title: `[자료] ${title}`, content: '', files });
-        showToast('자료가 업로드되었습니다!');
-        render();
-      } catch (err) {
-        console.error(err);
-        showToast('자료 업로드 중 오류가 발생했습니다.', 'error');
-      }
-    });
   }
 
-  render();
+  init();
 }

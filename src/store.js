@@ -1,44 +1,44 @@
 // ========================================
-// Genie Class - LocalStorage Data Store
+// Genie Class - Firebase Data Store
 // ========================================
+import {
+    signInWithPopup,
+    signOut,
+    onAuthStateChanged
+} from 'firebase/auth';
+import {
+    collection,
+    doc,
+    setDoc,
+    getDoc,
+    getDocs,
+    query,
+    where,
+    deleteDoc,
+    updateDoc,
+    increment,
+    serverTimestamp,
+    orderBy
+} from 'firebase/firestore';
+import { auth, db, googleProvider } from './firebase.js';
 
-const STORE_KEYS = {
-    TEACHERS: 'genie_teachers',
-    CLASSES: 'genie_classes',
-    STUDENTS: 'genie_students',
-    ASSIGNMENTS: 'genie_assignments',
-    ANNOUNCEMENTS: 'genie_announcements',
-    PRESENTATIONS: 'genie_presentations',
-    SUBMISSIONS: 'genie_submissions',
-    FILES: 'genie_files',
-    CURRENT_TEACHER: 'genie_current_teacher',
-    CURRENT_STUDENT: 'genie_current_student',
+const COLLECTIONS = {
+    TEACHERS: 'teachers',
+    CLASSES: 'classes',
+    STUDENTS: 'students',
+    ASSIGNMENTS: 'assignments',
+    ANNOUNCEMENTS: 'announcements',
+    PRESENTATIONS: 'presentations',
+    SUBMISSIONS: 'submissions',
+    FILES: 'files',
 };
 
-function getStore(key) {
-    try {
-        const data = localStorage.getItem(key);
-        return data ? JSON.parse(data) : [];
-    } catch {
-        return [];
-    }
-}
+// Internal state
+let _currentUser = null;
 
-function setStore(key, data) {
-    try {
-        localStorage.setItem(key, JSON.stringify(data));
-        return true;
-    } catch (e) {
-        if (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
-            const size = (JSON.stringify(data).length / 1024 / 1024).toFixed(2);
-            showToast(`저장 공간이 부족합니다 (용량: ${size}MB). 오래된 파일이나 데이터를 삭제해주세요.`, 'error');
-            console.error('Storage quota exceeded');
-        } else {
-            console.error('Store error:', e);
-        }
-        return false;
-    }
-}
+onAuthStateChanged(auth, (user) => {
+    _currentUser = user;
+});
 
 function generateId() {
     return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
@@ -50,171 +50,138 @@ function generateStudentCode() {
     for (let i = 0; i < 6; i++) {
         code += chars.charAt(Math.floor(Math.random() * chars.length));
     }
-    // Ensure uniqueness
-    const students = getStore(STORE_KEYS.STUDENTS);
-    if (students.some(s => s.uniqueCode === code)) {
-        return generateStudentCode();
-    }
     return code;
 }
 
-// ========== Teacher ==========
-export function registerTeacher(name, password) {
-    const teachers = getStore(STORE_KEYS.TEACHERS);
-    if (teachers.some(t => t.name === name)) {
-        return { error: '이미 존재하는 이름입니다.' };
-    }
-    const teacher = { id: generateId(), name, password, createdAt: new Date().toISOString() };
-    teachers.push(teacher);
-    setStore(STORE_KEYS.TEACHERS, teachers);
-    return { data: teacher };
-}
+// ========== Teacher Auth ==========
+export async function loginWithGoogle() {
+    try {
+        const result = await signInWithPopup(auth, googleProvider);
+        const user = result.user;
 
-export function loginTeacher(name, password) {
-    const teachers = getStore(STORE_KEYS.TEACHERS);
-    const teacher = teachers.find(t => t.name === name && t.password === password);
-    if (!teacher) return { error: '이름 또는 비밀번호가 올바르지 않습니다.' };
-    setStore(STORE_KEYS.CURRENT_TEACHER, teacher);
-    return { data: teacher };
+        // Check if teacher exists in Firestore, if not create
+        const teacherDoc = await getDoc(doc(db, COLLECTIONS.TEACHERS, user.uid));
+        if (!teacherDoc.exists()) {
+            await setDoc(doc(db, COLLECTIONS.TEACHERS, user.uid), {
+                id: user.uid,
+                name: user.displayName,
+                email: user.email,
+                photoURL: user.photoURL,
+                createdAt: serverTimestamp()
+            });
+        }
+        return { data: user };
+    } catch (error) {
+        console.error('Login error:', error);
+        return { error: '구글 로그인 중 오류가 발생했습니다.' };
+    }
 }
 
 export function getCurrentTeacher() {
-    try {
-        const data = localStorage.getItem(STORE_KEYS.CURRENT_TEACHER);
-        return data ? JSON.parse(data) : null;
-    } catch { return null; }
+    return auth.currentUser;
 }
 
-export function logoutTeacher() {
-    localStorage.removeItem(STORE_KEYS.CURRENT_TEACHER);
+export async function logoutTeacher() {
+    await signOut(auth);
 }
 
 // ========== Class ==========
-export function createClass(name, teacherId) {
-    const classes = getStore(STORE_KEYS.CLASSES);
+export async function createClass(name, teacherId) {
+    const classId = generateId();
     const cls = {
-        id: generateId(),
+        id: classId,
         name,
         teacherId,
         createdAt: new Date().toISOString(),
         color: getRandomColor(),
     };
-    classes.push(cls);
-    setStore(STORE_KEYS.CLASSES, classes);
+    await setDoc(doc(db, COLLECTIONS.CLASSES, classId), cls);
     return cls;
 }
 
-export function getClassesByTeacher(teacherId) {
-    return getStore(STORE_KEYS.CLASSES).filter(c => c.teacherId === teacherId);
+export async function getClassesByTeacher(teacherId) {
+    const q = query(collection(db, COLLECTIONS.CLASSES), where('teacherId', '==', teacherId));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => doc.data());
 }
 
-export function getClassById(classId) {
-    return getStore(STORE_KEYS.CLASSES).find(c => c.id === classId);
+export async function getClassById(classId) {
+    if (!classId) return null;
+    const docSnap = await getDoc(doc(db, COLLECTIONS.CLASSES, classId));
+    return docSnap.exists() ? docSnap.data() : null;
 }
 
-export function deleteClass(classId) {
-    const classes = getStore(STORE_KEYS.CLASSES).filter(c => c.id !== classId);
-    setStore(STORE_KEYS.CLASSES, classes);
-    // Also delete related students
-    const students = getStore(STORE_KEYS.STUDENTS).filter(s => s.classId !== classId);
-    setStore(STORE_KEYS.STUDENTS, students);
+export async function deleteClass(classId) {
+    await deleteDoc(doc(db, COLLECTIONS.CLASSES, classId));
 }
 
 // ========== Student ==========
-export function addStudent(name, classId) {
-    const students = getStore(STORE_KEYS.STUDENTS);
+export async function addStudent(name, classId) {
+    const studentId = generateId();
     const student = {
-        id: generateId(),
+        id: studentId,
         name,
         classId,
         uniqueCode: generateStudentCode(),
-        password: null,
         characterLevel: 1,
         praiseCount: 0,
         totalPoints: 0,
         createdAt: new Date().toISOString(),
     };
-    students.push(student);
-    setStore(STORE_KEYS.STUDENTS, students);
+    await setDoc(doc(db, COLLECTIONS.STUDENTS, studentId), student);
     return student;
 }
 
-export function addStudentsBatch(names, classId) {
-    const results = [];
-    names.forEach(name => {
-        if (name.trim()) {
-            results.push(addStudent(name.trim(), classId));
-        }
-    });
-    return results;
+export async function addStudentsBatch(names, classId) {
+    const batch = names.map(name => addStudent(name.trim(), classId));
+    return Promise.all(batch);
 }
 
-export function getStudentsByClass(classId) {
-    return getStore(STORE_KEYS.STUDENTS).filter(s => s.classId === classId);
+export async function getStudentsByClass(classId) {
+    const q = query(collection(db, COLLECTIONS.STUDENTS), where('classId', '==', classId));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => doc.data());
 }
 
-export function getStudentById(studentId) {
-    return getStore(STORE_KEYS.STUDENTS).find(s => s.id === studentId);
+export async function getStudentById(studentId) {
+    if (!studentId) return null;
+    const docSnap = await getDoc(doc(db, COLLECTIONS.STUDENTS, studentId));
+    return docSnap.exists() ? docSnap.data() : null;
 }
 
-export function getStudentByCode(code) {
-    return getStore(STORE_KEYS.STUDENTS).find(s => s.uniqueCode === code);
+export async function getStudentByCode(code) {
+    if (!code) return null;
+    const q = query(collection(db, COLLECTIONS.STUDENTS), where('uniqueCode', '==', code));
+    const snapshot = await getDocs(q);
+    return !snapshot.empty ? snapshot.docs[0].data() : null;
 }
 
-export function setStudentPassword(studentId, password) {
-    const students = getStore(STORE_KEYS.STUDENTS);
-    const idx = students.findIndex(s => s.id === studentId);
-    if (idx !== -1) {
-        students[idx].password = password;
-        setStore(STORE_KEYS.STUDENTS, students);
-        return students[idx];
+export async function praiseStudent(studentId) {
+    const studentRef = doc(db, COLLECTIONS.STUDENTS, studentId);
+    const snap = await getDoc(studentRef);
+    if (snap.exists()) {
+        const data = snap.data();
+        const newPoints = data.totalPoints + 1;
+        const newLevel = Math.min(5, Math.floor(newPoints / 5) + 1);
+        await updateDoc(studentRef, {
+            praiseCount: increment(1),
+            totalPoints: increment(1),
+            characterLevel: newLevel
+        });
+        return { ...data, praiseCount: data.praiseCount + 1, totalPoints: newPoints, characterLevel: newLevel };
     }
     return null;
 }
 
-export function loginStudent(name, password) {
-    const students = getStore(STORE_KEYS.STUDENTS);
-    const student = students.find(s => s.name === name && s.password === password);
-    if (!student) return { error: '이름 또는 비밀번호가 올바르지 않습니다.' };
-    setStore(STORE_KEYS.CURRENT_STUDENT, student);
-    return { data: student };
-}
-
-export function getCurrentStudent() {
-    try {
-        const data = localStorage.getItem(STORE_KEYS.CURRENT_STUDENT);
-        return data ? JSON.parse(data) : null;
-    } catch { return null; }
-}
-
-export function logoutStudent() {
-    localStorage.removeItem(STORE_KEYS.CURRENT_STUDENT);
-}
-
-export function praiseStudent(studentId) {
-    const students = getStore(STORE_KEYS.STUDENTS);
-    const idx = students.findIndex(s => s.id === studentId);
-    if (idx !== -1) {
-        students[idx].praiseCount += 1;
-        students[idx].totalPoints += 1;
-        // Level up every 5 praises
-        students[idx].characterLevel = Math.min(5, Math.floor(students[idx].totalPoints / 5) + 1);
-        setStore(STORE_KEYS.STUDENTS, students);
-        return students[idx];
-    }
-    return null;
-}
-
-export function deleteStudent(studentId) {
-    const students = getStore(STORE_KEYS.STUDENTS).filter(s => s.id !== studentId);
-    setStore(STORE_KEYS.STUDENTS, students);
+export async function deleteStudent(studentId) {
+    await deleteDoc(doc(db, COLLECTIONS.STUDENTS, studentId));
 }
 
 // ========== Presentations ==========
-export function addPresentation(studentId, classId, data) {
-    const presentations = getStore(STORE_KEYS.PRESENTATIONS);
+export async function addPresentation(studentId, classId, data) {
+    const id = generateId();
     const presentation = {
-        id: generateId(),
+        id,
         studentId,
         classId,
         whiteboardImage: data.whiteboardImage || null,
@@ -223,45 +190,45 @@ export function addPresentation(studentId, classId, data) {
         feedback: '',
         createdAt: new Date().toISOString(),
     };
-    presentations.push(presentation);
-    setStore(STORE_KEYS.PRESENTATIONS, presentations);
+    await setDoc(doc(db, COLLECTIONS.PRESENTATIONS, id), presentation);
 
     // Add points for presentation
-    const students = getStore(STORE_KEYS.STUDENTS);
-    const idx = students.findIndex(s => s.id === studentId);
-    if (idx !== -1) {
-        students[idx].totalPoints += 2;
-        students[idx].characterLevel = Math.min(5, Math.floor(students[idx].totalPoints / 5) + 1);
-        setStore(STORE_KEYS.STUDENTS, students);
-    }
+    const studentRef = doc(db, COLLECTIONS.STUDENTS, studentId);
+    await updateDoc(studentRef, {
+        totalPoints: increment(2)
+    });
 
     return presentation;
 }
 
-export function getPresentationsByStudent(studentId) {
-    return getStore(STORE_KEYS.PRESENTATIONS).filter(p => p.studentId === studentId);
+export async function getPresentationsByStudent(studentId) {
+    const q = query(collection(db, COLLECTIONS.PRESENTATIONS), where('studentId', '==', studentId));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => doc.data());
 }
 
-export function getPresentationsByClass(classId) {
-    return getStore(STORE_KEYS.PRESENTATIONS).filter(p => p.classId === classId);
+export async function getPresentationsByClass(classId) {
+    const q = query(collection(db, COLLECTIONS.PRESENTATIONS), where('classId', '==', classId));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => doc.data());
 }
 
-export function toggleSharePresentation(presentationId) {
-    const presentations = getStore(STORE_KEYS.PRESENTATIONS);
-    const idx = presentations.findIndex(p => p.id === presentationId);
-    if (idx !== -1) {
-        presentations[idx].shared = !presentations[idx].shared;
-        setStore(STORE_KEYS.PRESENTATIONS, presentations);
-        return presentations[idx];
+export async function toggleSharePresentation(presentationId) {
+    const ref = doc(db, COLLECTIONS.PRESENTATIONS, presentationId);
+    const snap = await getDoc(ref);
+    if (snap.exists()) {
+        const currentShared = snap.data().shared;
+        await updateDoc(ref, { shared: !currentShared });
+        return { ...snap.data(), shared: !currentShared };
     }
     return null;
 }
 
 // ========== Assignments ==========
-export function createAssignment(classId, data) {
-    const assignments = getStore(STORE_KEYS.ASSIGNMENTS);
+export async function createAssignment(classId, data) {
+    const id = generateId();
     const assignment = {
-        id: generateId(),
+        id,
         classId,
         title: data.title,
         description: data.description || '',
@@ -269,31 +236,36 @@ export function createAssignment(classId, data) {
         files: data.files || [],
         createdAt: new Date().toISOString(),
     };
-    assignments.push(assignment);
-    setStore(STORE_KEYS.ASSIGNMENTS, assignments);
+    await setDoc(doc(db, COLLECTIONS.ASSIGNMENTS, id), assignment);
     return assignment;
 }
 
-export function getAssignmentsByClass(classId) {
-    return getStore(STORE_KEYS.ASSIGNMENTS).filter(a => a.classId === classId);
+export async function getAssignmentsByClass(classId) {
+    const q = query(collection(db, COLLECTIONS.ASSIGNMENTS), where('classId', '==', classId));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => doc.data());
 }
 
-export function getAssignmentById(assignmentId) {
-    return getStore(STORE_KEYS.ASSIGNMENTS).find(a => a.id === assignmentId);
+export async function getAssignmentById(assignmentId) {
+    if (!assignmentId) return null;
+    const docSnap = await getDoc(doc(db, COLLECTIONS.ASSIGNMENTS, assignmentId));
+    return docSnap.exists() ? docSnap.data() : null;
 }
 
-export function deleteAssignment(assignmentId) {
-    const assignments = getStore(STORE_KEYS.ASSIGNMENTS).filter(a => a.id !== assignmentId);
-    setStore(STORE_KEYS.ASSIGNMENTS, assignments);
+export async function deleteAssignment(assignmentId) {
+    await deleteDoc(doc(db, COLLECTIONS.ASSIGNMENTS, assignmentId));
 }
 
 // ========== Submissions ==========
-export function submitAssignment(assignmentId, studentId, data) {
-    const submissions = getStore(STORE_KEYS.SUBMISSIONS);
-    // Remove existing submission if any
-    const filtered = submissions.filter(s => !(s.assignmentId === assignmentId && s.studentId === studentId));
+export async function submitAssignment(assignmentId, studentId, data) {
+    const q = query(collection(db, COLLECTIONS.SUBMISSIONS),
+        where('assignmentId', '==', assignmentId),
+        where('studentId', '==', studentId));
+    const existing = await getDocs(q);
+
+    const id = existing.empty ? generateId() : existing.docs[0].id;
     const submission = {
-        id: generateId(),
+        id,
         assignmentId,
         studentId,
         files: data.files || [],
@@ -301,82 +273,86 @@ export function submitAssignment(assignmentId, studentId, data) {
         shared: data.shared || false,
         createdAt: new Date().toISOString(),
     };
-    filtered.push(submission);
-    setStore(STORE_KEYS.SUBMISSIONS, filtered);
+    await setDoc(doc(db, COLLECTIONS.SUBMISSIONS, id), submission);
     return submission;
 }
 
-export function getSubmissionsByAssignment(assignmentId) {
-    return getStore(STORE_KEYS.SUBMISSIONS).filter(s => s.assignmentId === assignmentId);
+export async function getSubmissionsByAssignment(assignmentId) {
+    const q = query(collection(db, COLLECTIONS.SUBMISSIONS), where('assignmentId', '==', assignmentId));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => doc.data());
 }
 
-export function getSubmissionsByStudent(studentId) {
-    return getStore(STORE_KEYS.SUBMISSIONS).filter(s => s.studentId === studentId);
+export async function getSubmissionsByStudent(studentId) {
+    const q = query(collection(db, COLLECTIONS.SUBMISSIONS), where('studentId', '==', studentId));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => doc.data());
 }
 
-export function getSharedSubmissions(assignmentId) {
-    return getStore(STORE_KEYS.SUBMISSIONS).filter(s => s.assignmentId === assignmentId && s.shared);
+export async function getSharedSubmissions(assignmentId) {
+    const q = query(collection(db, COLLECTIONS.SUBMISSIONS),
+        where('assignmentId', '==', assignmentId),
+        where('shared', '==', true));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => doc.data());
 }
 
 // ========== Announcements ==========
-export function createAnnouncement(classId, data) {
-    const announcements = getStore(STORE_KEYS.ANNOUNCEMENTS);
+export async function createAnnouncement(classId, data) {
+    const id = generateId();
     const announcement = {
-        id: generateId(),
+        id,
         classId,
         title: data.title,
         content: data.content || '',
         files: data.files || [],
         createdAt: new Date().toISOString(),
     };
-    announcements.push(announcement);
-    setStore(STORE_KEYS.ANNOUNCEMENTS, announcements);
+    await setDoc(doc(db, COLLECTIONS.ANNOUNCEMENTS, id), announcement);
     return announcement;
 }
 
-export function getAnnouncementsByClass(classId) {
-    return getStore(STORE_KEYS.ANNOUNCEMENTS)
-        .filter(a => a.classId === classId)
-        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+export async function getAnnouncementsByClass(classId) {
+    const q = query(collection(db, COLLECTIONS.ANNOUNCEMENTS),
+        where('classId', '==', classId),
+        orderBy('createdAt', 'desc'));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => doc.data());
 }
 
-export function deleteAnnouncement(announcementId) {
-    const announcements = getStore(STORE_KEYS.ANNOUNCEMENTS).filter(a => a.id !== announcementId);
-    setStore(STORE_KEYS.ANNOUNCEMENTS, announcements);
+export async function deleteAnnouncement(announcementId) {
+    await deleteDoc(doc(db, COLLECTIONS.ANNOUNCEMENTS, announcementId));
 }
 
-// ========== Files (stored as base64) ==========
-export function saveFile(file) {
+// ========== Files ==========
+export async function saveFile(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onerror = () => reject(new Error('파일을 읽는 중 오류가 발생했습니다.'));
-        reader.onload = () => {
+        reader.onload = async () => {
+            const id = generateId();
             const fileData = {
-                id: generateId(),
+                id,
                 name: file.name,
                 type: file.type,
                 size: file.size,
                 data: reader.result,
                 createdAt: new Date().toISOString(),
             };
-            const files = getStore(STORE_KEYS.FILES);
-            files.push(fileData);
-            if (setStore(STORE_KEYS.FILES, files)) {
-                resolve(fileData);
-            } else {
-                reject(new Error('저장 공간이 부족하여 파일을 저장할 수 없습니다.'));
-            }
+            await setDoc(doc(db, COLLECTIONS.FILES, id), fileData);
+            resolve(fileData);
         };
         reader.readAsDataURL(file);
     });
 }
 
-export function getFileById(fileId) {
-    return getStore(STORE_KEYS.FILES).find(f => f.id === fileId);
+export async function getFileById(fileId) {
+    const docSnap = await getDoc(doc(db, COLLECTIONS.FILES, fileId));
+    return docSnap.exists() ? docSnap.data() : null;
 }
 
-export function downloadFile(fileId) {
-    const file = getFileById(fileId);
+export async function downloadFile(fileId) {
+    const file = await getFileById(fileId);
     if (!file) return;
     const link = document.createElement('a');
     link.href = file.data;
@@ -400,6 +376,7 @@ function getRandomColor() {
 }
 
 export function formatDate(dateStr) {
+    if (!dateStr) return '';
     const d = new Date(dateStr);
     const month = d.getMonth() + 1;
     const day = d.getDate();
@@ -409,6 +386,7 @@ export function formatDate(dateStr) {
 }
 
 export function formatDateShort(dateStr) {
+    if (!dateStr) return '';
     const d = new Date(dateStr);
     return `${d.getMonth() + 1}월 ${d.getDate()}일`;
 }

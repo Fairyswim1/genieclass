@@ -3,7 +3,8 @@
 // ========================================
 import {
   getCurrentTeacher, getClassById, getStudentsByClass,
-  praiseStudent, showToast, getStudentById, addPresentation
+  praiseStudent, showToast, getStudentById, addPresentation,
+  toggleSharePresentation
 } from '../../store.js';
 import { renderCharacter, getLevelConfig, renderPraiseAnimation } from '../../components/characterAvatar.js';
 
@@ -12,9 +13,8 @@ export function renderLessonMode(container, params) {
   if (!teacher) { window.location.hash = '/teacher/login'; return; }
 
   const classId = params.id;
-  const cls = getClassById(classId);
-  if (!cls) { window.location.hash = '/teacher/dashboard'; return; }
-
+  let cls = null;
+  let students = [];
   let selectedStudent = null;
   let isWhiteboard = false;
 
@@ -33,11 +33,17 @@ export function renderLessonMode(container, params) {
   let recordingTimer = null;
   let recordingSeconds = 0;
 
-  function render() {
-    const students = getStudentsByClass(classId);
+  async function init() {
+    cls = await getClassById(classId);
+    if (!cls) { window.location.hash = '/teacher/dashboard'; return; }
+    await render();
+  }
+
+  async function render() {
+    students = await getStudentsByClass(classId);
 
     if (isWhiteboard && selectedStudent) {
-      renderWhiteboardMode(students);
+      renderWhiteboardMode();
       return;
     }
 
@@ -84,7 +90,7 @@ export function renderLessonMode(container, params) {
       </div>
     `;
 
-    bindLessonEvents(students);
+    bindLessonEvents();
   }
 
   function renderActionPanel(student) {
@@ -121,12 +127,11 @@ export function renderLessonMode(container, params) {
     `;
   }
 
-  function bindLessonEvents(students) {
+  function bindLessonEvents() {
     document.getElementById('btn-back-dashboard')?.addEventListener('click', () => {
       window.location.hash = '/teacher/dashboard';
     });
 
-    // Student card click
     document.querySelectorAll('.student-avatar-card').forEach(card => {
       card.addEventListener('click', () => {
         const studentId = card.dataset.studentId;
@@ -135,21 +140,18 @@ export function renderLessonMode(container, params) {
       });
     });
 
-    // Close action panel
     document.getElementById('close-action-panel')?.addEventListener('click', () => {
       selectedStudent = null;
       render();
     });
 
-    // Praise button
-    document.getElementById('btn-praise')?.addEventListener('click', () => {
+    document.getElementById('btn-praise')?.addEventListener('click', async () => {
       if (!selectedStudent) return;
-      const updated = praiseStudent(selectedStudent.id);
+      const updated = await praiseStudent(selectedStudent.id);
       if (updated) {
         selectedStudent = updated;
         showToast(`${updated.name}에게 칭찬을 보냈습니다! ⭐`);
 
-        // Play animation on the card
         const card = document.querySelector(`.student-avatar-card[data-student-id="${updated.id}"]`);
         if (card) renderPraiseAnimation(card);
 
@@ -157,7 +159,6 @@ export function renderLessonMode(container, params) {
       }
     });
 
-    // Present button
     document.getElementById('btn-present')?.addEventListener('click', () => {
       if (!selectedStudent) return;
       isWhiteboard = true;
@@ -215,50 +216,29 @@ export function renderLessonMode(container, params) {
   function initWhiteboard() {
     wbCanvas = document.getElementById('whiteboard-canvas');
     wbCtx = wbCanvas.getContext('2d');
-
     const wrap = wbCanvas.parentElement;
     wbCanvas.width = wrap.clientWidth;
     wbCanvas.height = wrap.clientHeight;
-
     wbCtx.fillStyle = '#1A1230';
     wbCtx.fillRect(0, 0, wbCanvas.width, wbCanvas.height);
     wbCtx.lineCap = 'round';
     wbCtx.lineJoin = 'round';
-
-    // Mouse events
     wbCanvas.addEventListener('mousedown', startDraw);
     wbCanvas.addEventListener('mousemove', draw);
     wbCanvas.addEventListener('mouseup', endDraw);
     wbCanvas.addEventListener('mouseleave', endDraw);
-
-    // Touch events
     wbCanvas.addEventListener('touchstart', (e) => { e.preventDefault(); startDraw(getTouchPos(e)); });
     wbCanvas.addEventListener('touchmove', (e) => { e.preventDefault(); draw(getTouchPos(e)); });
     wbCanvas.addEventListener('touchend', (e) => { e.preventDefault(); endDraw(); });
-
-    // Resize
-    window.addEventListener('resize', () => {
-      const imgData = wbCtx.getImageData(0, 0, wbCanvas.width, wbCanvas.height);
-      wbCanvas.width = wrap.clientWidth;
-      wbCanvas.height = wrap.clientHeight;
-      wbCtx.putImageData(imgData, 0, 0);
-    });
   }
 
   function getTouchPos(e) {
     const rect = wbCanvas.getBoundingClientRect();
     const touch = e.touches[0];
-    return {
-      offsetX: touch.clientX - rect.left,
-      offsetY: touch.clientY - rect.top,
-    };
+    return { offsetX: touch.clientX - rect.left, offsetY: touch.clientY - rect.top };
   }
 
-  function startDraw(e) {
-    drawing = true;
-    wbCtx.beginPath();
-    wbCtx.moveTo(e.offsetX, e.offsetY);
-  }
+  function startDraw(e) { drawing = true; wbCtx.beginPath(); wbCtx.moveTo(e.offsetX, e.offsetY); }
 
   function draw(e) {
     if (!drawing) return;
@@ -268,10 +248,7 @@ export function renderLessonMode(container, params) {
     wbCtx.stroke();
   }
 
-  function endDraw() {
-    drawing = false;
-    wbCtx.closePath();
-  }
+  function endDraw() { drawing = false; wbCtx.closePath(); }
 
   function bindWhiteboardEvents() {
     document.getElementById('wb-back').addEventListener('click', () => {
@@ -280,57 +257,32 @@ export function renderLessonMode(container, params) {
       render();
     });
 
-    // Tools
     document.querySelectorAll('.whiteboard-tool').forEach(tool => {
       tool.addEventListener('click', () => {
         const t = tool.dataset.tool;
-        if (t === 'clear') {
-          wbCtx.fillStyle = '#1A1230';
-          wbCtx.fillRect(0, 0, wbCanvas.width, wbCanvas.height);
-          return;
-        }
+        if (t === 'clear') { wbCtx.fillStyle = '#1A1230'; wbCtx.fillRect(0, 0, wbCanvas.width, wbCanvas.height); return; }
         currentTool = t;
         document.querySelectorAll('.whiteboard-tool').forEach(tt => tt.classList.remove('active'));
         tool.classList.add('active');
       });
     });
 
-    // Colors
     document.querySelectorAll('.color-dot').forEach(dot => {
       dot.addEventListener('click', () => {
         penColor = dot.dataset.color;
         currentTool = 'pen';
         document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
         dot.classList.add('active');
-        document.querySelectorAll('.whiteboard-tool').forEach(t => {
-          t.classList.toggle('active', t.dataset.tool === 'pen');
-        });
+        document.querySelectorAll('.whiteboard-tool').forEach(t => t.classList.toggle('active', t.dataset.tool === 'pen'));
       });
     });
 
-    // Pen size
-    document.getElementById('pen-size').addEventListener('input', (e) => {
-      penSize = parseInt(e.target.value);
-    });
+    document.getElementById('pen-size').addEventListener('input', (e) => penSize = parseInt(e.target.value));
 
-    // Record
-    document.getElementById('wb-record').addEventListener('click', () => {
-      if (isRecording) {
-        stopRecording();
-      } else {
-        startRecording();
-      }
-    });
+    document.getElementById('wb-record').addEventListener('click', () => isRecording ? stopRecording() : startRecording());
 
-    // Save
-    document.getElementById('wb-save').addEventListener('click', () => {
-      savePresentation(false);
-    });
-
-    // Share
-    document.getElementById('wb-share').addEventListener('click', () => {
-      savePresentation(true);
-    });
+    document.getElementById('wb-save').addEventListener('click', () => savePresentation(false));
+    document.getElementById('wb-share').addEventListener('click', () => savePresentation(true));
   }
 
   async function startRecording() {
@@ -338,100 +290,56 @@ export function renderLessonMode(container, params) {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaRecorder = new MediaRecorder(stream);
       audioChunks = [];
-
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunks.push(e.data);
-      };
-
-      mediaRecorder.onstop = () => {
-        recordedAudioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-        stream.getTracks().forEach(t => t.stop());
-      };
-
+      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunks.push(e.data); };
+      mediaRecorder.onstop = () => { recordedAudioBlob = new Blob(audioChunks, { type: 'audio/webm' }); stream.getTracks().forEach(t => t.stop()); };
       mediaRecorder.start();
       isRecording = true;
       recordingSeconds = 0;
-
-      const recBtn = document.getElementById('wb-record');
-      const timerEl = document.getElementById('rec-timer');
-      if (recBtn) {
-        recBtn.classList.remove('btn-ghost');
-        recBtn.classList.add('btn-danger');
-        recBtn.innerHTML = '⏹ 녹음 중지';
-      }
-      if (timerEl) timerEl.classList.remove('hidden');
-
+      document.getElementById('wb-record').classList.replace('btn-ghost', 'btn-danger');
+      document.getElementById('wb-record').innerHTML = '⏹ 녹음 중지';
+      document.getElementById('rec-timer').classList.remove('hidden');
       recordingTimer = setInterval(() => {
         recordingSeconds++;
         const timerWrap = document.getElementById('rec-timer');
-        if (timerWrap) {
-          timerWrap.innerHTML = `<span class="rec-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);margin-right:4px;animation:pulse 1s infinite"></span>${formatRecTime(recordingSeconds)}`;
-        }
+        if (timerWrap) timerWrap.innerHTML = `<span class="rec-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);margin-right:4px;animation:pulse 1s infinite"></span>${formatRecTime(recordingSeconds)}`;
       }, 1000);
-
       showToast('녹음이 시작되었습니다 🎙');
-    } catch (err) {
-      console.error('Mic error:', err);
-      showToast('마이크를 시작할 수 없습니다. 권한 설정을 확인해주세요.', 'error');
-    }
+    } catch (err) { showToast('마이크를 시작할 수 없습니다.', 'error'); }
   }
 
   function stopRecording() {
-    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-      mediaRecorder.stop();
-    }
+    if (mediaRecorder?.state !== 'inactive') mediaRecorder.stop();
     isRecording = false;
     clearInterval(recordingTimer);
-
-    const recBtn = document.getElementById('wb-record');
-    const timerEl = document.getElementById('rec-timer');
-    if (recBtn) {
-      recBtn.classList.remove('btn-danger');
-      recBtn.classList.add('btn-ghost');
-      recBtn.innerHTML = '🎙 녹음 시작';
-    }
-    if (timerEl) timerEl.classList.add('hidden');
-
-    showToast('녹음이 중지되었습니다. 💾 저장 시 함께 저장됩니다.');
+    document.getElementById('wb-record').classList.replace('btn-danger', 'btn-ghost');
+    document.getElementById('wb-record').innerHTML = '🎙 녹음 시작';
+    document.getElementById('rec-timer').classList.add('hidden');
+    showToast('녹음 중지. 저장 시 반영됩니다.');
   }
 
-  function savePresentation(shared) {
+  async function savePresentation(shared) {
     if (!selectedStudent) return;
-
     const whiteboardImage = wbCanvas ? wbCanvas.toDataURL('image/png') : null;
-
     let audioData = null;
+
+    const finalize = async (aData) => {
+      const pres = await addPresentation(selectedStudent.id, classId, { whiteboardImage, audioData: aData });
+      if (shared) {
+        await toggleSharePresentation(pres.id);
+        showToast('발표가 저장 및 공유되었습니다! 📤');
+      } else {
+        showToast('발표가 저장되었습니다! 💾');
+      }
+      isWhiteboard = false;
+      render();
+    };
+
     if (recordedAudioBlob) {
       const reader = new FileReader();
-      reader.onload = () => {
-        audioData = reader.result;
-        const pres = addPresentation(selectedStudent.id, classId, {
-          whiteboardImage,
-          audioData,
-        });
-        if (shared) {
-          import('../../store.js').then(store => {
-            store.toggleSharePresentation(pres.id);
-            showToast(`${selectedStudent.name}의 발표가 저장 및 공유되었습니다! 📤`);
-          });
-        } else {
-          showToast(`${selectedStudent.name}의 발표가 저장되었습니다! 💾`);
-        }
-      };
+      reader.onload = async () => finalize(reader.result);
       reader.readAsDataURL(recordedAudioBlob);
     } else {
-      const pres = addPresentation(selectedStudent.id, classId, {
-        whiteboardImage,
-        audioData: null,
-      });
-      if (shared) {
-        import('../../store.js').then(store => {
-          store.toggleSharePresentation(pres.id);
-          showToast(`${selectedStudent.name}의 발표가 저장 및 공유되었습니다! 📤`);
-        });
-      } else {
-        showToast(`${selectedStudent.name}의 발표가 저장되었습니다! 💾`);
-      }
+      await finalize(null);
     }
   }
 
@@ -441,5 +349,5 @@ export function renderLessonMode(container, params) {
     return `${m}:${s}`;
   }
 
-  render();
+  init();
 }

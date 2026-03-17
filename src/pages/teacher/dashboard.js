@@ -2,25 +2,25 @@
 // Teacher Dashboard
 // ========================================
 import {
-    getCurrentTeacher, logoutTeacher, getClassesByTeacher,
-    createClass, getStudentsByClass, deleteClass, addStudent,
-    addStudentsBatch, showToast, formatDate
+  getCurrentTeacher, logoutTeacher, getClassesByTeacher,
+  createClass, getStudentsByClass, deleteClass, addStudent,
+  addStudentsBatch, showToast, formatDate
 } from '../../store.js';
 import { parseExcelFile } from '../../utils/excelImport.js';
 
 export function renderTeacherDashboard(container) {
-    const teacher = getCurrentTeacher();
-    if (!teacher) {
-        window.location.hash = '/teacher/login';
-        return;
-    }
+  const teacher = getCurrentTeacher();
+  if (!teacher) {
+    window.location.hash = '/teacher/login';
+    return;
+  }
 
-    let classes = getClassesByTeacher(teacher.id);
+  let classes = [];
 
-    function render() {
-        classes = getClassesByTeacher(teacher.id);
+  async function render() {
+    classes = await getClassesByTeacher(teacher.uid);
 
-        container.innerHTML = `
+    container.innerHTML = `
       <div class="teacher-layout">
         <!-- Sidebar -->
         <aside class="sidebar animate-slide-left">
@@ -47,9 +47,9 @@ export function renderTeacherDashboard(container) {
           </div>
           <div class="sidebar-footer">
             <div class="sidebar-user">
-              <div class="sidebar-user-avatar">${teacher.name.charAt(0)}</div>
+              <div class="sidebar-user-avatar">${(teacher.displayName || teacher.email || 'T').charAt(0)}</div>
               <div>
-                <div class="sidebar-user-name">${teacher.name}</div>
+                <div class="sidebar-user-name">${teacher.displayName || '선생님'}</div>
                 <div class="sidebar-user-role">교사</div>
               </div>
             </div>
@@ -60,7 +60,7 @@ export function renderTeacherDashboard(container) {
         <!-- Main Content -->
         <main class="main-content">
           <div class="dashboard-header animate-fade-in-down">
-            <h1 class="dashboard-greeting">안녕하세요, <span>${teacher.name}</span> 선생님! 👋</h1>
+            <h1 class="dashboard-greeting">안녕하세요, <span>${teacher.displayName || '선생님'}</span> 선생님! 👋</h1>
             <p class="dashboard-subtitle">오늘도 좋은 수업 되세요</p>
           </div>
 
@@ -70,9 +70,9 @@ export function renderTeacherDashboard(container) {
           </div>
 
           <div class="class-grid stagger-children">
-            ${classes.map(cls => {
-            const students = getStudentsByClass(cls.id);
-            return `
+            ${await Promise.all(classes.map(async cls => {
+      const students = await getStudentsByClass(cls.id);
+      return `
                 <div class="card card-clickable class-card" data-class-id="${cls.id}">
                   <div class="class-card-banner" style="background:${cls.color}"></div>
                   <div class="class-card-body">
@@ -90,7 +90,7 @@ export function renderTeacherDashboard(container) {
                   </div>
                 </div>
               `;
-        }).join('')}
+    })).then(results => results.join(''))}
             <div class="card add-class-card" id="add-class-card">
               <div class="add-class-icon">+</div>
               <span>새 클래스 만들기</span>
@@ -135,104 +135,104 @@ export function renderTeacherDashboard(container) {
       </div>
     `;
 
-        bindEvents();
-    }
+    bindEvents();
+  }
 
-    function bindEvents() {
-        // Logout
-        document.getElementById('btn-logout').addEventListener('click', () => {
-            logoutTeacher();
-            window.location.hash = '/teacher/login';
-        });
+  function bindEvents() {
+    // Logout
+    document.getElementById('btn-logout').addEventListener('click', async () => {
+      await logoutTeacher();
+      window.location.hash = '/teacher/login';
+    });
 
-        // Add class buttons
-        const addClassBtns = [
-            document.getElementById('btn-add-class'),
-            document.getElementById('add-class-card'),
-            document.getElementById('sidebar-add-class'),
-        ];
-        addClassBtns.forEach(btn => {
-            if (btn) btn.addEventListener('click', () => openModal('create-class-modal'));
-        });
+    // Add class buttons
+    const addClassBtns = [
+      document.getElementById('btn-add-class'),
+      document.getElementById('add-class-card'),
+      document.getElementById('sidebar-add-class'),
+    ];
+    addClassBtns.forEach(btn => {
+      if (btn) btn.addEventListener('click', () => openModal('create-class-modal'));
+    });
 
-        // Close modals
-        document.getElementById('close-create-modal').addEventListener('click', () => closeModal('create-class-modal'));
-        document.getElementById('close-manage-modal').addEventListener('click', () => closeModal('student-manage-modal'));
+    // Close modals
+    document.getElementById('close-create-modal')?.addEventListener('click', () => closeModal('create-class-modal'));
+    document.getElementById('close-manage-modal')?.addEventListener('click', () => closeModal('student-manage-modal'));
 
-        // Click backdrop to close
-        ['create-class-modal', 'student-manage-modal', 'mode-select-modal'].forEach(id => {
-            document.getElementById(id).addEventListener('click', (e) => {
-                if (e.target.classList.contains('modal-backdrop')) closeModal(id);
-            });
-        });
+    // Click backdrop to close
+    ['create-class-modal', 'student-manage-modal', 'mode-select-modal'].forEach(id => {
+      document.getElementById(id)?.addEventListener('click', (e) => {
+        if (e.target.classList.contains('modal-backdrop')) closeModal(id);
+      });
+    });
 
-        // Create class form
-        document.getElementById('create-class-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            const name = document.getElementById('class-name-input').value.trim();
-            if (!name) return;
-            createClass(name, teacher.id);
-            showToast(`'${name}' 클래스가 생성되었습니다!`);
-            closeModal('create-class-modal');
-            render();
-        });
+    // Create class form
+    document.getElementById('create-class-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('class-name-input').value.trim();
+      if (!name) return;
+      await createClass(name, teacher.uid);
+      showToast(`'${name}' 클래스가 생성되었습니다!`);
+      closeModal('create-class-modal');
+      render();
+    });
 
-        // Class card actions
-        document.querySelectorAll('.class-enter-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const classId = btn.dataset.classId;
-                openModeSelection(classId);
-            });
-        });
+    // Class card actions
+    document.querySelectorAll('.class-enter-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const classId = btn.dataset.classId;
+        openModeSelection(classId);
+      });
+    });
 
-        document.querySelectorAll('.class-manage-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                openStudentManagement(btn.dataset.classId);
-            });
-        });
+    document.querySelectorAll('.class-manage-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openStudentManagement(btn.dataset.classId);
+      });
+    });
 
-        document.querySelectorAll('.class-delete-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (confirm('정말 이 클래스를 삭제하시겠습니까? 관련된 모든 데이터가 삭제됩니다.')) {
-                    deleteClass(btn.dataset.classId);
-                    showToast('클래스가 삭제되었습니다.');
-                    render();
-                }
-            });
-        });
+    document.querySelectorAll('.class-delete-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (confirm('정말 이 클래스를 삭제하시겠습니까? 관련된 모든 데이터가 삭제됩니다.')) {
+          await deleteClass(btn.dataset.classId);
+          showToast('클래스가 삭제되었습니다.');
+          render();
+        }
+      });
+    });
 
-        // Sidebar class click
-        document.querySelectorAll('.sidebar-class-item[data-class-id]').forEach(item => {
-            item.addEventListener('click', () => {
-                openModeSelection(item.dataset.classId);
-            });
-        });
+    // Sidebar class click
+    document.querySelectorAll('.sidebar-class-item[data-class-id]').forEach(item => {
+      item.addEventListener('click', () => {
+        openModeSelection(item.dataset.classId);
+      });
+    });
 
-        // Class card click
-        document.querySelectorAll('.class-card[data-class-id]').forEach(card => {
-            card.addEventListener('click', () => {
-                openModeSelection(card.dataset.classId);
-            });
-        });
-    }
+    // Class card click
+    document.querySelectorAll('.class-card[data-class-id]').forEach(card => {
+      card.addEventListener('click', () => {
+        openModeSelection(card.dataset.classId);
+      });
+    });
+  }
 
-    function openModal(id) {
-        document.getElementById(id).classList.add('active');
-    }
+  function openModal(id) {
+    document.getElementById(id).classList.add('active');
+  }
 
-    function closeModal(id) {
-        document.getElementById(id).classList.remove('active');
-    }
+  function closeModal(id) {
+    document.getElementById(id).classList.remove('active');
+  }
 
-    function openModeSelection(classId) {
-        const cls = classes.find(c => c.id === classId);
-        if (!cls) return;
+  function openModeSelection(classId) {
+    const cls = classes.find(c => c.id === classId);
+    if (!cls) return;
 
-        const modalBtns = document.getElementById('mode-selection-btns');
-        modalBtns.innerHTML = `
+    const modalBtns = document.getElementById('mode-selection-btns');
+    modalBtns.innerHTML = `
       <div class="mode-card card card-clickable" id="mode-lesson-btn">
         <span class="mode-card-icon">📚</span>
         <div class="mode-card-title">수업 모드</div>
@@ -245,29 +245,29 @@ export function renderTeacherDashboard(container) {
       </div>
     `;
 
-        openModal('mode-select-modal');
+    openModal('mode-select-modal');
 
-        document.getElementById('mode-lesson-btn').addEventListener('click', () => {
-            closeModal('mode-select-modal');
-            window.location.hash = `/teacher/class/${classId}/lesson`;
-        });
+    document.getElementById('mode-lesson-btn').addEventListener('click', () => {
+      closeModal('mode-select-modal');
+      window.location.hash = `/teacher/class/${classId}/lesson`;
+    });
 
-        document.getElementById('mode-assign-btn').addEventListener('click', () => {
-            closeModal('mode-select-modal');
-            window.location.hash = `/teacher/class/${classId}/assign`;
-        });
-    }
+    document.getElementById('mode-assign-btn').addEventListener('click', () => {
+      closeModal('mode-select-modal');
+      window.location.hash = `/teacher/class/${classId}/assign`;
+    });
+  }
 
-    function openStudentManagement(classId) {
-        const cls = classes.find(c => c.id === classId);
-        if (!cls) return;
+  async function openStudentManagement(classId) {
+    const cls = classes.find(c => c.id === classId);
+    if (!cls) return;
 
-        document.getElementById('manage-modal-title').textContent = `${cls.name} - 학생 관리`;
-        const content = document.getElementById('student-manage-content');
+    document.getElementById('manage-modal-title').textContent = `${cls.name} - 학생 관리`;
+    const content = document.getElementById('student-manage-content');
 
-        function renderStudentList() {
-            const students = getStudentsByClass(classId);
-            content.innerHTML = `
+    async function renderStudentList() {
+      const students = await getStudentsByClass(classId);
+      content.innerHTML = `
         <div class="tabs">
           <div class="tab active" data-tab="list">학생 목록</div>
           <div class="tab" data-tab="add">추가</div>
@@ -338,99 +338,96 @@ export function renderTeacherDashboard(container) {
         </div>
       `;
 
-            // Tab switching
-            content.querySelectorAll('.tab').forEach(tab => {
-                tab.addEventListener('click', () => {
-                    content.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-                    tab.classList.add('active');
-                    ['list', 'add', 'excel'].forEach(t => {
-                        document.getElementById(`tab-${t}`).classList.toggle('hidden', t !== tab.dataset.tab);
-                    });
-                });
-            });
+      // Tab switching
+      content.querySelectorAll('.tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          content.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+          ['list', 'add', 'excel'].forEach(t => {
+            document.getElementById(`tab-${t}`).classList.toggle('hidden', t !== tab.dataset.tab);
+          });
+        });
+      });
 
-            // Add single student
-            document.getElementById('btn-add-single-student')?.addEventListener('click', () => {
-                const name = document.getElementById('add-student-name').value.trim();
-                if (!name) { showToast('이름을 입력해주세요.', 'error'); return; }
-                addStudent(name, classId);
-                showToast(`${name} 학생이 추가되었습니다!`);
-                renderStudentList();
-            });
+      // Add single student
+      document.getElementById('btn-add-single-student')?.addEventListener('click', async () => {
+        const name = document.getElementById('add-student-name').value.trim();
+        if (!name) { showToast('이름을 입력해주세요.', 'error'); return; }
+        await addStudent(name, classId);
+        showToast(`${name} 학생이 추가되었습니다!`);
+        await renderStudentList();
+      });
 
-            // Add batch students
-            document.getElementById('btn-add-batch-students')?.addEventListener('click', () => {
-                const text = document.getElementById('add-students-batch').value;
-                const names = text.split('\n').map(n => n.trim()).filter(n => n);
-                if (names.length === 0) { showToast('학생 이름을 입력해주세요.', 'error'); return; }
-                addStudentsBatch(names, classId);
-                showToast(`${names.length}명의 학생이 추가되었습니다!`);
-                renderStudentList();
-            });
+      // Add batch students
+      document.getElementById('btn-add-batch-students')?.addEventListener('click', async () => {
+        const text = document.getElementById('add-students-batch').value;
+        const names = text.split('\n').map(n => n.trim()).filter(n => n);
+        if (names.length === 0) { showToast('학생 이름을 입력해주세요.', 'error'); return; }
+        await addStudentsBatch(names, classId);
+        showToast(`${names.length}명의 학생이 추가되었습니다!`);
+        await renderStudentList();
+      });
 
-            // Excel drop zone
-            const dropZone = document.getElementById('excel-drop-zone');
-            const fileInput = document.getElementById('excel-file-input');
-            let pendingNames = [];
+      // Excel drop zone
+      const dropZone = document.getElementById('excel-drop-zone');
+      const fileInput = document.getElementById('excel-file-input');
+      let pendingNames = [];
 
-            if (dropZone) {
-                dropZone.addEventListener('click', () => fileInput.click());
-                dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
-                dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
-                dropZone.addEventListener('drop', (e) => {
-                    e.preventDefault();
-                    dropZone.classList.remove('drag-over');
-                    handleExcelFile(e.dataTransfer.files[0]);
-                });
-                fileInput.addEventListener('change', (e) => {
-                    if (e.target.files[0]) handleExcelFile(e.target.files[0]);
-                });
-            }
+      if (dropZone) {
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+        dropZone.addEventListener('drop', (e) => {
+          e.preventDefault();
+          dropZone.classList.remove('drag-over');
+          handleExcelFile(e.dataTransfer.files[0]);
+        });
+        fileInput.addEventListener('change', (e) => {
+          if (e.target.files[0]) handleExcelFile(e.target.files[0]);
+        });
+      }
 
-            async function handleExcelFile(file) {
-                try {
-                    const names = await parseExcelFile(file);
-                    if (names.length === 0) {
-                        showToast('파일에서 학생 이름을 찾을 수 없습니다.', 'error');
-                        return;
-                    }
-                    pendingNames = names;
-                    document.getElementById('excel-preview').classList.remove('hidden');
-                    document.getElementById('excel-count').textContent = `${names.length}명`;
-                    document.getElementById('excel-names-list').innerHTML = names.map(n =>
-                        `<span class="badge badge-primary" style="margin:2px">${n}</span>`
-                    ).join('');
-                } catch (err) {
-                    showToast(err.message, 'error');
-                }
-            }
-
-            document.getElementById('btn-import-excel')?.addEventListener('click', () => {
-                if (pendingNames.length > 0) {
-                    addStudentsBatch(pendingNames, classId);
-                    showToast(`${pendingNames.length}명의 학생이 추가되었습니다!`);
-                    pendingNames = [];
-                    renderStudentList();
-                }
-            });
-
-            // Delete student
-            content.querySelectorAll('.delete-student-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const { deleteStudent } = require('../../store.js');
-                    // Use dynamic import workaround
-                    import('../../store.js').then(store => {
-                        store.deleteStudent(btn.dataset.studentId);
-                        showToast('학생이 삭제되었습니다.');
-                        renderStudentList();
-                    });
-                });
-            });
+      async function handleExcelFile(file) {
+        try {
+          const names = await parseExcelFile(file);
+          if (names.length === 0) {
+            showToast('파일에서 학생 이름을 찾을 수 없습니다.', 'error');
+            return;
+          }
+          pendingNames = names;
+          document.getElementById('excel-preview').classList.remove('hidden');
+          document.getElementById('excel-count').textContent = `${names.length}명`;
+          document.getElementById('excel-names-list').innerHTML = names.map(n =>
+            `<span class="badge badge-primary" style="margin:2px">${n}</span>`
+          ).join('');
+        } catch (err) {
+          showToast(err.message, 'error');
         }
+      }
 
-        renderStudentList();
-        openModal('student-manage-modal');
+      document.getElementById('btn-import-excel')?.addEventListener('click', async () => {
+        if (pendingNames.length > 0) {
+          await addStudentsBatch(pendingNames, classId);
+          showToast(`${pendingNames.length}명의 학생이 추가되었습니다!`);
+          pendingNames = [];
+          await renderStudentList();
+        }
+      });
+
+      // Delete student
+      content.querySelectorAll('.delete-student-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const { deleteStudent } = await import('../../store.js');
+          await deleteStudent(btn.dataset.studentId);
+          showToast('학생이 삭제되었습니다.');
+          await renderStudentList();
+        });
+      });
     }
 
-    render();
+    await renderStudentList();
+    openModal('student-manage-modal');
+  }
+
+  render();
 }
