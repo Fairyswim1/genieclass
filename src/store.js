@@ -85,6 +85,16 @@ export async function logoutTeacher() {
     await signOut(auth);
 }
 
+// ========== Student Auth (Local Session) ==========
+export function getCurrentStudent() {
+    const data = localStorage.getItem('genie_current_student');
+    return data ? JSON.parse(data) : null;
+}
+
+export function logoutStudent() {
+    localStorage.removeItem('genie_current_student');
+}
+
 // ========== Class ==========
 export async function createClass(name, teacherId) {
     const classId = generateId();
