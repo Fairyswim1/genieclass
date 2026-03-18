@@ -40,10 +40,6 @@ export function renderTeacherLogin(container) {
       }
     });
 
-    document.getElementById('teacher-login-form').addEventListener('submit', (e) => {
-      e.preventDefault();
-      showToast('구글 로그인을 이용해 주세요.', 'info');
-    });
 
     document.getElementById('back-to-landing').addEventListener('click', () => {
       window.location.hash = '/';
