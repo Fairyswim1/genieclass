@@ -20,7 +20,8 @@ import {
     serverTimestamp,
     orderBy
 } from 'firebase/firestore';
-import { auth, db, googleProvider } from './firebase.js';
+import { auth, db, storage, googleProvider } from './firebase.js';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const COLLECTIONS = {
     TEACHERS: 'teachers',
@@ -342,38 +343,46 @@ export async function deleteAnnouncement(announcementId) {
 
 // ========== Files ==========
 export async function saveFile(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onerror = () => reject(new Error('파일을 읽는 중 오류가 발생했습니다.'));
-        reader.onload = async () => {
-            const id = generateId();
-            const fileData = {
-                id,
-                name: file.name,
-                type: file.type,
-                size: file.size,
-                data: reader.result,
-                createdAt: new Date().toISOString(),
-            };
-            await setDoc(doc(db, COLLECTIONS.FILES, id), fileData);
-            resolve(fileData);
-        };
-        reader.readAsDataURL(file);
-    });
+    const id = generateId();
+    const storageRef = ref(storage, `files/${id}_${file.name}`);
+
+    // Upload to Firebase Storage
+    await uploadBytes(storageRef, file);
+    const downloadURL = await getDownloadURL(storageRef);
+
+    // Store metadata in Firestore (without the actual file data)
+    const fileMetadata = {
+        id,
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        url: downloadURL, // Store the public URL
+        storagePath: `files/${id}_${file.name}`,
+        createdAt: new Date().toISOString(),
+    };
+
+    await setDoc(doc(db, COLLECTIONS.FILES, id), fileMetadata);
+    return fileMetadata;
 }
 
 export async function getFileById(fileId) {
+    if (!fileId) return null;
     const docSnap = await getDoc(doc(db, COLLECTIONS.FILES, fileId));
     return docSnap.exists() ? docSnap.data() : null;
 }
 
 export async function downloadFile(fileId) {
     const file = await getFileById(fileId);
-    if (!file) return;
+    if (!file || !file.url) return;
+
+    // For cloud storage URLs, we can just open them in a new tab or use a link
     const link = document.createElement('a');
-    link.href = file.data;
+    link.href = file.url;
+    link.target = '_blank';
     link.download = file.name;
+    document.body.appendChild(link);
     link.click();
+    document.body.removeChild(link);
 }
 
 // ========== Utils ==========

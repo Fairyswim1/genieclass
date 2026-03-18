@@ -172,6 +172,15 @@ export function renderStudentDashboard(container) {
                 <div class="announcement-item">
                   <div class="announcement-title">${ann.title}</div>
                   <div class="announcement-date">${formatDate(ann.createdAt)}</div>
+                  ${ann.files && ann.files.length > 0 ? `
+                    <div class="file-attachments" style="margin-top:4px">
+                      ${ann.files.map(f => `
+                        <div class="file-item-mini" style="display:inline-block;font-size:0.7rem;background:var(--bg-body);padding:1px 6px;border-radius:4px;margin-right:4px;cursor:pointer" onclick="window.downloadFile('${f.id}')">
+                          📁 ${f.name}
+                        </div>
+                      `).join('')}
+                    </div>
+                  ` : ''}
                 </div>
               `).join('')}
             </div>
@@ -230,6 +239,11 @@ export function renderStudentDashboard(container) {
       render();
     });
   }
+
+  // Expose download function to window for onclick
+  window.downloadFile = (fileId) => {
+    import('../../store.js').then(m => m.downloadFile(fileId));
+  };
 
   init();
 }

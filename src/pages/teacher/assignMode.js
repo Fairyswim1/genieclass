@@ -87,6 +87,15 @@ export function renderAssignMode(container, params) {
                     <span>${formatDate(ann.createdAt)}</span>
                   </div>
                   <div style="font-size:0.85rem;color:var(--text-secondary);line-height:1.6;white-space:pre-line">${ann.content}</div>
+                  ${ann.files && ann.files.length > 0 ? `
+                    <div class="file-attachments" style="margin-top:var(--space-sm)">
+                      ${ann.files.map(f => `
+                        <div class="file-item" style="display:inline-flex;align-items:center;gap:4px;background:var(--bg-body);padding:2px 8px;border-radius:4px;font-size:0.75rem;margin-right:4px;cursor:pointer" onclick="window.downloadFile('${f.id}')">
+                          📁 ${f.name}
+                        </div>
+                      `).join('')}
+                    </div>
+                  ` : ''}
                 </div>
               `).join('')}
             </div>
@@ -249,6 +258,11 @@ export function renderAssignMode(container, params) {
       });
     });
   }
+
+  // Expose download function to window for onclick
+  window.downloadFile = (fileId) => {
+    const { downloadFile } = import('../../store.js').then(m => m.downloadFile(fileId));
+  };
 
   init();
 }
