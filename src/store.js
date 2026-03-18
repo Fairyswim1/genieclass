@@ -126,11 +126,12 @@ export async function deleteClass(classId) {
 }
 
 // ========== Student ==========
-export async function addStudent(name, classId) {
+export async function addStudent(name, classId, number = '') {
     const studentId = generateId();
     const student = {
         id: studentId,
         name,
+        number, // Optional student number
         classId,
         uniqueCode: generateStudentCode(),
         characterLevel: 1,
@@ -142,8 +143,13 @@ export async function addStudent(name, classId) {
     return student;
 }
 
-export async function addStudentsBatch(names, classId) {
-    const batch = names.map(name => addStudent(name.trim(), classId));
+export async function addStudentsBatch(data, classId) {
+    const batch = data.map(item => {
+        // Handle both simple names and { name, number } objects
+        const name = typeof item === 'string' ? item.trim() : item.name.trim();
+        const number = typeof item === 'object' ? (item.number || '') : '';
+        return addStudent(name, classId, number);
+    });
     return Promise.all(batch);
 }
 

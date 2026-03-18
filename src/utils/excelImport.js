@@ -13,36 +13,41 @@ export function parseExcelFile(file) {
                 const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
                 const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
 
-                // Try to find the name column
-                const names = [];
+                // Detect columns
+                const students = [];
                 if (jsonData.length > 0) {
-                    // Check if first row is header
                     const firstRow = jsonData[0];
-                    let nameColIndex = 0;
+                    let nameColIndex = -1;
+                    let numColIndex = -1;
 
-                    // Try to detect name column by header
+                    // Try to detect columns by header
                     if (Array.isArray(firstRow)) {
                         for (let i = 0; i < firstRow.length; i++) {
                             const val = String(firstRow[i] || '').toLowerCase();
-                            if (val.includes('이름') || val.includes('name') || val.includes('성명')) {
+                            if (nameColIndex === -1 && (val.includes('이름') || val.includes('name') || val.includes('성명'))) {
                                 nameColIndex = i;
-                                break;
+                            } else if (numColIndex === -1 && (val.includes('번호') || val.includes('number') || val.includes('no'))) {
+                                numColIndex = i;
                             }
                         }
                     }
 
-                    // Extract names starting from row 2 (skip header)
+                    // Fallback: if no name column found, assume column 0 is name
+                    if (nameColIndex === -1) nameColIndex = 0;
+
+                    // Extract data
                     const startRow = isNaN(Number(firstRow[nameColIndex])) ? 1 : 0;
                     for (let i = startRow; i < jsonData.length; i++) {
                         const row = jsonData[i];
                         if (row && row[nameColIndex]) {
                             const name = String(row[nameColIndex]).trim();
-                            if (name) names.push(name);
+                            const number = numColIndex !== -1 ? String(row[numColIndex] || '').trim() : '';
+                            if (name) students.push({ name, number });
                         }
                     }
                 }
 
-                resolve(names);
+                resolve(students);
             } catch (err) {
                 reject(new Error('엑셀 파일을 읽을 수 없습니다.'));
             }

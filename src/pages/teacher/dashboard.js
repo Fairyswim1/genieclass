@@ -284,6 +284,7 @@ export function renderTeacherDashboard(container) {
             <table class="student-table">
               <thead>
                 <tr>
+                  <th style="width:60px">번호</th>
                   <th>이름</th>
                   <th>고유코드</th>
                   <th>레벨</th>
@@ -294,7 +295,8 @@ export function renderTeacherDashboard(container) {
               <tbody>
                 ${students.map(s => `
                   <tr>
-                    <td>${s.name}</td>
+                    <td><span style="color:var(--text-secondary)">${s.number || '-'}</span></td>
+                    <td><span style="font-weight:600">${s.name}</span></td>
                     <td><span class="student-code">${s.uniqueCode}</span></td>
                     <td><span class="badge badge-primary">Lv.${s.characterLevel}</span></td>
                     <td><span class="badge badge-gold">⭐ ${s.praiseCount}</span></td>
@@ -307,9 +309,15 @@ export function renderTeacherDashboard(container) {
         </div>
 
         <div id="tab-add" class="hidden">
-          <div class="form-group">
-            <label class="input-label">학생 이름</label>
-            <input type="text" class="input-field" id="add-student-name" placeholder="학생 이름을 입력하세요" autocomplete="off" />
+          <div style="display:flex; gap:10px">
+            <div class="form-group" style="flex:0 0 80px">
+              <label class="input-label">번호</label>
+              <input type="text" class="input-field" id="add-student-number" placeholder="번호" autocomplete="off" />
+            </div>
+            <div class="form-group" style="flex:1">
+              <label class="input-label">이름 <span style="color:var(--red)">*</span></label>
+              <input type="text" class="input-field" id="add-student-name" placeholder="학생 이름을 입력하세요" autocomplete="off" />
+            </div>
           </div>
           <button class="btn btn-primary w-full" id="btn-add-single-student">학생 추가</button>
           <div class="divider"></div>
@@ -321,6 +329,14 @@ export function renderTeacherDashboard(container) {
         </div>
 
         <div id="tab-excel" class="hidden">
+          <div style="margin-bottom:var(--space-md); padding:var(--space-md); background:var(--bg-body); border-radius:var(--radius-md); font-size:0.85rem">
+            <div style="font-weight:600; margin-bottom:4px">💡 엑셀 파일 형식</div>
+            <div style="color:var(--text-secondary)">
+              • 첫 줄은 제목(헤더)이어야 합니다.<br/>
+              • <span style="font-weight:600; color:var(--primary-light)">'이름'</span> 컬럼은 필수입니다.<br/>
+              • <span style="font-weight:600">'번호'</span> 컬럼은 선택사항입니다.
+            </div>
+          </div>
           <div class="drop-zone" id="excel-drop-zone">
             <div class="drop-zone-icon">📄</div>
             <div>엑셀 파일을 드래그하거나 클릭하여 업로드</div>
@@ -352,8 +368,9 @@ export function renderTeacherDashboard(container) {
       // Add single student
       document.getElementById('btn-add-single-student')?.addEventListener('click', async () => {
         const name = document.getElementById('add-student-name').value.trim();
+        const number = document.getElementById('add-student-number').value.trim();
         if (!name) { showToast('이름을 입력해주세요.', 'error'); return; }
-        await addStudent(name, classId);
+        await addStudent(name, classId, number);
         showToast(`${name} 학생이 추가되었습니다!`);
         await renderStudentList();
       });
@@ -371,7 +388,7 @@ export function renderTeacherDashboard(container) {
       // Excel drop zone
       const dropZone = document.getElementById('excel-drop-zone');
       const fileInput = document.getElementById('excel-file-input');
-      let pendingNames = [];
+      let pendingStudents = [];
 
       if (dropZone) {
         dropZone.addEventListener('click', () => fileInput.click());
@@ -389,16 +406,18 @@ export function renderTeacherDashboard(container) {
 
       async function handleExcelFile(file) {
         try {
-          const names = await parseExcelFile(file);
-          if (names.length === 0) {
+          const students = await parseExcelFile(file);
+          if (students.length === 0) {
             showToast('파일에서 학생 이름을 찾을 수 없습니다.', 'error');
             return;
           }
-          pendingNames = names;
+          pendingStudents = students;
           document.getElementById('excel-preview').classList.remove('hidden');
-          document.getElementById('excel-count').textContent = `${names.length}명`;
-          document.getElementById('excel-names-list').innerHTML = names.map(n =>
-            `<span class="badge badge-primary" style="margin:2px">${n}</span>`
+          document.getElementById('excel-count').textContent = `${students.length}명`;
+          document.getElementById('excel-names-list').innerHTML = students.map(s =>
+            `<div class="badge badge-primary" style="margin:2px">
+              ${s.number ? `<small style="opacity:0.7;margin-right:4px">${s.number}</small>` : ''}${s.name}
+            </div>`
           ).join('');
         } catch (err) {
           showToast(err.message, 'error');
@@ -406,10 +425,10 @@ export function renderTeacherDashboard(container) {
       }
 
       document.getElementById('btn-import-excel')?.addEventListener('click', async () => {
-        if (pendingNames.length > 0) {
-          await addStudentsBatch(pendingNames, classId);
-          showToast(`${pendingNames.length}명의 학생이 추가되었습니다!`);
-          pendingNames = [];
+        if (pendingStudents.length > 0) {
+          await addStudentsBatch(pendingStudents, classId);
+          showToast(`${pendingStudents.length}명의 학생이 추가되었습니다!`);
+          pendingStudents = [];
           await renderStudentList();
         }
       });
