@@ -23,13 +23,30 @@ export function renderStudentDashboard(container) {
   }
 
   async function render() {
-    const freshStudent = await getStudentByCode(student.uniqueCode) || student;
-    const cls = await getClassById(freshStudent.classId);
-    const config = getLevelConfig(freshStudent.characterLevel);
-    const presentations = await getPresentationsByStudent(freshStudent.id);
-    const assignments = cls ? await getAssignmentsByClass(cls.id) : [];
-    const submissions = await getSubmissionsByStudent(freshStudent.id);
-    const announcements = cls ? await getAnnouncementsByClass(cls.id) : [];
+    let freshStudent = student;
+    let cls = null;
+    let config = getLevelConfig(student.characterLevel);
+    let presentations = [];
+    let assignments = [];
+    let submissions = [];
+    let announcements = [];
+
+    try {
+      freshStudent = await getStudentByCode(student.uniqueCode) || student;
+      cls = await getClassById(freshStudent.classId);
+      config = getLevelConfig(freshStudent.characterLevel);
+
+      // Parallel data fetching with individual error handling or wrapping all
+      [presentations, assignments, submissions, announcements] = await Promise.all([
+        getPresentationsByStudent(freshStudent.id).catch(e => { console.error("Rec error:", e); return []; }),
+        cls ? getAssignmentsByClass(cls.id).catch(e => { console.error("Assign error:", e); return []; }) : [],
+        getSubmissionsByStudent(freshStudent.id).catch(e => { console.error("Sub error:", e); return []; }),
+        cls ? getAnnouncementsByClass(cls.id).catch(e => { console.error("Announce error (Index needed):", e); return []; }) : [],
+      ]);
+    } catch (err) {
+      console.error('Data loading error:', err);
+      showToast('데이터를 불러오는 중 문제가 발생했습니다. 관리자에게 문의하세요.', 'error');
+    }
 
     if (activeView === 'assignment' && selectedAssignment) {
       await renderAssignmentDetail(freshStudent, selectedAssignment, cls);
