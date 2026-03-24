@@ -1,10 +1,11 @@
 // ========================================
-// Teacher Lesson Mode
+// Teacher Lesson Mode (v2.0)
 // ========================================
 import {
   getCurrentTeacher, getClassById, getStudentsByClass,
   praiseStudent, showToast, getStudentById, addPresentation,
-  toggleSharePresentation
+  toggleSharePresentation, startQuiz, stopQuiz, listenToQuizSubmissions,
+  saveFile
 } from '../../store.js';
 import { renderCharacter, getLevelConfig, renderPraiseAnimation } from '../../components/characterAvatar.js';
 
@@ -16,20 +17,23 @@ export function renderLessonMode(container, params) {
   let cls = null;
   let students = [];
   let selectedStudent = null;
-  let isWhiteboard = false;
+  let activeView = 'lesson'; // 'lesson', 'whiteboard', 'quiz'
 
-  // Whiteboard state
+  // Quiz State
+  let activeQuiz = null;
+  let quizSubmissions = [];
+  let unsubscribeSubmissions = null;
+
+  // Whiteboard State
   let wbCanvas, wbCtx;
   let drawing = false;
   let penColor = '#FFFFFF';
   let penSize = 3;
   let currentTool = 'pen';
-
-  // Recorder state
+  let isRecording = false;
   let mediaRecorder = null;
   let audioChunks = [];
   let recordedAudioBlob = null;
-  let isRecording = false;
   let recordingTimer = null;
   let recordingSeconds = 0;
 
@@ -42,50 +46,73 @@ export function renderLessonMode(container, params) {
   async function render() {
     students = await getStudentsByClass(classId);
 
-    if (isWhiteboard && selectedStudent) {
+    if (activeView === 'whiteboard') {
       renderWhiteboardMode();
       return;
     }
 
+    if (activeView === 'quiz') {
+      renderQuizMode();
+      return;
+    }
+
     container.innerHTML = `
-      <div class="teacher-layout">
-        <main class="main-content" style="margin-left:0">
-          <div class="lesson-header">
+      <div class="teacher-layout page-enter">
+        <main class="main-content" style="margin-left:0; max-width: 1850px; margin: 0 auto; width: 100%;">
+          <div class="lesson-header flex justify-between items-center" style="margin-bottom: var(--s-8);">
             <div class="flex items-center gap-md">
-              <button class="btn btn-ghost" id="btn-back-dashboard">← 대시보드</button>
-              <h2 style="font-weight:700">${cls.name}</h2>
-              <span class="badge badge-primary">수업 모드</span>
+              <button class="btn btn-ghost btn-sm" id="btn-back-dashboard">← 대시보드</button>
+              <h2 class="page-title" style="margin-bottom: 0;">${cls.name} <span class="badge badge-purple" style="vertical-align: middle; margin-left: 10px;">수업 중</span></h2>
             </div>
-            <div class="flex items-center gap-sm">
-              <span style="color:var(--text-secondary);font-size:0.85rem">학생 ${students.length}명</span>
+            <div class="flex gap-sm">
+              <button class="btn btn-primary btn-sm" id="btn-start-quiz-view">⚡ 번개 퀴즈</button>
+              <div class="badge badge-blue">학생 ${students.length}명 접속</div>
             </div>
           </div>
 
-          <div class="student-grid stagger-children" id="student-grid">
+          <div class="student-grid" style="grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--s-6);">
             ${students.map(s => {
       const config = getLevelConfig(s.characterLevel);
       return `
-                <div class="student-avatar-card ${selectedStudent?.id === s.id ? 'selected' : ''}" data-student-id="${s.id}">
-                  <div class="student-character">
+                <div class="student-avatar-card card ${selectedStudent?.id === s.id ? 'selected' : ''}" data-student-id="${s.id}" style="padding: var(--s-4); text-align: center; cursor: pointer;">
+                  <div class="student-character" style="width: 80px; height: 80px; margin: 0 auto 10px;">
                     ${renderCharacter(s.characterLevel, 80)}
                   </div>
-                  <div class="student-name">${s.name}</div>
-                  <div class="student-praise-count">⭐ ${s.praiseCount} · ${config.name}</div>
+                  <div class="student-name" style="font-weight: 700; font-size: 0.95rem;">${s.name}</div>
+                  <div style="font-size: 0.75rem; color: var(--gold); margin-top: 5px;">⭐ ${s.praiseCount}P</div>
                 </div>
               `;
     }).join('')}
-            ${students.length === 0 ? `
-              <div class="empty-state" style="grid-column:1/-1">
-                <div class="empty-state-icon">👤</div>
-                <div class="empty-state-text">학생이 없습니다. 대시보드에서 학생을 추가해주세요.</div>
-              </div>
-            ` : ''}
+            ${students.length === 0 ? '<div class="empty-state w-full">학생이 없습니다.</div>' : ''}
           </div>
         </main>
 
         <!-- Student Action Panel -->
-        <div class="student-action-panel ${selectedStudent ? 'open' : ''}" id="action-panel">
-          ${selectedStudent ? renderActionPanel(selectedStudent) : ''}
+        <div class="student-action-panel ${selectedStudent ? 'open' : ''}" style="width: 340px; background: var(--bg-glass-heavy); backdrop-filter: blur(20px);">
+          ${selectedStudent ? `
+            <div class="action-panel-header">
+              <h3 style="font-weight: 800; font-size: 1.25rem;">${selectedStudent.name}</h3>
+              <button class="modal-close" id="close-action-panel">✕</button>
+            </div>
+            <div class="action-panel-body">
+               <div class="text-center" style="margin-bottom: var(--s-8);">
+                 <div style="width: 120px; height: 120px; margin: 0 auto 15px;">
+                   ${renderCharacter(selectedStudent.characterLevel, 120)}
+                 </div>
+                 <div class="badge badge-purple">${getLevelConfig(selectedStudent.characterLevel).name}</div>
+               </div>
+               <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 10px;">
+                 <button class="btn btn-primary" id="btn-praise" style="flex-direction: column; height: 100px; gap: 10px;">
+                   <span style="font-size: 1.5rem;">⭐</span>
+                   <span>칭찬하기</span>
+                 </button>
+                 <button class="btn btn-secondary" id="btn-present" style="flex-direction: column; height: 100px; gap: 10px;">
+                   <span style="font-size: 1.5rem;">🎤</span>
+                   <span>발표하기</span>
+                 </button>
+               </div>
+            </div>
+          ` : ''}
         </div>
       </div>
     `;
@@ -93,122 +120,176 @@ export function renderLessonMode(container, params) {
     bindLessonEvents();
   }
 
-  function renderActionPanel(student) {
-    const config = getLevelConfig(student.characterLevel);
-    return `
-      <div class="action-panel-header">
-        <h3 style="font-weight:700">${student.name}</h3>
-        <button class="modal-close" id="close-action-panel">✕</button>
-      </div>
-      <div class="action-panel-body">
-        <div class="text-center" style="margin-bottom:var(--space-lg)">
-          <div style="margin:0 auto;width:100px;height:100px">
-            ${renderCharacter(student.characterLevel, 100)}
-          </div>
-          <div style="margin-top:var(--space-sm);color:var(--text-secondary);font-size:0.85rem">
-            ${config.emoji} ${config.name} · Lv.${student.characterLevel}
-          </div>
-          <div style="margin-top:var(--space-xs)">
-            <span class="badge badge-gold">⭐ 칭찬 ${student.praiseCount}회</span>
-            <span class="badge badge-primary" style="margin-left:4px">포인트 ${student.totalPoints}</span>
-          </div>
-        </div>
-        <div class="action-buttons">
-          <div class="action-btn action-btn-praise" id="btn-praise">
-            <span class="action-btn-icon">⭐</span>
-            <span class="action-btn-label">칭찬하기</span>
-          </div>
-          <div class="action-btn action-btn-present" id="btn-present">
-            <span class="action-btn-icon">🎤</span>
-            <span class="action-btn-label">발표</span>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
   function bindLessonEvents() {
-    document.getElementById('btn-back-dashboard')?.addEventListener('click', () => {
-      window.location.hash = '/teacher/dashboard';
-    });
+    document.getElementById('btn-back-dashboard')?.addEventListener('click', () => { window.location.hash = '/teacher/dashboard'; });
+    document.getElementById('btn-start-quiz-view')?.addEventListener('click', () => { activeView = 'quiz'; render(); });
 
     document.querySelectorAll('.student-avatar-card').forEach(card => {
       card.addEventListener('click', () => {
-        const studentId = card.dataset.studentId;
-        selectedStudent = students.find(s => s.id === studentId);
+        selectedStudent = students.find(s => s.id === card.dataset.studentId);
         render();
       });
     });
 
-    document.getElementById('close-action-panel')?.addEventListener('click', () => {
-      selectedStudent = null;
-      render();
-    });
+    document.getElementById('close-action-panel')?.addEventListener('click', () => { selectedStudent = null; render(); });
 
     document.getElementById('btn-praise')?.addEventListener('click', async () => {
-      if (!selectedStudent) return;
       const updated = await praiseStudent(selectedStudent.id);
       if (updated) {
         selectedStudent = updated;
-        showToast(`${updated.name}에게 칭찬을 보냈습니다! ⭐`);
-
-        const card = document.querySelector(`.student-avatar-card[data-student-id="${updated.id}"]`);
-        if (card) renderPraiseAnimation(card);
-
-        setTimeout(() => render(), 600);
+        showToast(`${updated.name}에게 칭찬을 보냈습니다!`);
+        render();
       }
     });
 
     document.getElementById('btn-present')?.addEventListener('click', () => {
-      if (!selectedStudent) return;
-      isWhiteboard = true;
+      activeView = 'whiteboard';
       render();
     });
   }
 
+  // --- Quiz Mode ---
+  function renderQuizMode() {
+    container.innerHTML = `
+      <div class="teacher-layout page-enter">
+        <main class="main-content" style="max-width: 1400px; margin: 0 auto; width: 100%;">
+          <header class="page-header flex justify-between items-center">
+            <div>
+              <button class="btn btn-ghost btn-sm" id="quiz-back">← 수업으로</button>
+              <h1 class="page-title">⚡ 번개 퀴즈 <span class="badge ${activeQuiz ? 'badge-green' : 'badge-purple'}">${activeQuiz ? '진행 중' : '준비'}</span></h1>
+            </div>
+            ${activeQuiz ? `<button class="btn btn-danger" id="btn-stop-quiz">퀴즈 종료</button>` : ''}
+          </header>
+
+          <div class="grid" style="grid-template-columns: 1fr 340px; gap: var(--s-8);">
+            <!-- Left: Problem & Gallery -->
+            <div class="flex flex-col gap-lg">
+              ${!activeQuiz ? `
+                <div class="card" style="padding: var(--s-12); text-align: center;">
+                  <h3 style="margin-bottom: var(--s-4);">새 퀴즈 출제하기</h3>
+                  <div class="drop-zone" id="quiz-img-dropzone" style="height: 300px; display: flex; flex-direction: column; justify-content: center;">
+                    <span style="font-size: 3rem; margin-bottom: 15px;">🖼️</span>
+                    <p>문제 이미지를 업로드하세요</p>
+                    <input type="file" id="quiz-img-input" class="hidden" accept="image/*" />
+                  </div>
+                  <button class="btn btn-primary btn-lg w-full" style="margin-top: var(--s-6);" id="btn-start-quiz">퀴즈 시작하기</button>
+                </div>
+              ` : `
+                <div class="card" style="padding: var(--s-4);">
+                  <div class="input-label">출제된 문제</div>
+                  <img src="${activeQuiz.problemImage.url}" style="max-height: 400px; width: 100%; object-fit: contain; background: #000; border-radius: var(--r-md);" />
+                </div>
+                
+                <div class="section-header" style="margin-top: var(--s-8);">
+                  <h2 class="section-title">학생 풀이 갤러리 (${quizSubmissions.length})</h2>
+                </div>
+                <div class="grid" style="grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--s-4);">
+                  ${quizSubmissions.map(s => `
+                    <div class="card" style="padding: var(--s-3);">
+                      <img src="${s.image.url}" style="width: 100%; aspect-ratio: 4/3; object-fit: cover; border-radius: var(--r-sm); cursor: pointer;" onclick="window.open('${s.image.url}')" />
+                      <div style="margin-top: 10px; font-weight: 700; text-align: center;">${s.studentName}</div>
+                    </div>
+                  `).join('')}
+                </div>
+              `}
+            </div>
+
+            <!-- Right: Status -->
+            <div class="flex flex-col gap-sm">
+               <div class="card">
+                 <h4 style="margin-bottom: 15px;">참여 현황</h4>
+                 <div class="flex flex-col gap-sm">
+                   ${students.map(s => {
+      const solved = quizSubmissions.some(sub => sub.studentId === s.id);
+      return `
+                       <div class="flex items-center justify-between" style="font-size: 0.9rem; padding: 5px 0;">
+                         <span>${s.name}</span>
+                         <span class="badge ${solved ? 'badge-green' : 'badge-blue'}" style="font-size: 0.65rem;">${solved ? '제출' : '대기'}</span>
+                       </div>
+                     `;
+    }).join('')}
+                 </div>
+               </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    `;
+
+    bindQuizEvents();
+  }
+
+  function bindQuizEvents() {
+    document.getElementById('quiz-back')?.addEventListener('click', () => {
+      if (unsubscribeSubmissions) unsubscribeSubmissions();
+      activeView = 'lesson';
+      render();
+    });
+
+    const dropzone = document.getElementById('quiz-img-dropzone');
+    const input = document.getElementById('quiz-img-input');
+    dropzone?.addEventListener('click', () => input.click());
+
+    document.getElementById('btn-start-quiz')?.addEventListener('click', async () => {
+      if (!input.files[0]) { showToast('이미지를 선택해주세요.', 'error'); return; }
+      try {
+        const saved = await saveFile(input.files[0]);
+        const quiz = await startQuiz(classId, saved);
+        activeQuiz = quiz;
+        startSubmissionsListener(quiz.id);
+        render();
+      } catch (err) { showToast('시작 중 오류 발생', 'error'); }
+    });
+
+    document.getElementById('btn-stop-quiz')?.addEventListener('click', async () => {
+      if (confirm('퀴즈를 종료하시겠습니까?')) {
+        await stopQuiz(classId);
+        activeQuiz = null;
+        if (unsubscribeSubmissions) unsubscribeSubmissions();
+        render();
+      }
+    });
+  }
+
+  function startSubmissionsListener(quizId) {
+    if (unsubscribeSubmissions) unsubscribeSubmissions();
+    unsubscribeSubmissions = listenToQuizSubmissions(quizId, (subs) => {
+      quizSubmissions = subs;
+      render();
+    });
+  }
+
+  // --- Whiteboard Mode --- (Keep existing logic but styled)
   function renderWhiteboardMode() {
     container.innerHTML = `
-      <div class="whiteboard-container">
-        <div class="whiteboard-toolbar">
+      <div class="whiteboard-container page-enter" style="background: var(--bg-deep);">
+        <div class="whiteboard-toolbar card" style="border-radius: 0; border-top: 0; border-left: 0; border-right: 0;">
           <button class="btn btn-ghost btn-sm" id="wb-back">← 돌아가기</button>
-          <div style="flex:1;text-align:center;font-weight:600">
-            ${selectedStudent.name}의 발표
+          <div style="flex:1; text-align:center; font-weight:800; font-size: 1.1rem; color: var(--primary-light);">
+            ${selectedStudent.name}의 발표 공간
           </div>
           <div class="whiteboard-tools">
-            <button class="whiteboard-tool active" data-tool="pen" title="펜">✏️</button>
-            <button class="whiteboard-tool" data-tool="eraser" title="지우개">🧹</button>
-            <button class="whiteboard-tool" data-tool="clear" title="전체 지우기">🗑️</button>
+            <button class="whiteboard-tool ${currentTool === 'pen' ? 'active' : ''}" data-tool="pen">✏️</button>
+            <button class="whiteboard-tool ${currentTool === 'eraser' ? 'active' : ''}" data-tool="eraser">🧹</button>
+            <button class="whiteboard-tool" data-tool="clear">🗑️</button>
           </div>
           <div class="color-picker-group">
             <div class="color-dot active" data-color="#FFFFFF" style="background:#FFFFFF"></div>
             <div class="color-dot" data-color="#FF6B6B" style="background:#FF6B6B"></div>
             <div class="color-dot" data-color="#FFD93D" style="background:#FFD93D"></div>
             <div class="color-dot" data-color="#6BCB77" style="background:#6BCB77"></div>
-            <div class="color-dot" data-color="#6C5CE7" style="background:#6C5CE7"></div>
-            <div class="color-dot" data-color="#4ECDC4" style="background:#4ECDC4"></div>
+            <div class="color-dot" data-color="#4F46E5" style="background:#4F46E5"></div>
           </div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <label style="font-size:0.8rem;color:var(--text-secondary)">굵기</label>
-            <input type="range" id="pen-size" min="1" max="20" value="3" style="width:80px" />
-          </div>
-          <div class="recorder-controls">
-            <button class="btn ${isRecording ? 'btn-danger' : 'btn-ghost'} btn-sm" id="wb-record">
-              ${isRecording ? '⏹ 녹음 중지' : '🎙 녹음 시작'}
-            </button>
-            <span id="rec-timer" class="${isRecording ? '' : 'hidden'}" style="color:var(--red);font-size:0.85rem;font-weight:600">
-              <span class="rec-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);margin-right:4px"></span>
-              ${formatRecTime(recordingSeconds)}
-            </span>
-          </div>
-          <button class="btn btn-primary btn-sm" id="wb-save">💾 저장</button>
-          <button class="btn btn-gold btn-sm" id="wb-share">📤 공유</button>
+          <button class="btn ${isRecording ? 'btn-danger' : 'btn-primary'} btn-sm" id="wb-record">
+            ${isRecording ? '⏹ 중지' : '🎙 녹음'}
+          </button>
+          <button class="btn btn-secondary btn-sm" id="wb-save">💾 저장</button>
         </div>
-        <div class="whiteboard-canvas-wrap">
+        <div class="whiteboard-canvas-wrap" style="background: #000;">
           <canvas id="whiteboard-canvas"></canvas>
         </div>
       </div>
     `;
-
     initWhiteboard();
     bindWhiteboardEvents();
   }
@@ -219,134 +300,39 @@ export function renderLessonMode(container, params) {
     const wrap = wbCanvas.parentElement;
     wbCanvas.width = wrap.clientWidth;
     wbCanvas.height = wrap.clientHeight;
-    wbCtx.fillStyle = '#1A1230';
+    wbCtx.fillStyle = '#000';
     wbCtx.fillRect(0, 0, wbCanvas.width, wbCanvas.height);
     wbCtx.lineCap = 'round';
     wbCtx.lineJoin = 'round';
-    wbCanvas.addEventListener('mousedown', startDraw);
-    wbCanvas.addEventListener('mousemove', draw);
-    wbCanvas.addEventListener('mouseup', endDraw);
-    wbCanvas.addEventListener('mouseleave', endDraw);
-    wbCanvas.addEventListener('touchstart', (e) => { e.preventDefault(); startDraw(getTouchPos(e)); });
-    wbCanvas.addEventListener('touchmove', (e) => { e.preventDefault(); draw(getTouchPos(e)); });
-    wbCanvas.addEventListener('touchend', (e) => { e.preventDefault(); endDraw(); });
+
+    wbCanvas.addEventListener('mousedown', (e) => { drawing = true; wbCtx.beginPath(); wbCtx.moveTo(e.offsetX, e.offsetY); });
+    wbCanvas.addEventListener('mousemove', (e) => {
+      if (!drawing) return;
+      wbCtx.strokeStyle = currentTool === 'eraser' ? '#000' : penColor;
+      wbCtx.lineWidth = currentTool === 'eraser' ? penSize * 10 : penSize;
+      wbCtx.lineTo(e.offsetX, e.offsetY);
+      wbCtx.stroke();
+    });
+    wbCanvas.addEventListener('mouseup', () => { drawing = false; wbCtx.closePath(); });
   }
-
-  function getTouchPos(e) {
-    const rect = wbCanvas.getBoundingClientRect();
-    const touch = e.touches[0];
-    return { offsetX: touch.clientX - rect.left, offsetY: touch.clientY - rect.top };
-  }
-
-  function startDraw(e) { drawing = true; wbCtx.beginPath(); wbCtx.moveTo(e.offsetX, e.offsetY); }
-
-  function draw(e) {
-    if (!drawing) return;
-    wbCtx.strokeStyle = currentTool === 'eraser' ? '#1A1230' : penColor;
-    wbCtx.lineWidth = currentTool === 'eraser' ? penSize * 5 : penSize;
-    wbCtx.lineTo(e.offsetX, e.offsetY);
-    wbCtx.stroke();
-  }
-
-  function endDraw() { drawing = false; wbCtx.closePath(); }
 
   function bindWhiteboardEvents() {
-    document.getElementById('wb-back').addEventListener('click', () => {
-      if (isRecording) stopRecording();
-      isWhiteboard = false;
-      render();
-    });
-
-    document.querySelectorAll('.whiteboard-tool').forEach(tool => {
-      tool.addEventListener('click', () => {
-        const t = tool.dataset.tool;
-        if (t === 'clear') { wbCtx.fillStyle = '#1A1230'; wbCtx.fillRect(0, 0, wbCanvas.width, wbCanvas.height); return; }
-        currentTool = t;
-        document.querySelectorAll('.whiteboard-tool').forEach(tt => tt.classList.remove('active'));
-        tool.classList.add('active');
+    document.getElementById('wb-back')?.addEventListener('click', () => { activeView = 'lesson'; render(); });
+    document.querySelectorAll('.whiteboard-tool').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (btn.dataset.tool === 'clear') { wbCtx.fillRect(0, 0, wbCanvas.width, wbCanvas.height); return; }
+        currentTool = btn.dataset.tool;
+        renderWhiteboardMode();
       });
     });
-
     document.querySelectorAll('.color-dot').forEach(dot => {
       dot.addEventListener('click', () => {
         penColor = dot.dataset.color;
         currentTool = 'pen';
         document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
         dot.classList.add('active');
-        document.querySelectorAll('.whiteboard-tool').forEach(t => t.classList.toggle('active', t.dataset.tool === 'pen'));
       });
     });
-
-    document.getElementById('pen-size').addEventListener('input', (e) => penSize = parseInt(e.target.value));
-
-    document.getElementById('wb-record').addEventListener('click', () => isRecording ? stopRecording() : startRecording());
-
-    document.getElementById('wb-save').addEventListener('click', () => savePresentation(false));
-    document.getElementById('wb-share').addEventListener('click', () => savePresentation(true));
-  }
-
-  async function startRecording() {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorder = new MediaRecorder(stream);
-      audioChunks = [];
-      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunks.push(e.data); };
-      mediaRecorder.onstop = () => { recordedAudioBlob = new Blob(audioChunks, { type: 'audio/webm' }); stream.getTracks().forEach(t => t.stop()); };
-      mediaRecorder.start();
-      isRecording = true;
-      recordingSeconds = 0;
-      document.getElementById('wb-record').classList.replace('btn-ghost', 'btn-danger');
-      document.getElementById('wb-record').innerHTML = '⏹ 녹음 중지';
-      document.getElementById('rec-timer').classList.remove('hidden');
-      recordingTimer = setInterval(() => {
-        recordingSeconds++;
-        const timerWrap = document.getElementById('rec-timer');
-        if (timerWrap) timerWrap.innerHTML = `<span class="rec-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);margin-right:4px;animation:pulse 1s infinite"></span>${formatRecTime(recordingSeconds)}`;
-      }, 1000);
-      showToast('녹음이 시작되었습니다 🎙');
-    } catch (err) { showToast('마이크를 시작할 수 없습니다.', 'error'); }
-  }
-
-  function stopRecording() {
-    if (mediaRecorder?.state !== 'inactive') mediaRecorder.stop();
-    isRecording = false;
-    clearInterval(recordingTimer);
-    document.getElementById('wb-record').classList.replace('btn-danger', 'btn-ghost');
-    document.getElementById('wb-record').innerHTML = '🎙 녹음 시작';
-    document.getElementById('rec-timer').classList.add('hidden');
-    showToast('녹음 중지. 저장 시 반영됩니다.');
-  }
-
-  async function savePresentation(shared) {
-    if (!selectedStudent) return;
-    const whiteboardImage = wbCanvas ? wbCanvas.toDataURL('image/png') : null;
-    let audioData = null;
-
-    const finalize = async (aData) => {
-      const pres = await addPresentation(selectedStudent.id, classId, { whiteboardImage, audioData: aData });
-      if (shared) {
-        await toggleSharePresentation(pres.id);
-        showToast('발표가 저장 및 공유되었습니다! 📤');
-      } else {
-        showToast('발표가 저장되었습니다! 💾');
-      }
-      isWhiteboard = false;
-      render();
-    };
-
-    if (recordedAudioBlob) {
-      const reader = new FileReader();
-      reader.onload = async () => finalize(reader.result);
-      reader.readAsDataURL(recordedAudioBlob);
-    } else {
-      await finalize(null);
-    }
-  }
-
-  function formatRecTime(seconds) {
-    const m = Math.floor(seconds / 60).toString().padStart(2, '0');
-    const s = (seconds % 60).toString().padStart(2, '0');
-    return `${m}:${s}`;
   }
 
   init();

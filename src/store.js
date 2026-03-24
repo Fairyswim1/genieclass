@@ -31,6 +31,9 @@ const COLLECTIONS = {
     ANNOUNCEMENTS: 'announcements',
     PRESENTATIONS: 'presentations',
     SUBMISSIONS: 'submissions',
+    RESOURCES: 'resources',
+    QUIZZES: 'quizzes',
+    QUIZ_SUBMISSIONS: 'quiz_submissions',
     FILES: 'files',
 };
 
@@ -135,6 +138,8 @@ export async function addStudent(name, classId, number = '') {
         number, // Optional student number
         classId,
         uniqueCode: generateStudentCode(),
+        loginId: '',   // Initial: empty
+        password: '',  // Initial: empty
         characterLevel: 1,
         praiseCount: 0,
         totalPoints: 0,
@@ -168,9 +173,36 @@ export async function getStudentById(studentId) {
 
 export async function getStudentByCode(code) {
     if (!code) return null;
-    const q = query(collection(db, COLLECTIONS.STUDENTS), where('uniqueCode', '==', code));
+    const q = query(collection(db, COLLECTIONS.STUDENTS), where('uniqueCode', '==', code.toUpperCase()));
     const snapshot = await getDocs(q);
     return !snapshot.empty ? snapshot.docs[0].data() : null;
+}
+
+export async function checkLoginIdExists(loginId) {
+    const q = query(collection(db, COLLECTIONS.STUDENTS), where('loginId', '==', loginId));
+    const snapshot = await getDocs(q);
+    return !snapshot.empty;
+}
+
+export async function setupStudentAuth(studentId, loginId, password) {
+    const ref = doc(db, COLLECTIONS.STUDENTS, studentId);
+    await updateDoc(ref, {
+        loginId: loginId,
+        password: password, // Simple password for now as per teacher request (educational environment)
+    });
+}
+
+export async function loginStudentByIdPw(loginId, password) {
+    const q = query(collection(db, COLLECTIONS.STUDENTS),
+        where('loginId', '==', loginId),
+        where('password', '==', password));
+    const snapshot = await getDocs(q);
+    if (!snapshot.empty) {
+        const student = snapshot.docs[0].data();
+        localStorage.setItem('genie_current_student', JSON.stringify(student));
+        return student;
+    }
+    return null;
 }
 
 export async function praiseStudent(studentId) {
@@ -339,6 +371,101 @@ export async function getAnnouncementsByClass(classId) {
 
 export async function deleteAnnouncement(announcementId) {
     await deleteDoc(doc(db, COLLECTIONS.ANNOUNCEMENTS, announcementId));
+}
+
+// ========== Resources (Materials) ==========
+export async function addResource(classId, data) {
+    const id = generateId();
+    const resource = {
+        id,
+        classId,
+        title: data.title,
+        description: data.description || '',
+        files: data.files || [],
+        createdAt: new Date().toISOString(),
+    };
+    await setDoc(doc(db, COLLECTIONS.RESOURCES, id), resource);
+    return resource;
+}
+
+export async function getResourcesByClass(classId) {
+    const q = query(collection(db, COLLECTIONS.RESOURCES),
+        where('classId', '==', classId),
+        orderBy('createdAt', 'desc'));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => doc.data());
+}
+
+export async function deleteResource(resourceId) {
+    await deleteDoc(doc(db, COLLECTIONS.RESOURCES, resourceId));
+}
+
+// ========== Real-time Quiz ==========
+export async function startQuiz(classId, problemImageFile) {
+    const id = generateId();
+    const quiz = {
+        id,
+        classId,
+        problemImage: problemImageFile, // { id, name, url? }
+        active: true,
+        createdAt: new Date().toISOString(),
+    };
+
+    // Update class with active quiz ID
+    await updateDoc(doc(db, COLLECTIONS.CLASSES, classId), {
+        activeQuizId: id
+    });
+
+    await setDoc(doc(db, COLLECTIONS.QUIZZES, id), quiz);
+    return quiz;
+}
+
+export async function stopQuiz(classId) {
+    const cls = await getClassById(classId);
+    if (cls?.activeQuizId) {
+        await updateDoc(doc(db, COLLECTIONS.QUIZZES, cls.activeQuizId), { active: false });
+        await updateDoc(doc(db, COLLECTIONS.CLASSES, classId), { activeQuizId: '' });
+    }
+}
+
+export async function submitQuizSolution(quizId, studentId, studentName, solutionImageFile) {
+    const id = generateId();
+    const sub = {
+        id,
+        quizId,
+        studentId,
+        studentName,
+        image: solutionImageFile,
+        shared: true,
+        createdAt: new Date().toISOString(),
+    };
+    await setDoc(doc(db, COLLECTIONS.QUIZ_SUBMISSIONS, id), sub);
+    return sub;
+}
+
+export function listenToActiveQuiz(classId, callback) {
+    return onSnapshot(doc(db, COLLECTIONS.CLASSES, classId), async (docSnap) => {
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            if (data.activeQuizId) {
+                const quizSnap = await getDoc(doc(db, COLLECTIONS.QUIZZES, data.activeQuizId));
+                if (quizSnap.exists()) {
+                    callback(quizSnap.data());
+                    return;
+                }
+            }
+            callback(null);
+        }
+    });
+}
+
+export function listenToQuizSubmissions(quizId, callback) {
+    const q = query(collection(db, COLLECTIONS.QUIZ_SUBMISSIONS),
+        where('quizId', '==', quizId),
+        orderBy('createdAt', 'desc'));
+    return onSnapshot(q, (snapshot) => {
+        callback(snapshot.docs.map(doc => doc.data()));
+    });
 }
 
 // ========== Files ==========
