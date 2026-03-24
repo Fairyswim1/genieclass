@@ -19,72 +19,68 @@ export function renderStudentLogin(container) {
 
     container.innerHTML = `
       <div class="star-bg"></div>
-      <div class="login-page page-enter">
-        <div class="login-container card animate-up" style="max-width: 440px; border-radius: 24px; padding: 40px;">
-          <div class="login-logo" style="margin-bottom: 30px;">
-            <div class="login-logo-icon" style="width: 60px; height: 60px; font-size: 1.5rem; margin: 0 auto 15px;">G</div>
-            <h1 class="landing-title" style="font-size: 1.8rem; margin-bottom: 0.5rem; letter-spacing: -0.02em;"><span>Genie</span> Class</h1>
-            <p class="login-subtitle" style="color: var(--text-muted); font-size: 0.95rem;">학생용 학습 서비스</p>
+      <div class="auth-page page-enter">
+        <div class="auth-card">
+          <div class="auth-logo">
+            <div class="auth-logo-icon">G</div>
+            <h1 class="auth-title"><span>Genie</span> Class</h1>
+            <p class="auth-subtitle">학생용 학습 서비스</p>
           </div>
 
           ${mode !== 'setup' ? `
-            <div class="tabs" style="margin-bottom: 30px; background: rgba(255,255,255,0.05); padding: 5px; border-radius: 12px;">
-              <div class="tab ${mode === 'login' ? 'active' : ''}" id="tab-idpw" style="border-radius: 8px;">ID/PW 로그인</div>
-              <div class="tab ${mode === 'code' ? 'active' : ''}" id="tab-code" style="border-radius: 8px;">고유코드로 시작</div>
+            <div class="tabs">
+              <div class="tab ${mode === 'login' ? 'active' : ''}" id="tab-idpw">ID/PW 로그인</div>
+              <div class="tab ${mode === 'code' ? 'active' : ''}" id="tab-code">고유코드로 시작</div>
             </div>
           ` : ''}
 
           <form class="login-form" id="student-login-form">
             ${mode === 'login' ? `
-              <div class="form-group" style="margin-bottom: 20px;">
-                <label class="input-label" style="font-size: 0.8rem; margin-bottom: 6px;">아이디</label>
+              <div class="form-group" style="margin-bottom: var(--s-4);">
+                <label class="input-label">아이디</label>
                 <input type="text" class="input-field" id="std-login-id" placeholder="ID를 입력하세요" required autocomplete="username" />
               </div>
-              <div class="form-group" style="margin-bottom: 30px;">
-                <label class="input-label" style="font-size: 0.8rem; margin-bottom: 6px;">비밀번호</label>
+              <div class="form-group" style="margin-bottom: var(--s-8);">
+                <label class="input-label">비밀번호</label>
                 <input type="password" class="input-field" id="std-password" placeholder="비밀번호를 입력하세요" required autocomplete="current-password" />
               </div>
-              <button type="submit" class="btn btn-primary btn-lg w-full" style="height: 54px; font-size: 1rem;">
-                로그인
-              </button>
+              <button type="submit" class="btn btn-primary btn-lg w-full">로그인</button>
             ` : mode === 'code' ? `
-              <div class="form-group" style="text-align: center; margin-bottom: 30px;">
-                <label class="input-label" style="font-size: 0.8rem; margin-bottom: 15px; display: block;">선생님께 받은 6자리 고유코드</label>
+              <div class="form-group text-center" style="margin-bottom: var(--s-8);">
+                <label class="input-label" style="margin-bottom: var(--s-4); display: block;">선생님께 받은 6자리 고유코드</label>
                 <input type="text" class="input-field" id="std-unique-code" maxlength="6" 
-                  style="text-align: center; font-size: 2rem; letter-spacing: 0.6rem; font-family: monospace; height: 80px; background: rgba(255,255,255,0.03);" 
+                  style="text-align: center; font-size: 2rem; letter-spacing: 0.6rem; font-family: monospace; height: 80px;" 
                   placeholder="000000" autocomplete="off" />
               </div>
-              <button type="submit" class="btn btn-primary btn-lg w-full" style="height: 54px; font-size: 1rem;">
-                코드 확인
-              </button>
-              <p style="font-size: 0.85rem; color: var(--text-dim); text-align: center; margin-top: 20px;">
+              <button type="submit" class="btn btn-primary btn-lg w-full">코드 확인</button>
+              <p class="auth-subtitle text-center" style="margin-top: var(--s-6);">
                 처음 접속하는 학생은 고유코드가 필요합니다.
               </p>
             ` : mode === 'setup' ? `
-              <div class="text-center" style="margin-bottom: 30px;">
-                <div class="badge badge-purple" style="margin-bottom: 10px; font-size: 0.7rem; padding: 4px 12px; height: auto;">${className}</div>
-                <h2 style="font-size: 1.5rem; font-weight: 800; margin-bottom: 8px;">계정 설정</h2>
-                <p style="color: var(--text-muted); font-size: 0.9rem;">${pendingStudent.name}님, 앞으로 사용할 정보를 입력하세요.</p>
+              <div class="text-center" style="margin-bottom: var(--s-8);">
+                <div class="badge badge-purple" style="margin-bottom: var(--s-2);">${className}</div>
+                <h2 class="auth-title">계정 설정</h2>
+                <p class="auth-subtitle">${pendingStudent.name}님, 앞으로 사용할 정보를 입력하세요.</p>
               </div>
 
-              <div class="form-group" style="margin-bottom: 15px;">
-                <label class="input-label" style="font-size: 0.8rem; margin-bottom: 6px;">사용할 아이디</label>
+              <div class="form-group" style="margin-bottom: var(--s-4);">
+                <label class="input-label">사용할 아이디</label>
                 <input type="text" class="input-field" id="setup-login-id" placeholder="영문, 숫자 포함 4자 이상" required minlength="4" />
               </div>
-              <div class="form-group" style="margin-bottom: 15px;">
-                <label class="input-label" style="font-size: 0.8rem; margin-bottom: 6px;">비밀번호</label>
+              <div class="form-group" style="margin-bottom: var(--s-4);">
+                <label class="input-label">비밀번호</label>
                 <input type="password" class="input-field" id="setup-password" placeholder="비밀번호 입력" required minlength="4" />
               </div>
-              <div class="form-group" style="margin-bottom: 25px;">
-                <label class="input-label" style="font-size: 0.8rem; margin-bottom: 6px;">비밀번호 확인</label>
+              <div class="form-group" style="margin-bottom: var(--s-8);">
+                <label class="input-label">비밀번호 확인</label>
                 <input type="password" class="input-field" id="setup-password-confirm" placeholder="비밀번호 재입력" required />
               </div>
-              <button type="submit" class="btn btn-primary btn-lg w-full" style="height: 54px;">계정 생성 및 로그인</button>
-              <button type="button" class="btn btn-ghost w-full" style="margin-top: 10px; height: 48px;" id="setup-cancel">취소</button>
+              <button type="submit" class="btn btn-primary btn-lg w-full">계정 생성 및 로그인</button>
+              <button type="button" class="btn btn-ghost w-full" style="margin-top: var(--s-2);" id="setup-cancel">취소</button>
             ` : ''}
           </form>
 
-          <div style="margin-top: 40px; text-align: center;">
+          <div class="text-center" style="margin-top: var(--s-12);">
              <a id="back-to-landing" style="cursor: pointer; color: var(--text-dim); font-size: 0.85rem; font-weight: 500;">
                ← 처음으로 돌아가기
              </a>
