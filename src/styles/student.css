@@ -7,19 +7,18 @@
     background: var(--bg-deep);
 }
 
-/* Student Topbar - Clean & Modern */
+/* Student Topbar - Warm Paper Ribbon */
 .student-topbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: var(--s-4) var(--s-12);
-    background: var(--bg-glass);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border-bottom: 1px solid var(--border-subtle);
+    background: var(--bg-sidebar);
+    border-bottom: 2px dashed var(--border-main);
     position: sticky;
     top: 0;
     z-index: 100;
+    box-shadow: 0 4px 10px rgba(62, 54, 46, 0.03);
 }
 
 .student-topbar-logo {
@@ -29,24 +28,24 @@
 }
 
 .student-topbar-logo-icon {
-    width: 36px;
-    height: 36px;
-    background: linear-gradient(135deg, var(--primary), var(--secondary));
-    border-radius: var(--r-md);
+    width: 38px;
+    height: 38px;
+    background: var(--primary);
+    border-radius: 10px 4px 10px 4px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-weight: 800;
-    font-size: 1.1rem;
+    font-family: var(--font-title);
+    font-size: 1.2rem;
     color: white;
-    box-shadow: 0 4px 12px var(--primary-glow);
+    box-shadow: 2px 2px 0 0 var(--primary-dark);
 }
 
 .student-topbar-title {
-    font-size: 1.1rem;
-    font-weight: 800;
-    color: var(--text-white);
-    letter-spacing: -0.02em;
+    font-family: var(--font-title);
+    font-size: 1.25rem;
+    color: var(--text-main);
+    letter-spacing: -0.01em;
 }
 
 .student-topbar-user {
@@ -56,16 +55,17 @@
 }
 
 .student-topbar-avatar {
-    width: 34px;
-    height: 34px;
-    border-radius: var(--r-full);
-    background: var(--bg-surface);
-    border: 1px solid var(--border-main);
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #FFFFFF;
+    border: 2px solid var(--border-main);
 }
 
 .student-topbar-name {
-    font-size: 0.95rem;
-    font-weight: 600;
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    font-weight: 700;
     color: var(--text-main);
 }
 
@@ -79,45 +79,71 @@
 
 .student-welcome {
     margin-bottom: var(--s-12);
+    text-align: center;
 }
 
 .student-welcome-title {
-    font-size: 2.75rem;
-    font-weight: 800;
-    letter-spacing: -0.04em;
+    font-family: var(--font-title);
+    font-size: 3.5rem;
+    font-weight: 400;
+    letter-spacing: -0.02em;
     margin-bottom: var(--s-2);
+    color: var(--text-main);
 }
 
 .student-welcome-title span {
-    color: var(--primary-light);
+    color: var(--primary);
+    border-bottom: 4px wavy var(--accent-amber);
 }
 
 .student-welcome-subtitle {
-    font-size: 1.15rem;
+    font-family: var(--font-hand);
+    font-size: 1.8rem;
     color: var(--text-muted);
 }
 
-/* Stats Dashboard */
+/* Stats Dashboard - Polaroid Look */
 .student-stats-row {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: var(--s-6);
+    gap: var(--s-10);
     margin-bottom: var(--s-12);
 }
 
+.stat-card {
+    background: #FFFFFF;
+    border: 2px solid var(--border-main);
+    border-radius: 2px;
+    padding: var(--s-6);
+    box-shadow: 4px 6px 0 0 var(--border-subtle);
+    text-align: center;
+    transition: all 0.3s var(--ease-out);
+}
+
+.stat-card:hover {
+    transform: rotate(-1deg) scale(1.05);
+    box-shadow: 6px 10px 0 0 var(--border-main);
+}
+
 .stat-card-featured {
-    background: linear-gradient(135deg, rgba(79, 70, 229, 0.15), rgba(14, 165, 233, 0.15)) !important;
-    border: 1px solid var(--primary-glow) !important;
+    border-color: var(--primary) !important;
+    background: #FFFDFC !important;
+}
+
+.stat-card-label {
+    font-family: var(--font-point);
+    font-size: 1.1rem;
+    color: var(--text-muted);
 }
 
 .stat-card-value-display {
-    font-size: 2.75rem;
-    font-weight: 800;
+    font-family: var(--font-title);
+    font-size: 3rem;
     margin-bottom: var(--s-1);
-    letter-spacing: -0.03em;
+    color: var(--primary);
 }
 
-/* Feature Grid */
+/* Feature Grid - Paper Scraps */
 .student-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -131,15 +157,27 @@
 }
 
 .section-card {
-    background: var(--bg-card);
-    backdrop-filter: blur(10px);
-    border-radius: var(--r-xl);
-    border: 1px solid var(--border-main);
-    padding: var(--s-8);
+    background: #FFFFFF;
+    border: 2px solid var(--border-main);
+    border-radius: 4px;
+    padding: var(--s-10);
     height: 100%;
     display: flex;
     flex-direction: column;
-    box-shadow: var(--shadow-lg);
+    box-shadow: 5px 5px 0 0 var(--border-subtle);
+    position: relative;
+}
+
+.section-card::before {
+    content: '';
+    position: absolute;
+    top: -15px;
+    left: 30px;
+    width: 50px;
+    height: 25px;
+    background: rgba(230, 164, 180, 0.3); /* Rose tape */
+    border-radius: 2px;
+    transform: rotate(5deg);
 }
 
 .section-card-header {
@@ -148,35 +186,41 @@
     gap: var(--s-4);
     margin-bottom: var(--s-8);
     padding-bottom: var(--s-4);
-    border-bottom: 1px solid var(--border-subtle);
+    border-bottom: 2px dashed var(--border-light);
 }
 
 .section-card-title {
-    font-size: 1.35rem;
-    font-weight: 800;
-    color: var(--text-white);
-    letter-spacing: -0.02em;
+    font-family: var(--font-title);
+    font-size: 1.6rem;
+    color: var(--text-main);
 }
 
-/* Lists & Items */
+/* Lists & Items - Sticky Note Look */
 .interactive-item {
-    background: rgba(255, 255, 255, 0.03);
-    border-radius: var(--r-lg);
-    padding: var(--s-5);
+    background: var(--bg-main);
+    border-radius: 12px;
+    padding: var(--s-6);
     margin-bottom: var(--s-4);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    border: 1px solid var(--border-subtle);
+    border: 1px solid var(--border-main);
     transition: var(--transition-all);
     cursor: pointer;
 }
 
 .interactive-item:hover {
-    background: rgba(255, 255, 255, 0.07);
-    border-color: var(--border-main);
-    transform: translateX(8px);
-    box-shadow: var(--shadow-md);
+    background: #FFFFFF;
+    border-color: var(--primary);
+    transform: translateX(8px) rotate(-0.5deg);
+    box-shadow: 4px 4px 0 0 var(--border-subtle);
+}
+
+.interactive-item-title {
+    font-family: var(--font-sans);
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-main);
 }
 
 /* Assignment Specifics */
@@ -191,24 +235,25 @@
     left: 0;
     top: 0;
     bottom: 0;
-    width: 4px;
-    background: var(--primary);
-    opacity: 0.5;
+    width: 6px;
+    background: var(--accent-amber);
+    opacity: 0.6;
 }
 
 .assignment-item.submitted::before {
-    background: var(--success);
-}
-
-.assignment-item.pending::before {
-    background: var(--accent-amber);
+    background: var(--accent-green);
 }
 
 /* Animation Utils */
 .student-character-float {
-    width: 120px;
-    height: 120px;
-    margin: 0 auto var(--s-4);
-    animation: float 4s ease-in-out infinite;
-    filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.3));
+    width: 140px;
+    height: 140px;
+    margin: 0 auto var(--s-6);
+    animation: bounce 4s ease-in-out infinite;
+    filter: drop-shadow(4px 10px 0px rgba(62, 54, 46, 0.05));
 }
+
+@keyframes bounce {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    50% { transform: translateY(-15px) rotate(2deg); }
+}

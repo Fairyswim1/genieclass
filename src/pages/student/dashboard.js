@@ -105,16 +105,16 @@ export function renderStudentDashboard(container) {
 
           <!-- Character & Progress -->
           <section class="card flex items-center gap-lg" style="margin-bottom: var(--s-12); padding: var(--s-8);">
-            <div class="student-character-float" style="margin: 0;">
+            <div class="student-character-float">
               ${renderCharacter(freshStudent.characterLevel, 100)}
             </div>
             <div class="flex-1">
               <div class="flex justify-between items-end" style="margin-bottom: var(--s-2);">
-                <span style="font-weight: 700; font-size: 1.1rem;">${config.emoji} ${config.name}</span>
-                <span style="font-size: 0.85rem; color: var(--text-dim);">다음 레벨까지 ${Math.max(0, (freshStudent.characterLevel * 5) - freshStudent.totalPoints)}P 남음</span>
+                <span style="font-family: var(--font-title); font-size: 1.2rem;">${config.emoji} ${config.name}</span>
+                <span style="font-family: var(--font-hand); font-size: 1.2rem;">다음 레벨까지 ${Math.max(0, (freshStudent.characterLevel * 5) - freshStudent.totalPoints)}P 남음</span>
               </div>
-              <div style="background: var(--bg-surface); height: 12px; border-radius: 6px; overflow: hidden; border: 1px solid var(--border-main);">
-                <div style="width: ${Math.min(100, (freshStudent.totalPoints % 5) / 5 * 100)}%; height: 100%; background: linear-gradient(90deg, var(--primary), var(--secondary)); transition: width 0.5s;"></div>
+              <div style="background: var(--bg-main); height: 14px; border-radius: 7px; overflow: hidden; border: 2px solid var(--border-main);">
+                <div style="width: ${Math.min(100, (freshStudent.totalPoints % 5) / 5 * 100)}%; height: 100%; background: var(--primary); transition: width 0.5s;"></div>
               </div>
             </div>
           </section>

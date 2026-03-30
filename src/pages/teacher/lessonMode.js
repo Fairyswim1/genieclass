@@ -74,12 +74,12 @@ export function renderLessonMode(container, params) {
             ${students.map(s => {
       const config = getLevelConfig(s.characterLevel);
       return `
-                <div class="student-avatar-card card ${selectedStudent?.id === s.id ? 'selected' : ''}" data-student-id="${s.id}" style="padding: var(--s-4); text-align: center; cursor: pointer;">
-                  <div class="student-character" style="width: 80px; height: 80px; margin: 0 auto 10px;">
+                <div class="student-avatar-card card ${selectedStudent?.id === s.id ? 'selected' : ''}" data-student-id="${s.id}">
+                  <div class="student-character">
                     ${renderCharacter(s.characterLevel, 80)}
                   </div>
-                  <div class="student-name" style="font-weight: 700; font-size: 0.95rem;">${s.name}</div>
-                  <div style="font-size: 0.75rem; color: var(--gold); margin-top: 5px;">⭐ ${s.praiseCount}P</div>
+                  <div class="student-name">${s.name}</div>
+                  <div class="student-praise-count">⭐ ${s.praiseCount}P</div>
                 </div>
               `;
     }).join('')}
@@ -88,7 +88,7 @@ export function renderLessonMode(container, params) {
         </main>
 
         <!-- Student Action Panel -->
-        <div class="student-action-panel ${selectedStudent ? 'open' : ''}" style="width: 340px; background: var(--bg-glass-heavy); backdrop-filter: blur(20px);">
+        <div class="student-action-panel ${selectedStudent ? 'open' : ''}">
           ${selectedStudent ? `
             <div class="action-panel-header">
               <h3 style="font-weight: 800; font-size: 1.25rem;">${selectedStudent.name}</h3>

@@ -8,12 +8,12 @@
     background: var(--bg-deep);
 }
 
-/* Sidebar - Professional & Sleek */
+/* Sidebar - Warm Paper Note */
 .sidebar {
     width: 280px;
     min-height: 100vh;
     background: var(--bg-sidebar);
-    border-right: 1px solid var(--border-main);
+    border-right: 2px solid var(--border-main);
     display: flex;
     flex-direction: column;
     position: fixed;
@@ -21,12 +21,12 @@
     top: 0;
     bottom: 0;
     z-index: 100;
-    box-shadow: 10px 0 30px rgba(0, 0, 0, 0.2);
+    box-shadow: 4px 0 15px rgba(62, 54, 46, 0.05);
 }
 
 .sidebar-header {
     padding: var(--s-10) var(--s-8);
-    border-bottom: 1px solid var(--border-subtle);
+    border-bottom: 2px dashed var(--border-subtle);
 }
 
 .sidebar-logo {
@@ -38,22 +38,22 @@
 .sidebar-logo-icon {
     width: 44px;
     height: 44px;
-    background: linear-gradient(135deg, var(--primary), var(--secondary));
-    border-radius: var(--r-lg);
+    background: var(--primary);
+    border-radius: 12px 4px 12px 4px; /* Slightly irregular */
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.4rem;
-    font-weight: 900;
+    font-family: var(--font-title);
+    font-size: 1.6rem;
     color: white;
-    box-shadow: 0 8px 16px var(--primary-glow);
+    box-shadow: 3px 3px 0 0 var(--primary-dark);
 }
 
 .sidebar-logo-text {
-    font-size: 1.25rem;
-    font-weight: 850;
-    color: var(--text-white);
-    letter-spacing: -0.03em;
+    font-family: var(--font-title);
+    font-size: 1.4rem;
+    color: var(--text-main);
+    letter-spacing: -0.02em;
 }
 
 .sidebar-classes {
@@ -63,13 +63,13 @@
 }
 
 .sidebar-section-title {
-    font-size: 0.75rem;
-    font-weight: 800;
+    font-family: var(--font-point);
+    font-size: 1.1rem;
+    font-weight: 700;
     color: var(--text-dim);
-    text-transform: uppercase;
-    letter-spacing: 0.15em;
+    text-transform: none;
+    letter-spacing: normal;
     padding: 0 var(--s-4) var(--s-4);
-    opacity: 0.7;
 }
 
 .sidebar-class-item {
@@ -77,52 +77,52 @@
     align-items: center;
     gap: var(--s-4);
     padding: var(--s-4) var(--s-5);
-    border-radius: var(--r-lg);
+    border-radius: 12px 12px 12px 12px;
     color: var(--text-muted);
     font-size: 1rem;
-    font-weight: 600;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    font-weight: 500;
+    transition: all 0.3s var(--ease-out);
     cursor: pointer;
     margin-bottom: var(--s-2);
 }
 
 .sidebar-class-item:hover {
-    background: rgba(255, 255, 255, 0.08);
-    color: var(--text-white);
-    transform: translateX(4px);
+    background: #FFFDFC;
+    color: var(--primary);
+    transform: rotate(-1deg) scale(1.02);
 }
 
 .sidebar-class-item.active {
-    background: linear-gradient(90deg, rgba(79, 70, 229, 0.2), transparent);
-    color: var(--primary-light);
-    border-left: 3px solid var(--primary);
+    background: #FFFFFF;
+    color: var(--primary);
+    border: 2px solid var(--border-main);
+    box-shadow: 4px 4px 0 0 var(--border-main);
 }
 
 .sidebar-class-icon {
     width: 28px;
     height: 28px;
-    border-radius: 8px;
+    border-radius: 6px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 0.85rem;
     font-weight: 900;
     color: white;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
 .sidebar-footer {
     padding: var(--s-8) var(--s-4);
-    border-top: 1px solid var(--border-subtle);
-    background: linear-gradient(0deg, rgba(0, 0, 0, 0.3) 0%, transparent 100%);
+    border-top: 2px dashed var(--border-subtle);
 }
 
 .sidebar-user-card {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--r-xl);
+    background: #FFFFFF;
+    border: 2px solid var(--border-main);
+    border-radius: var(--r-lg);
     padding: var(--s-4);
     margin-bottom: var(--s-4);
+    box-shadow: 4px 4px 0 0 var(--border-subtle);
 }
 
 .sidebar-user {
@@ -135,16 +135,15 @@
 .sidebar-user-avatar {
     width: 44px;
     height: 44px;
-    border-radius: var(--r-full);
-    background: linear-gradient(135deg, var(--bg-surface), var(--bg-body));
+    border-radius: 50%;
+    background: var(--bg-main);
     border: 2px solid var(--border-main);
     display: flex;
     align-items: center;
     justify-content: center;
     font-weight: 800;
-    color: var(--primary-light);
+    color: var(--primary);
     font-size: 1.1rem;
-    box-shadow: var(--shadow-sm);
 }
 
 .sidebar-user-info {
@@ -153,18 +152,18 @@
 }
 
 .sidebar-user-name {
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--text-white);
+    font-family: var(--font-title);
+    font-size: 1.1rem;
+    color: var(--text-main);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
 .sidebar-user-role {
+    font-family: var(--font-sans);
     font-size: 0.8rem;
     color: var(--text-dim);
-    font-weight: 500;
 }
 
 /* Main Content Area */
@@ -172,242 +171,229 @@
     flex: 1;
     margin-left: 280px;
     padding: var(--s-14) var(--s-20);
-    background: radial-gradient(circle at 50% 0%, rgba(79, 70, 229, 0.08) 0%, transparent 70%);
 }
 
 /* Dashboard Header */
 .dashboard-header {
     margin-bottom: var(--s-16);
+    position: relative;
+}
+
+.dashboard-header::after {
+    content: '';
+    position: absolute;
+    bottom: -20px;
+    left: 0;
+    width: 200px;
+    height: 4px;
+    background: var(--accent-amber);
+    opacity: 0.4;
+    border-radius: 2px;
 }
 
 .dashboard-greeting {
-    font-size: 2.75rem;
-    font-weight: 900;
-    letter-spacing: -0.04em;
+    font-family: var(--font-title);
+    font-size: 3rem;
+    font-weight: 400;
     margin-bottom: var(--s-3);
-    line-height: 1.1;
+    line-height: 1.2;
 }
 
 .dashboard-greeting span {
-    background: linear-gradient(to right, var(--primary-light), var(--secondary-light));
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
+    color: var(--primary);
+    background: none;
+    -webkit-text-fill-color: unset;
 }
 
 .dashboard-subtitle {
-    font-size: 1.2rem;
+    font-family: var(--font-hand);
+    font-size: 1.6rem;
     color: var(--text-muted);
-    font-weight: 500;
 }
 
 /* Class Grid */
 .class-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-    gap: var(--s-10);
+    gap: var(--s-12);
 }
 
 .class-card {
-    padding: 0;
-    overflow: hidden;
-    background: var(--bg-card);
-    backdrop-filter: blur(12px);
-    border: 1px solid var(--border-main);
-    border-radius: var(--r-2xl);
-    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.3);
-    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    background: #FFFFFF;
+    border: 2px solid var(--border-main);
+    border-radius: 4px; /* Square like Polaroid */
+    padding: var(--s-4); /* Internal padding for Polaroid look */
+    box-shadow: 4px 8px 20px rgba(62, 54, 46, 0.08);
+    transition: all 0.4s var(--ease-out);
 }
 
 .class-card:hover {
-    border-color: var(--primary-light);
-    transform: translateY(-10px) scale(1.02);
-    box-shadow: 0 20px 40px -15px rgba(79, 70, 229, 0.3);
+    transform: translateY(-8px) rotate(1deg);
+    box-shadow: 6px 12px 25px rgba(62, 54, 46, 0.12);
 }
 
 .class-card-banner {
-    height: 120px;
-    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    height: 200px;
+    background: var(--bg-main);
+    border-radius: 2px;
     position: relative;
     overflow: hidden;
-}
-
-.class-card-banner::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.2));
+    margin-bottom: var(--s-6);
 }
 
 .class-card-body {
-    padding: var(--s-10) var(--s-8);
+    padding: var(--s-4) var(--s-2);
 }
 
 .class-card-name {
+    font-family: var(--font-title);
     font-size: 1.6rem;
-    font-weight: 850;
-    color: var(--text-white);
+    color: var(--text-main);
     margin-bottom: var(--s-2);
-    letter-spacing: -0.02em;
 }
 
 .class-card-info {
-    font-size: 1rem;
+    font-family: var(--font-point);
+    font-size: 1.2rem;
     color: var(--text-muted);
-    margin-bottom: var(--s-10);
+    margin-bottom: var(--s-8);
     display: flex;
     align-items: center;
     gap: var(--s-4);
-    font-weight: 500;
 }
 
 .class-card-actions {
     display: flex;
     gap: var(--s-4);
     padding-top: var(--s-6);
-    border-top: 1px solid var(--border-subtle);
+    border-top: 1px dashed var(--border-light);
 }
 
 /* Add Class Card */
 .add-class-card {
-    border: 2px dashed var(--border-subtle);
-    border-radius: var(--r-2xl);
+    border: 3px dashed var(--border-main);
+    border-radius: var(--r-xl);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: var(--s-6);
     padding: var(--s-12);
-    min-height: 320px;
+    min-height: 380px;
     cursor: pointer;
-    transition: all 0.3s ease;
-    background: rgba(255, 255, 255, 0.01);
+    background: #FFFDFC;
     color: var(--text-dim);
+    transition: all 0.3s ease;
 }
 
-.add-class-button:hover {
-    border-color: var(--primary-light);
-    border-style: solid;
-    background: rgba(79, 70, 229, 0.08);
-    color: var(--text-white);
+.add-class-card:hover {
+    border-color: var(--primary);
+    background: #FFFFFF;
     transform: scale(1.02);
+    color: var(--primary);
 }
 
-.add-class-button-icon {
-    font-size: 3rem;
-    background: var(--bg-surface);
-    width: 64px;
-    height: 64px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: var(--r-lg);
+.add-class-icon {
+    font-size: 4rem;
     margin-bottom: var(--s-2);
 }
 
-/* Lesson/Assign Mode Specifics */
-.mode-tabs {
-    background: var(--bg-surface);
-    padding: 4px;
-    border-radius: var(--r-md);
+/* Mode Selection / Tabs */
+.tabs {
+    background: var(--bg-main);
+    padding: 6px;
+    border-radius: 12px;
     display: inline-flex;
     margin-bottom: var(--s-8);
+    border: 1px solid var(--border-subtle);
 }
 
-.mode-tab {
-    padding: 0.6rem 1.5rem;
-    border-radius: var(--r-sm);
-    font-size: 0.95rem;
-    font-weight: 600;
+.tab {
+    padding: 0.8rem 2rem;
+    font-family: var(--font-title);
+    font-size: 1.1rem;
     color: var(--text-muted);
+    border-radius: 8px;
     cursor: pointer;
-    transition: var(--transition-all);
+    transition: all 0.3s ease;
 }
 
-.mode-tab.active {
-    background: var(--primary);
-    color: white;
-    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2);
+.tab.active {
+    background: #FFFFFF;
+    color: var(--primary);
+    box-shadow: 2px 2px 0 0 var(--border-main);
 }
 
-/* Assignments & Announcements Items */
+/* Feed Items (Announcements) */
 .feed-item {
-    background: var(--bg-surface);
-    border: 1px solid var(--border-main);
-    border-radius: var(--r-lg);
-    padding: var(--s-6);
-    margin-bottom: var(--s-4);
-    transition: var(--transition-all);
+    background: #FFFFFF;
+    border: 2px solid var(--border-main);
+    border-radius: 2px; /* Paper scrap look */
+    padding: var(--s-10);
+    margin-bottom: var(--s-8);
+    box-shadow: 3px 3px 0 0 var(--border-subtle);
+    position: relative;
 }
 
-.feed-item:hover {
-    border-color: var(--border-light);
-    transform: translateX(4px);
+.feed-item::before {
+    content: '';
+    position: absolute;
+    top: -12px;
+    left: 40px;
+    width: 60px;
+    height: 25px;
+    background: rgba(153, 169, 143, 0.4); /* Washi tape decoration */
+    border-radius: 2px;
+    transform: rotate(-2deg);
 }
 
 .feed-item-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: var(--s-4);
+    margin-bottom: var(--s-6);
 }
 
 .feed-item-title {
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: var(--text-white);
+    font-family: var(--font-title);
+    font-size: 1.8rem;
+    color: var(--text-main);
 }
 
 .feed-item-body {
-    font-size: 0.95rem;
-    color: var(--text-muted);
-    line-height: 1.6;
+    font-family: var(--font-sans);
+    font-size: 1.1rem;
+    color: var(--text-main);
+    line-height: 1.8;
 }
 
 .feed-item-footer {
-    margin-top: var(--s-6);
-    display: flex;
-    align-items: center;
-    gap: var(--s-6);
-    font-size: 0.85rem;
+    margin-top: var(--s-8);
+    font-family: var(--font-hand);
+    font-size: 1.4rem;
     color: var(--text-dim);
 }
 
 /* Student Management */
-.student-avatar-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-    gap: var(--s-6);
+.student-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: var(--s-4);
 }
 
-.student-card {
-    text-align: center;
-    cursor: pointer;
-    transition: var(--transition-all);
+.student-table th {
+    font-family: var(--font-point);
+    font-size: 1.2rem;
+    text-align: left;
+    padding: var(--s-4);
+    border-bottom: 2px solid var(--border-main);
 }
 
-.student-card:hover {
-    transform: scale(1.05);
+.student-table td {
+    padding: var(--s-4);
+    border-bottom: 1px dashed var(--border-light);
 }
 
-.student-card-avatar {
-    width: 72px;
-    height: 72px;
-    border-radius: var(--r-full);
-    background: var(--bg-surface);
-    margin: 0 auto var(--s-2);
-    padding: var(--s-3);
-    border: 2px solid transparent;
-    transition: var(--transition-all);
-}
-
-.student-card:hover .student-card-avatar {
-    border-color: var(--primary);
-    background: rgba(79, 70, 229, 0.1);
-}
-
-.student-card-name {
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: var(--text-main);
-}
+.student-code {
+    font-family: 'Courier New', monospace;
+    background: var(--bg-main);
+    padding: 2px 6px;
+    border-radius: 4px;
+}

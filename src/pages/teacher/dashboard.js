@@ -40,8 +40,8 @@ export function renderTeacherDashboard(container) {
                 <span>${cls.name}</span>
               </div>
             `).join('')}
-            <div class="sidebar-class-item" id="sidebar-add-class" style="color:var(--primary-light); margin-top: var(--s-4);">
-              <div class="sidebar-class-icon" style="background:var(--bg-card); color:var(--primary-light); font-size:1.1rem; border:1px dashed var(--primary-glow)">+</div>
+            <div class="sidebar-class-item" id="sidebar-add-class">
+              <div class="sidebar-class-icon add-class-sidebar-icon">+</div>
               <span>클래스 추가</span>
             </div>
           </div>
@@ -95,7 +95,7 @@ export function renderTeacherDashboard(container) {
     })).then(results => results.join(''))}
             <div class="add-class-card" id="add-class-card">
               <div class="add-class-icon">＋</div>
-              <span style="font-weight:700; font-size:1.1rem">새 클래스 만들기</span>
+              <span>새 클래스 만들기</span>
             </div>
           </div>
         </main>

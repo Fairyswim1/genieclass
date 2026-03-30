@@ -54,7 +54,7 @@ export function renderAssignMode(container, params) {
               <button class="btn btn-primary btn-sm" id="btn-new-announcement">+ 공지 작성</button>
             </div>
             
-            <div id="announcement-form" class="card hidden" style="margin-bottom: var(--s-8); background: var(--bg-surface);">
+            <div id="announcement-form" class="card hidden" style="margin-bottom: var(--s-8);">
               <div class="form-group">
                 <label class="input-label">공지 제목</label>
                 <input type="text" class="input-field" id="ann-title" placeholder="제목을 입력하세요" />
@@ -108,7 +108,7 @@ export function renderAssignMode(container, params) {
               <button class="btn btn-primary btn-sm" id="btn-new-assignment">+ 과제 만들기</button>
             </div>
 
-            <div id="assignment-form" class="card hidden" style="margin-bottom: var(--s-8); background: var(--bg-surface);">
+            <div id="assignment-form" class="card hidden" style="margin-bottom: var(--s-8);">
               <div class="form-group">
                 <label class="input-label">과제 제목</label>
                 <input type="text" class="input-field" id="assign-title" placeholder="과제 제목을 입력하세요" />
@@ -135,7 +135,7 @@ export function renderAssignMode(container, params) {
               ${(await Promise.all(assignments.map(async a => {
       const subs = await getSubmissionsByAssignment(a.id);
       return `
-                  <div class="feed-item" style="border-left: 4px solid var(--primary);">
+                  <div class="feed-item homework-item">
                     <div class="feed-item-header">
                       <h3 class="feed-item-title">${a.title}</h3>
                       <button class="btn btn-danger btn-sm delete-btn" data-type="assign" data-id="${a.id}">삭제</button>

@@ -18,12 +18,11 @@ export function renderStudentLogin(container) {
     }
 
     container.innerHTML = `
-      <div class="star-bg"></div>
       <div class="auth-page page-enter">
         <div class="auth-card">
           <div class="auth-logo">
             <div class="auth-logo-icon">G</div>
-            <h1 class="auth-title"><span>Genie</span> Class</h1>
+            <h1 class="auth-title">Genie Class</h1>
             <p class="auth-subtitle">학생용 학습 서비스</p>
           </div>
 
