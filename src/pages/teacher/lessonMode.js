@@ -305,6 +305,14 @@ export function renderLessonMode(container, params) {
     wbCtx.lineCap = 'round';
     wbCtx.lineJoin = 'round';
 
+    // Handle resize
+    window.onresize = () => {
+      const temp = wbCtx.getImageData(0, 0, wbCanvas.width, wbCanvas.height);
+      wbCanvas.width = wrap.clientWidth;
+      wbCanvas.height = wrap.clientHeight;
+      wbCtx.putImageData(temp, 0, 0);
+    };
+
     wbCanvas.addEventListener('mousedown', (e) => { drawing = true; wbCtx.beginPath(); wbCtx.moveTo(e.offsetX, e.offsetY); });
     wbCanvas.addEventListener('mousemove', (e) => {
       if (!drawing) return;
@@ -318,13 +326,19 @@ export function renderLessonMode(container, params) {
 
   function bindWhiteboardEvents() {
     document.getElementById('wb-back')?.addEventListener('click', () => { activeView = 'lesson'; render(); });
+    
     document.querySelectorAll('.whiteboard-tool').forEach(btn => {
       btn.addEventListener('click', () => {
-        if (btn.dataset.tool === 'clear') { wbCtx.fillRect(0, 0, wbCanvas.width, wbCanvas.height); return; }
+        if (btn.dataset.tool === 'clear') {
+          wbCtx.fillStyle = '#000';
+          wbCtx.fillRect(0, 0, wbCanvas.width, wbCanvas.height);
+          return;
+        }
         currentTool = btn.dataset.tool;
         renderWhiteboardMode();
       });
     });
+
     document.querySelectorAll('.color-dot').forEach(dot => {
       dot.addEventListener('click', () => {
         penColor = dot.dataset.color;
@@ -333,6 +347,65 @@ export function renderLessonMode(container, params) {
         dot.classList.add('active');
       });
     });
+
+    document.getElementById('wb-record')?.addEventListener('click', handleRecordToggle);
+    document.getElementById('wb-save')?.addEventListener('click', handleSavePresentation);
+  }
+
+  async function handleRecordToggle() {
+    if (!isRecording) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
+        mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
+        mediaRecorder.onstop = () => {
+          recordedAudioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        };
+        mediaRecorder.start();
+        isRecording = true;
+        renderWhiteboardMode();
+        showToast('🎙 녹음을 시작합니다.');
+      } catch (err) {
+        showToast('마이크 접근 권한이 필요합니다.', 'error');
+      }
+    } else {
+      mediaRecorder.stop();
+      mediaRecorder.stream.getTracks().forEach(t => t.stop());
+      isRecording = false;
+      renderWhiteboardMode();
+      showToast('⏹ 녹음이 중지되었습니다.');
+    }
+  }
+
+  async function handleSavePresentation() {
+    showToast('💾 저장 중...', 'info');
+    try {
+      // 1. Canvas to Blob
+      const canvasBlob = await new Promise(resolve => wbCanvas.toBlob(resolve, 'image/png'));
+      const imageFile = new File([canvasBlob], `wb_${Date.now()}.png`, { type: 'image/png' });
+      const savedImage = await saveFile(imageFile);
+
+      // 2. Audio to Blob (if exists)
+      let savedAudio = null;
+      if (recordedAudioBlob) {
+        const audioFile = new File([recordedAudioBlob], `voice_${Date.now()}.webm`, { type: 'audio/webm' });
+        savedAudio = await saveFile(audioFile);
+      }
+
+      // 3. Save to presentation record
+      await addPresentation(selectedStudent.id, classId, {
+        whiteboardImage: savedImage,
+        audioData: savedAudio
+      });
+
+      showToast('발표 자료가 성공적으로 저장되었습니다! 🎉');
+      activeView = 'lesson';
+      render();
+    } catch (err) {
+      console.error(err);
+      showToast('저장 중 오류가 발생했습니다.', 'error');
+    }
   }
 
   init();
