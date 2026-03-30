@@ -474,3 +474,57 @@
     transform: scale(1.2);
     box-shadow: 0 0 0 2px var(--primary);
 }
+
+/* Student Avatar Grid & Cards (Fix Overlap) */
+.student-avatar-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: var(--s-6) !important;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    cursor: pointer;
+    background: #FFFFFF;
+    border: 2px solid var(--border-main);
+    border-radius: 16px;
+    position: relative;
+    overflow: visible;
+}
+
+.student-avatar-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(62, 54, 46, 0.08);
+    border-color: var(--primary-light);
+}
+
+.student-avatar-card.selected {
+    border-color: var(--primary);
+    background: #FFFDFC;
+    box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
+}
+
+.student-character {
+    margin-bottom: var(--s-4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 90px;
+}
+
+.student-name {
+    font-family: var(--font-title);
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-main);
+    margin-bottom: 4px;
+    width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.student-praise-count {
+    font-family: var(--font-hand);
+    font-size: 1.2rem;
+    color: var(--text-dim);
+}

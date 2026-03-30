@@ -68,10 +68,11 @@ export function renderCharacter(level, size = 80, type = 'chick') {
         font-size: ${fontSize}px;
         z-index: 2;
         filter: drop-shadow(2px 4px 4px rgba(62, 54, 46, 0.1));
-        line-height: 1;
+        line-height: 1.1;
         display: flex;
         align-items: center;
         justify-content: center;
+        white-space: nowrap;
       ">
         ${displayEmoji}
       </div>
