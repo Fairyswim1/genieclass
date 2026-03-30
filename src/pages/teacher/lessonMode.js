@@ -313,15 +313,52 @@ export function renderLessonMode(container, params) {
       wbCtx.putImageData(temp, 0, 0);
     };
 
-    wbCanvas.addEventListener('mousedown', (e) => { drawing = true; wbCtx.beginPath(); wbCtx.moveTo(e.offsetX, e.offsetY); });
-    wbCanvas.addEventListener('mousemove', (e) => {
+    // Coordinate helper
+    const getPos = (e) => {
+      const rect = wbCanvas.getBoundingClientRect();
+      if (e.touches && e.touches[0]) {
+        return {
+          x: e.touches[0].clientX - rect.left,
+          y: e.touches[0].clientY - rect.top
+        };
+      }
+      return { x: e.offsetX, y: e.offsetY };
+    };
+
+    const startDrawing = (e) => {
+      drawing = true;
+      const pos = getPos(e);
+      wbCtx.beginPath();
+      wbCtx.moveTo(pos.x, pos.y);
+      if (e.type === 'touchstart') e.preventDefault();
+    };
+
+    const moveDrawing = (e) => {
       if (!drawing) return;
+      const pos = getPos(e);
       wbCtx.strokeStyle = currentTool === 'eraser' ? '#000' : penColor;
       wbCtx.lineWidth = currentTool === 'eraser' ? penSize * 10 : penSize;
-      wbCtx.lineTo(e.offsetX, e.offsetY);
+      wbCtx.lineTo(pos.x, pos.y);
       wbCtx.stroke();
-    });
-    wbCanvas.addEventListener('mouseup', () => { drawing = false; wbCtx.closePath(); });
+      if (e.type === 'touchmove') e.preventDefault();
+    };
+
+    const stopDrawing = () => {
+      drawing = false;
+      wbCtx.closePath();
+    };
+
+    // Mouse Listeners
+    wbCanvas.addEventListener('mousedown', startDrawing);
+    wbCanvas.addEventListener('mousemove', moveDrawing);
+    wbCanvas.addEventListener('mouseup', stopDrawing);
+    wbCanvas.addEventListener('mouseleave', stopDrawing);
+
+    // Touch Listeners
+    wbCanvas.addEventListener('touchstart', startDrawing);
+    wbCanvas.addEventListener('touchmove', moveDrawing);
+    wbCanvas.addEventListener('touchend', stopDrawing);
+    wbCanvas.addEventListener('touchcancel', stopDrawing);
   }
 
   function bindWhiteboardEvents() {
