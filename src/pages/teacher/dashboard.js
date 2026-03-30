@@ -81,8 +81,6 @@ export function renderTeacherDashboard(container) {
                     <div class="class-card-name">${cls.name}</div>
                     <div class="class-card-info">
                       <span>👤 ${students.length}명</span>
-                      <span>•</span>
-                      <span>${formatDate(cls.createdAt)}</span>
                     </div>
                     <div class="class-card-actions">
                       <button class="btn btn-primary btn-sm class-enter-btn" data-class-id="${cls.id}">입장</button>

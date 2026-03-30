@@ -170,7 +170,7 @@
 .main-content {
     flex: 1;
     margin-left: 280px;
-    padding: var(--s-14) var(--s-20);
+    padding: var(--s-16) var(--s-24);
 }
 
 /* Dashboard Header */
@@ -214,8 +214,8 @@
 /* Class Grid */
 .class-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-    gap: var(--s-12);
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: var(--s-10);
 }
 
 .class-card {
@@ -233,7 +233,7 @@
 }
 
 .class-card-banner {
-    height: 200px;
+    height: 160px;
     background: var(--bg-main);
     border-radius: 2px;
     position: relative;
@@ -242,7 +242,7 @@
 }
 
 .class-card-body {
-    padding: var(--s-4) var(--s-2);
+    padding: var(--s-6) var(--s-4);
 }
 
 .class-card-name {
@@ -329,9 +329,9 @@
     background: #FFFFFF;
     border: 2px solid var(--border-main);
     border-radius: 2px; /* Paper scrap look */
-    padding: var(--s-10);
-    margin-bottom: var(--s-8);
-    box-shadow: 3px 3px 0 0 var(--border-subtle);
+    padding: var(--s-16);
+    margin-bottom: var(--s-12);
+    box-shadow: 4px 4px 0 0 var(--border-subtle);
     position: relative;
 }
 
