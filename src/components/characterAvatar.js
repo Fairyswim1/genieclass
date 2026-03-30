@@ -12,17 +12,17 @@ const ANIMAL_TYPES = {
 
 const GROWTH_STAGES = {
   1: { name: '신비로운 알', badge: '🥚', glow: 'rgba(235, 227, 213, 0.4)' },
-  2: { name: '갓 태어난 아기', badge: '🍼', glow: 'rgba(243, 202, 82, 0.3)' },
-  3: { name: '쑥쑥 자란 꼬마', badge: '✨', glow: 'rgba(153, 169, 143, 0.3)' },
-  4: { name: '멋쟁이 친구', badge: '🎩', glow: 'rgba(230, 164, 180, 0.3)' },
-  5: { name: '전설의 대장님', badge: '👑', glow: 'rgba(209, 125, 57, 0.4)' }
+  2: { name: '아기 동물 친구', badge: '👶', glow: 'rgba(243, 202, 82, 0.3)' },
+  3: { name: '쑥쑥 자란 어린이', badge: '🌱', glow: 'rgba(153, 169, 143, 0.3)' },
+  4: { name: '듬직한 어른', badge: '💼', glow: 'rgba(230, 164, 180, 0.3)' },
+  5: { name: '위대한 대장님', badge: '🦸', glow: 'rgba(209, 125, 57, 0.4)' }
 };
 
 const ANIMAL_LEVEL_ASSETS = {
-  chick: ['🥚', '🐣', '🐥', '🐥🎩', '👑👑🐥'],
-  puppy: ['🥚', '🐶', '🐕', '🐕🎒', '👑👑🐕'],
-  kitty: ['🥚', '🐱', '🐈', '🐈🕶️', '👑👑🐈'],
-  bunny: ['🥚', '🐰', '🐇', '🐇🎀', '👑👑🐇']
+  chick: ['🥚', '🐣', '🐥', '🐔', '🐓'],
+  puppy: ['🥚', '🐶', '🐕', '🐩', '🐺'],
+  kitty: ['🥚', '🐱', '🐈', '🐈‍⬛', '🐯'],
+  bunny: ['🥚', '🐰', '🐇', '🎠', '🦄']
 };
 
 export function getLevelConfig(level, type = 'chick') {
