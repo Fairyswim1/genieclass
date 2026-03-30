@@ -363,10 +363,11 @@ export async function createAnnouncement(classId, data) {
 
 export async function getAnnouncementsByClass(classId) {
     const q = query(collection(db, COLLECTIONS.ANNOUNCEMENTS),
-        where('classId', '==', classId),
-        orderBy('createdAt', 'desc'));
+        where('classId', '==', classId));
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => doc.data());
+    return snapshot.docs
+        .map(doc => doc.data())
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 }
 
 export async function deleteAnnouncement(announcementId) {
@@ -390,10 +391,11 @@ export async function addResource(classId, data) {
 
 export async function getResourcesByClass(classId) {
     const q = query(collection(db, COLLECTIONS.RESOURCES),
-        where('classId', '==', classId),
-        orderBy('createdAt', 'desc'));
+        where('classId', '==', classId));
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => doc.data());
+    return snapshot.docs
+        .map(doc => doc.data())
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 }
 
 export async function deleteResource(resourceId) {
@@ -461,10 +463,12 @@ export function listenToActiveQuiz(classId, callback) {
 
 export function listenToQuizSubmissions(quizId, callback) {
     const q = query(collection(db, COLLECTIONS.QUIZ_SUBMISSIONS),
-        where('quizId', '==', quizId),
-        orderBy('createdAt', 'desc'));
+        where('quizId', '==', quizId));
     return onSnapshot(q, (snapshot) => {
-        callback(snapshot.docs.map(doc => doc.data()));
+        const subs = snapshot.docs
+            .map(doc => doc.data())
+            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        callback(subs);
     });
 }
 
@@ -515,14 +519,14 @@ export async function downloadFile(fileId) {
 // ========== Utils ==========
 function getRandomColor() {
     const colors = [
-        'linear-gradient(135deg, #6C5CE7, #A29BFE)',
-        'linear-gradient(135deg, #FF6B6B, #FFA07A)',
-        'linear-gradient(135deg, #6BCB77, #4ECDC4)',
-        'linear-gradient(135deg, #FFD93D, #FFA94D)',
-        'linear-gradient(135deg, #4ECDC4, #44A3F1)',
-        'linear-gradient(135deg, #FF6B9D, #C44569)',
-        'linear-gradient(135deg, #A29BFE, #6C5CE7)',
-        'linear-gradient(135deg, #FD79A8, #E84393)',
+        'linear-gradient(135deg, #4F46E5, #818CF8)', // Indigo
+        'linear-gradient(135deg, #0D9488, #2DD4BF)', // Teal
+        'linear-gradient(135deg, #7C3AED, #A78BFA)', // Violet
+        'linear-gradient(135deg, #DB2777, #F472B6)', // Pink
+        'linear-gradient(135deg, #2563EB, #60A5FA)', // Blue
+        'linear-gradient(135deg, #059669, #34D399)', // Green
+        'linear-gradient(135deg, #D97706, #FBBF24)', // Amber
+        'linear-gradient(135deg, #EA580C, #FB923C)', // Orange
     ];
     return colors[Math.floor(Math.random() * colors.length)];
 }

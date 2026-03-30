@@ -23,28 +23,31 @@
   --error: #EF4444;
   --info: #3B82F6;
 
-  /* Neutrals - Dark Mode Elite */
-  --bg-deep: #0B0E14;
+  /* Neutrals - Premium Indigo Navy Elite */
+  --bg-deep: #0B0F1A;
   --bg-main: #0F172A;
   --bg-surface: #1E293B;
-  --bg-glass: rgba(30, 41, 59, 0.7);
-  --bg-glass-heavy: rgba(15, 23, 42, 0.9);
+  --bg-card: rgba(30, 41, 59, 0.4);
+  --bg-glass: rgba(15, 23, 42, 0.6);
+  --bg-glass-heavy: rgba(15, 23, 42, 0.85);
+  --bg-sidebar: #111827;
 
   --text-white: #F8FAFC;
   --text-main: #E2E8F0;
   --text-muted: #94A3B8;
   --text-dim: #64748B;
 
-  --border-subtle: rgba(255, 255, 255, 0.05);
-  --border-main: rgba(255, 255, 255, 0.1);
-  --border-light: rgba(255, 255, 255, 0.2);
+  --border-subtle: rgba(255, 255, 255, 0.03);
+  --border-main: rgba(255, 255, 255, 0.08);
+  --border-light: rgba(255, 255, 255, 0.15);
+  --border-glow: rgba(79, 70, 229, 0.2);
 
   /* Shadows */
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-  --shadow-premium: 0 0 50px -12px rgba(79, 70, 229, 0.25);
+  --shadow-lg: 0 10px 25px -3px rgb(0 0 0 / 0.15);
+  --shadow-xl: 0 25px 40px -10px rgb(0 0 0 / 0.2);
+  --shadow-premium: 0 0 60px -15px rgba(79, 70, 229, 0.3);
 
   /* Typography */
   --font-sans: 'Inter', 'Noto Sans KR', system-ui, -apple-system, sans-serif;
@@ -85,14 +88,15 @@ body {
   font-family: var(--font-sans);
   background: var(--bg-deep);
   background-image:
-    radial-gradient(at 0% 0%, rgba(79, 70, 229, 0.1) 0px, transparent 50%),
-    radial-gradient(at 100% 100%, rgba(14, 165, 233, 0.1) 0px, transparent 50%);
+    radial-gradient(at 0% 0%, rgba(79, 70, 229, 0.08) 0px, transparent 40%),
+    radial-gradient(at 100% 100%, rgba(14, 165, 233, 0.08) 0px, transparent 40%);
   color: var(--text-main);
   line-height: 1.6;
   min-height: 100vh;
   word-break: keep-all;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.01em;
 }
 
 #app {

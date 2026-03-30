@@ -40,20 +40,22 @@ export function renderTeacherDashboard(container) {
                 <span>${cls.name}</span>
               </div>
             `).join('')}
-            <div class="sidebar-class-item" id="sidebar-add-class" style="color:var(--primary-light);margin-top:var(--space-sm)">
-              <div class="sidebar-class-icon" style="background:var(--bg-card);color:var(--primary-light);font-size:1.2rem">+</div>
+            <div class="sidebar-class-item" id="sidebar-add-class" style="color:var(--primary-light); margin-top: var(--s-4);">
+              <div class="sidebar-class-icon" style="background:var(--bg-card); color:var(--primary-light); font-size:1.1rem; border:1px dashed var(--primary-glow)">+</div>
               <span>클래스 추가</span>
             </div>
           </div>
           <div class="sidebar-footer">
-            <div class="sidebar-user">
-              <div class="sidebar-user-avatar">${(teacher.displayName || teacher.email || 'T').charAt(0)}</div>
-              <div>
-                <div class="sidebar-user-name">${teacher.displayName || '선생님'}</div>
-                <div class="sidebar-user-role">교사</div>
+            <div class="sidebar-user-card">
+              <div class="sidebar-user">
+                <div class="sidebar-user-avatar">${(teacher.displayName || teacher.email || 'T').charAt(0)}</div>
+                <div class="sidebar-user-info">
+                  <div class="sidebar-user-name">${teacher.displayName || '선생님'}</div>
+                  <div class="sidebar-user-role">교사</div>
+                </div>
               </div>
+              <button class="btn btn-ghost btn-sm w-full" id="btn-logout">로그아웃</button>
             </div>
-            <button class="btn btn-ghost btn-sm w-full" id="btn-logout" style="margin-top:var(--space-sm)">로그아웃</button>
           </div>
         </aside>
 
@@ -91,9 +93,9 @@ export function renderTeacherDashboard(container) {
                 </div>
               `;
     })).then(results => results.join(''))}
-            <div class="card add-class-card" id="add-class-card">
-              <div class="add-class-icon">+</div>
-              <span>새 클래스 만들기</span>
+            <div class="add-class-card" id="add-class-card">
+              <div class="add-class-icon">＋</div>
+              <span style="font-weight:700; font-size:1.1rem">새 클래스 만들기</span>
             </div>
           </div>
         </main>

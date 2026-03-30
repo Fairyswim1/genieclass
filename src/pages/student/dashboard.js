@@ -78,10 +78,10 @@ export function renderStudentDashboard(container) {
         <main class="student-dashboard">
           <section class="student-welcome flex justify-between items-end">
             <div>
-              <h1 class="student-welcome-title">반가워요, <span>${freshStudent.name}</span>!</h1>
+              <h1 class="student-welcome-title">반가워요, <span>${freshStudent.name}</span>님!</h1>
               <p class="student-welcome-subtitle">${cls?.name || '클래스 정보 없음'} · ${config.name} (Lv.${freshStudent.characterLevel})</p>
             </div>
-            <div class="badge badge-purple animate-up">포인트: ${freshStudent.totalPoints}P</div>
+            <div class="badge badge-purple animate-up" style="padding: 8px 16px; font-size: 0.9rem;">포인트: ${freshStudent.totalPoints}P</div>
           </section>
 
           <section class="student-stats-row">
