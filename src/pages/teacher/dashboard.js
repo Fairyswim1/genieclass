@@ -298,7 +298,12 @@ export function renderTeacherDashboard(container) {
                     <td><span style="color:var(--text-secondary)">${s.number || '-'}</span></td>
                     <td><span style="font-weight:600">${s.name}</span></td>
                     <td><span class="student-code">${s.uniqueCode}</span></td>
-                    <td><span class="badge badge-primary">Lv.${s.characterLevel}</span></td>
+                    <td>
+                      <div class="flex items-center gap-sm">
+                        ${renderCharacter(s.characterLevel, 32, s.characterType || 'chick')}
+                        <span class="badge badge-primary">Lv.${s.characterLevel}</span>
+                      </div>
+                    </td>
                     <td><span class="badge badge-gold">⭐ ${s.praiseCount}</span></td>
                     <td><button class="btn btn-ghost btn-sm delete-student-btn" data-student-id="${s.id}" style="color:var(--red);font-size:0.8rem">삭제</button></td>
                   </tr>

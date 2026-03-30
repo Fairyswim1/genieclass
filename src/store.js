@@ -141,6 +141,7 @@ export async function addStudent(name, classId, number = '') {
         loginId: '',   // Initial: empty
         password: '',  // Initial: empty
         characterLevel: 1,
+        characterType: 'chick', // Default
         praiseCount: 0,
         totalPoints: 0,
         createdAt: new Date().toISOString(),
@@ -220,6 +221,18 @@ export async function praiseStudent(studentId) {
         return { ...data, praiseCount: data.praiseCount + 1, totalPoints: newPoints, characterLevel: newLevel };
     }
     return null;
+}
+
+export async function updateStudentCharacterType(studentId, type) {
+    const ref = doc(db, COLLECTIONS.STUDENTS, studentId);
+    await updateDoc(ref, { characterType: type });
+    
+    // Also update local storage if it's the current student
+    const current = getCurrentStudent();
+    if (current && current.id === studentId) {
+        current.characterType = type;
+        localStorage.setItem('genie_current_student', JSON.stringify(current));
+    }
 }
 
 export async function deleteStudent(studentId) {

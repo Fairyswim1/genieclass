@@ -8,9 +8,9 @@ import {
   getResourcesByClass, getStudentById, formatDate,
   listenToActiveQuiz, listenToQuizSubmissions, submitQuizSolution,
   showToast, downloadFile, getStudentByCode,
-  submitAssignment, saveFile
+  submitAssignment, saveFile, updateStudentCharacterType
 } from '../../store.js';
-import { renderCharacter, getLevelConfig } from '../../components/characterAvatar.js';
+import { renderCharacter, getLevelConfig, ANIMAL_TYPES } from '../../components/characterAvatar.js';
 
 export function renderStudentDashboard(container) {
   const student = getCurrentStudent();
@@ -43,7 +43,7 @@ export function renderStudentDashboard(container) {
     try {
       freshStudent = await getStudentByCode(student.uniqueCode) || student;
       cls = await getClassById(freshStudent.classId);
-      config = getLevelConfig(freshStudent.characterLevel);
+      config = getLevelConfig(freshStudent.characterLevel, freshStudent.characterType || 'chick');
 
       [presentations, assignments, submissions, announcements, resources] = await Promise.all([
         getPresentationsByStudent(freshStudent.id),
@@ -69,7 +69,7 @@ export function renderStudentDashboard(container) {
             <div class="student-topbar-title">Genie Class</div>
           </div>
           <div class="student-topbar-user">
-            <div class="student-topbar-avatar">${renderCharacter(freshStudent.characterLevel, 34)}</div>
+            <div class="student-topbar-avatar">${renderCharacter(freshStudent.characterLevel, 34, freshStudent.characterType || 'chick')}</div>
             <div class="student-topbar-name">${freshStudent.name}</div>
             <button class="btn btn-ghost btn-sm" id="btn-student-logout" style="margin-left: 10px;">로그아웃</button>
           </div>
@@ -106,7 +106,7 @@ export function renderStudentDashboard(container) {
           <!-- Character & Progress -->
           <section class="card flex items-center gap-lg" style="margin-bottom: var(--s-12); padding: var(--s-8);">
             <div class="student-character-float">
-              ${renderCharacter(freshStudent.characterLevel, 100)}
+              ${renderCharacter(freshStudent.characterLevel, 100, freshStudent.characterType || 'chick')}
             </div>
             <div class="flex-1">
               <div class="flex justify-between items-end" style="margin-bottom: var(--s-2);">
@@ -118,7 +118,6 @@ export function renderStudentDashboard(container) {
               </div>
             </div>
           </section>
-
           <div class="student-grid">
             <!-- Assignments & Records -->
             <div class="flex flex-col gap-lg">
@@ -185,9 +184,36 @@ export function renderStudentDashboard(container) {
           </div>
         </main>
       </div>
+
+      <!-- Character Selection Modal -->
+      ${!freshStudent.characterType ? `
+        <div id="selection-modal" class="modal-backdrop active" style="z-index: 1000;">
+          <div class="modal-content animate-up" style="max-width: 500px; text-align: center; background: var(--bg-card);">
+            <h2 class="modal-title" style="margin-bottom: var(--s-4); font-family: var(--font-title);">🐾 나만의 동물 친구 고르기</h2>
+            <p style="color: var(--text-muted); margin-bottom: var(--s-8); font-family: var(--font-sans);">함께 성장할 단짝 친구를 선택해봐요!</p>
+            <div class="grid" style="grid-template-columns: 1fr 1fr; gap: var(--s-4); margin-bottom: var(--s-8);">
+              ${Object.entries(ANIMAL_TYPES).map(([id, info]) => `
+                <div class="card selection-card" data-type="${id}" style="cursor: pointer; padding: var(--s-6); transition: all 0.3s var(--ease-out); border: 2px solid var(--border-main);">
+                  <div style="font-size: 3rem; margin-bottom: 10px;">${info.icon}</div>
+                  <div style="font-family: var(--font-title); font-size: 1.2rem;">${info.name}</div>
+                </div>
+              `).join('')}
+            </div>
+            <button class="btn btn-primary btn-lg w-full" id="btn-confirm-selection" disabled>이 친구로 할래요!</button>
+          </div>
+        </div>
+        <style>
+          .selection-card.selected {
+            border-color: var(--primary) !important;
+            background: #FFFDFC !important;
+            transform: scale(1.05);
+            box-shadow: var(--shadow-lg);
+          }
+        </style>
+      ` : ''}
     `;
 
-    bindEvents(assignments);
+    bindEvents(assignments, freshStudent);
   }
 
   function startQuizListener() {
@@ -281,7 +307,34 @@ export function renderStudentDashboard(container) {
     if (existing) existing.remove();
   }
 
-  function bindEvents(assignments) {
+  function bindEvents(assignments, freshStudent) {
+    // Selection Modal Events
+    const modal = document.getElementById('selection-modal');
+    if (modal) {
+      let selectedType = null;
+      const confirmBtn = document.getElementById('btn-confirm-selection');
+      
+      modal.querySelectorAll('.selection-card').forEach(card => {
+        card.addEventListener('click', () => {
+          modal.querySelectorAll('.selection-card').forEach(c => c.classList.remove('selected'));
+          card.classList.add('selected');
+          selectedType = card.dataset.type;
+          confirmBtn.disabled = false;
+        });
+      });
+
+      confirmBtn.addEventListener('click', async () => {
+        if (!selectedType) return;
+        try {
+          await updateStudentCharacterType(freshStudent.id, selectedType);
+          showToast(`${ANIMAL_TYPES[selectedType].name}와(과) 친구가 되었어요! 🎉`);
+          render();
+        } catch (err) {
+          showToast('선택 중 오류가 발생했습니다.', 'error');
+        }
+      });
+    }
+
     document.getElementById('btn-student-logout')?.addEventListener('click', () => {
       logoutStudent(); if (unsubscribeQuiz) unsubscribeQuiz(); window.location.hash = '/student/login';
     });
