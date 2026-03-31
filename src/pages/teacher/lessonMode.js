@@ -32,8 +32,8 @@ export function renderLessonMode(container, params) {
   let currentTool = 'pen';
   let isRecording = false;
   let mediaRecorder = null;
-  let audioChunks = [];
-  let recordedAudioBlob = null;
+  let mediaChunks = [];
+  let recordedBlob = null;
   let recordingTimer = null;
   let recordingSeconds = 0;
 
@@ -418,26 +418,41 @@ export function renderLessonMode(container, params) {
   async function handleRecordToggle() {
     if (!isRecording) {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorder = new MediaRecorder(stream);
-        audioChunks = [];
-        mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
-        mediaRecorder.onstop = () => {
-          recordedAudioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const canvasStream = wbCanvas.captureStream(30); // 30 FPS
+        
+        // Combine tracks
+        const combinedStream = new MediaStream([
+          ...canvasStream.getVideoTracks(),
+          ...audioStream.getAudioTracks()
+        ]);
+
+        mediaRecorder = new MediaRecorder(combinedStream, {
+          mimeType: 'video/webm;codecs=vp8,opus'
+        });
+        
+        mediaChunks = [];
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data.size > 0) mediaChunks.push(e.data);
         };
+        mediaRecorder.onstop = () => {
+          recordedBlob = new Blob(mediaChunks, { type: 'video/webm' });
+        };
+        
         mediaRecorder.start();
         isRecording = true;
         renderWhiteboardMode();
-        showToast('🎙 녹음을 시작합니다.');
+        showToast('📹 화면과 음성 녹화를 시작합니다.');
       } catch (err) {
-        showToast('마이크 접근 권한이 필요합니다.', 'error');
+        console.error(err);
+        showToast('마이크 또는 화면 접근 권한이 필요합니다.', 'error');
       }
     } else {
       mediaRecorder.stop();
       mediaRecorder.stream.getTracks().forEach(t => t.stop());
       isRecording = false;
       renderWhiteboardMode();
-      showToast('⏹ 녹음이 중지되었습니다.');
+      showToast('⏹ 녹화가 중지되었습니다.');
     }
   }
 
@@ -449,17 +464,17 @@ export function renderLessonMode(container, params) {
       const imageFile = new File([canvasBlob], `wb_${Date.now()}.png`, { type: 'image/png' });
       const savedImage = await saveFile(imageFile);
 
-      // 2. Audio to Blob (if exists)
-      let savedAudio = null;
-      if (recordedAudioBlob) {
-        const audioFile = new File([recordedAudioBlob], `voice_${Date.now()}.webm`, { type: 'audio/webm' });
-        savedAudio = await saveFile(audioFile);
+      // 2. Video to Blob (if exists)
+      let savedVideo = null;
+      if (recordedBlob) {
+        const videoFile = new File([recordedBlob], `video_${Date.now()}.webm`, { type: 'video/webm' });
+        savedVideo = await saveFile(videoFile);
       }
 
       // 3. Save to presentation record
       await addPresentation(selectedStudent.id, classId, {
         whiteboardImage: savedImage,
-        audioData: savedAudio
+        audioData: savedVideo // Reusing audioData field for video URL
       });
 
       showToast('발표 자료가 성공적으로 저장되었습니다! 🎉');
