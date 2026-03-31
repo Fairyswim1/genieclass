@@ -425,11 +425,13 @@
     position: relative;
     overflow: hidden;
     background: #000;
+    touch-action: none;
 }
 
 #whiteboard-canvas {
     display: block;
     cursor: crosshair;
+    touch-action: none;
 }
 
 .whiteboard-tools {

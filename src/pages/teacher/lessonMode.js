@@ -298,67 +298,93 @@ export function renderLessonMode(container, params) {
     wbCanvas = document.getElementById('whiteboard-canvas');
     wbCtx = wbCanvas.getContext('2d');
     const wrap = wbCanvas.parentElement;
-    wbCanvas.width = wrap.clientWidth;
-    wbCanvas.height = wrap.clientHeight;
+    const dpr = window.devicePixelRatio || 1;
+    wbCanvas.width = wrap.clientWidth * dpr;
+    wbCanvas.height = wrap.clientHeight * dpr;
+    wbCtx.scale(dpr, dpr);
+
     wbCtx.fillStyle = '#000';
-    wbCtx.fillRect(0, 0, wbCanvas.width, wbCanvas.height);
+    wbCtx.fillRect(0, 0, wrap.clientWidth, wrap.clientHeight);
     wbCtx.lineCap = 'round';
     wbCtx.lineJoin = 'round';
+
+    let lastPoint = null;
+    let lastMidPoint = null;
 
     // Handle resize
     window.onresize = () => {
       const temp = wbCtx.getImageData(0, 0, wbCanvas.width, wbCanvas.height);
-      wbCanvas.width = wrap.clientWidth;
-      wbCanvas.height = wrap.clientHeight;
+      const dpr = window.devicePixelRatio || 1;
+      wbCanvas.width = wrap.clientWidth * dpr;
+      wbCanvas.height = wrap.clientHeight * dpr;
+      wbCtx.scale(dpr, dpr);
       wbCtx.putImageData(temp, 0, 0);
+      wbCtx.lineCap = 'round';
+      wbCtx.lineJoin = 'round';
     };
 
-    // Coordinate helper
     const getPos = (e) => {
       const rect = wbCanvas.getBoundingClientRect();
-      if (e.touches && e.touches[0]) {
-        return {
-          x: e.touches[0].clientX - rect.left,
-          y: e.touches[0].clientY - rect.top
-        };
-      }
-      return { x: e.offsetX, y: e.offsetY };
+      return {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      };
+    };
+
+    const getMidPoint = (p1, p2) => {
+      return { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
     };
 
     const startDrawing = (e) => {
+      if (e.button !== undefined && e.button !== 0) return; // Only primary button
       drawing = true;
       const pos = getPos(e);
+      lastPoint = pos;
+      lastMidPoint = pos;
+      
       wbCtx.beginPath();
       wbCtx.moveTo(pos.x, pos.y);
-      if (e.type === 'touchstart') e.preventDefault();
+      wbCanvas.setPointerCapture(e.pointerId);
     };
 
     const moveDrawing = (e) => {
       if (!drawing) return;
+      
       const pos = getPos(e);
+      const midPoint = getMidPoint(lastPoint, pos);
+
+      wbCtx.beginPath();
       wbCtx.strokeStyle = currentTool === 'eraser' ? '#000' : penColor;
-      wbCtx.lineWidth = currentTool === 'eraser' ? penSize * 10 : penSize;
+      wbCtx.lineWidth = currentTool === 'eraser' ? penSize * 15 : penSize; // Eraser slightly larger
+      
+      wbCtx.moveTo(lastMidPoint.x, lastMidPoint.y);
+      wbCtx.quadraticCurveTo(lastPoint.x, lastPoint.y, midPoint.x, midPoint.y);
+      wbCtx.stroke();
+
+      lastPoint = pos;
+      lastMidPoint = midPoint;
+    };
+
+    const stopDrawing = (e) => {
+      if (!drawing) return;
+      drawing = false;
+      const pos = getPos(e);
+      
+      // Draw final segment
       wbCtx.lineTo(pos.x, pos.y);
       wbCtx.stroke();
-      if (e.type === 'touchmove') e.preventDefault();
-    };
-
-    const stopDrawing = () => {
-      drawing = false;
       wbCtx.closePath();
+      
+      wbCanvas.releasePointerCapture(e.pointerId);
+      lastPoint = null;
+      lastMidPoint = null;
     };
 
-    // Mouse Listeners
-    wbCanvas.addEventListener('mousedown', startDrawing);
-    wbCanvas.addEventListener('mousemove', moveDrawing);
-    wbCanvas.addEventListener('mouseup', stopDrawing);
-    wbCanvas.addEventListener('mouseleave', stopDrawing);
-
-    // Touch Listeners
-    wbCanvas.addEventListener('touchstart', startDrawing);
-    wbCanvas.addEventListener('touchmove', moveDrawing);
-    wbCanvas.addEventListener('touchend', stopDrawing);
-    wbCanvas.addEventListener('touchcancel', stopDrawing);
+    // Pointer Listeners (Replaces Mouse & Touch)
+    wbCanvas.addEventListener('pointerdown', startDrawing);
+    wbCanvas.addEventListener('pointermove', moveDrawing);
+    wbCanvas.addEventListener('pointerup', stopDrawing);
+    wbCanvas.addEventListener('pointercancel', stopDrawing);
   }
 
   function bindWhiteboardEvents() {
