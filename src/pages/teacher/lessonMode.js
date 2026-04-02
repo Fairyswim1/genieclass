@@ -5,7 +5,7 @@ import {
   getCurrentTeacher, getClassById, getStudentsByClass,
   praiseStudent, showToast, getStudentById, addPresentation,
   toggleSharePresentation, startQuiz, stopQuiz, listenToQuizSubmissions,
-  saveFile
+  saveFile, getPresentationsByStudent
 } from '../../store.js';
 import { renderCharacter, getLevelConfig, renderPraiseAnimation } from '../../components/characterAvatar.js';
 
@@ -17,7 +17,8 @@ export function renderLessonMode(container, params) {
   let cls = null;
   let students = [];
   let selectedStudent = null;
-  let activeView = 'lesson'; // 'lesson', 'whiteboard', 'quiz'
+  let activeView = 'lesson'; // 'lesson', 'whiteboard', 'quiz', 'presentations'
+  let studentPresentations = [];
 
   // Quiz State
   let activeQuiz = null;
@@ -53,6 +54,11 @@ export function renderLessonMode(container, params) {
 
     if (activeView === 'quiz') {
       renderQuizMode();
+      return;
+    }
+
+    if (activeView === 'presentations') {
+      renderPresentationHistoryMode();
       return;
     }
 
@@ -110,6 +116,10 @@ export function renderLessonMode(container, params) {
                    <span style="font-size: 1.5rem;">🎤</span>
                    <span>발표하기</span>
                  </button>
+                 <button class="btn btn-ghost" id="btn-history" style="flex-direction: column; height: 100px; gap: 10px; border: 2px dashed var(--border-main);">
+                   <span style="font-size: 1.5rem;">📁</span>
+                   <span>발표 기록</span>
+                 </button>
                </div>
             </div>
           ` : ''}
@@ -144,6 +154,13 @@ export function renderLessonMode(container, params) {
 
     document.getElementById('btn-present')?.addEventListener('click', () => {
       activeView = 'whiteboard';
+      render();
+    });
+
+    document.getElementById('btn-history')?.addEventListener('click', async () => {
+      showToast('발표 기록을 불러오는 중...', 'info');
+      studentPresentations = await getPresentationsByStudent(selectedStudent.id);
+      activeView = 'presentations';
       render();
     });
   }
@@ -518,6 +535,98 @@ export function renderLessonMode(container, params) {
     // Update Tool States
     document.querySelectorAll('.whiteboard-tool').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.tool === currentTool);
+    });
+  }
+
+  // --- Presentation History Mode ---
+  function renderPresentationHistoryMode() {
+    container.innerHTML = `
+      <div class="teacher-layout page-enter">
+        <main class="main-content" style="max-width: 1400px; margin: 0 auto; width: 100%;">
+          <header class="page-header flex justify-between items-center" style="margin-bottom: var(--s-8);">
+            <div class="flex items-center gap-md">
+              <button class="btn btn-ghost btn-sm" id="history-back">← 수업으로</button>
+              <h1 class="page-title">${selectedStudent.name} 학생의 <span class="badge badge-purple">발표 기록</span></h1>
+            </div>
+            <div class="badge badge-blue">총 ${studentPresentations.length}개의 발표</div>
+          </header>
+
+          ${studentPresentations.length === 0 ? `
+            <div class="card" style="padding: 100px; text-align: center;">
+              <div style="font-size: 3rem; margin-bottom: 20px;">📁</div>
+              <p style="color: var(--text-muted);">아직 저장된 발표 자료가 없습니다.</p>
+            </div>
+          ` : `
+            <div class="grid" style="grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: var(--s-8);">
+              ${studentPresentations.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map(p => `
+                <div class="card presentation-card animate-up" style="padding: var(--s-4); position: relative;">
+                  <div class="badge badge-main" style="position: absolute; top: 15px; left: 15px; z-index: 2;">
+                    ${formatDate(p.createdAt)}
+                  </div>
+                  <div class="presentation-media" style="background: #000; border-radius: var(--r-md); overflow: hidden; margin-bottom: var(--s-4);">
+                    <img src="${p.whiteboardImage?.url}" style="width: 100%; aspect-ratio: 16/9; object-fit: contain;" />
+                  </div>
+                  <div class="flex flex-col gap-sm">
+                    ${p.audioData ? `
+                      <button class="btn btn-primary w-full play-video-btn" data-url="${p.audioData.url}">
+                        🎬 발표 영상 재생
+                      </button>
+                    ` : `
+                      <button class="btn btn-ghost w-full" disabled>영상 없음</button>
+                    `}
+                    <button class="btn btn-secondary w-full" onclick="window.open('${p.whiteboardImage?.url}')">
+                      🖼️ 원본 이미지 보기
+                    </button>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          `}
+        </main>
+      </div>
+
+      <!-- Video Modal -->
+      <div class="modal-backdrop" id="video-modal" style="z-index: 2000;">
+        <div class="modal-content" style="max-width: 1000px; width: 90%; background: #000; padding: 0;">
+          <div class="modal-header" style="background: rgba(0,0,0,0.5); position: absolute; top: 0; left: 0; right: 0; z-index: 10;">
+             <h3 class="modal-title" style="color: #fff;">발표 영상</h3>
+             <button class="modal-close" style="color: #fff; background: rgba(255,255,255,0.1);" id="close-video-modal">✕</button>
+          </div>
+          <video id="player" controls style="width: 100%; aspect-ratio: 16/9; display: block; border-radius: var(--r-lg);">
+            소스가 없습니다.
+          </video>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('history-back')?.addEventListener('click', () => {
+      activeView = 'lesson';
+      render();
+    });
+
+    const videoModal = document.getElementById('video-modal');
+    const player = document.getElementById('player');
+    
+    document.querySelectorAll('.play-video-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        player.src = btn.dataset.url;
+        videoModal.classList.add('active');
+        player.play();
+      });
+    });
+
+    document.getElementById('close-video-modal')?.addEventListener('click', () => {
+      player.pause();
+      player.src = "";
+      videoModal.classList.remove('active');
+    });
+
+    videoModal.addEventListener('click', (e) => {
+      if (e.target === videoModal) {
+        player.pause();
+        player.src = "";
+        videoModal.classList.remove('active');
+      }
     });
   }
 
