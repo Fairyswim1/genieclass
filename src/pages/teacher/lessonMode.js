@@ -299,8 +299,12 @@ export function renderLessonMode(container, params) {
     wbCtx = wbCanvas.getContext('2d');
     const wrap = wbCanvas.parentElement;
     const dpr = window.devicePixelRatio || 1;
-    wbCanvas.width = wrap.clientWidth * dpr;
-    wbCanvas.height = wrap.clientHeight * dpr;
+    const w = wrap.clientWidth;
+    const h = wrap.clientHeight;
+    wbCanvas.width = w * dpr;
+    wbCanvas.height = h * dpr;
+    wbCanvas.style.width = w + 'px';
+    wbCanvas.style.height = h + 'px';
     wbCtx.scale(dpr, dpr);
 
     wbCtx.fillStyle = '#000';
@@ -313,14 +317,28 @@ export function renderLessonMode(container, params) {
 
     // Handle resize
     window.onresize = () => {
-      const temp = wbCtx.getImageData(0, 0, wbCanvas.width, wbCanvas.height);
+      if (!wbCanvas || !wbCtx) return;
       const dpr = window.devicePixelRatio || 1;
-      wbCanvas.width = wrap.clientWidth * dpr;
-      wbCanvas.height = wrap.clientHeight * dpr;
+      const w = wrap.clientWidth;
+      const h = wrap.clientHeight;
+      
+      // Save current content
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = wbCanvas.width;
+      tempCanvas.height = wbCanvas.height;
+      tempCanvas.getContext('2d').drawImage(wbCanvas, 0, 0);
+
+      // Resize
+      wbCanvas.width = w * dpr;
+      wbCanvas.height = h * dpr;
+      wbCanvas.style.width = w + 'px';
+      wbCanvas.style.height = h + 'px';
+      
+      // Restore & Set params
       wbCtx.scale(dpr, dpr);
-      wbCtx.putImageData(temp, 0, 0);
       wbCtx.lineCap = 'round';
       wbCtx.lineJoin = 'round';
+      wbCtx.drawImage(tempCanvas, 0, 0, w, h);
     };
 
     const getPos = (e) => {
@@ -393,12 +411,14 @@ export function renderLessonMode(container, params) {
     document.querySelectorAll('.whiteboard-tool').forEach(btn => {
       btn.addEventListener('click', () => {
         if (btn.dataset.tool === 'clear') {
-          wbCtx.fillStyle = '#000';
-          wbCtx.fillRect(0, 0, wbCanvas.width, wbCanvas.height);
+          if (confirm('전체 필기를 지우시겠습니까?')) {
+            wbCtx.fillStyle = '#000';
+            wbCtx.fillRect(0, 0, wbCanvas.width, wbCanvas.height);
+          }
           return;
         }
         currentTool = btn.dataset.tool;
-        renderWhiteboardMode();
+        updateWhiteboardUI();
       });
     });
 
@@ -408,6 +428,7 @@ export function renderLessonMode(container, params) {
         currentTool = 'pen';
         document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
         dot.classList.add('active');
+        updateWhiteboardUI();
       });
     });
 
@@ -441,7 +462,7 @@ export function renderLessonMode(container, params) {
         
         mediaRecorder.start();
         isRecording = true;
-        renderWhiteboardMode();
+        updateWhiteboardUI();
         showToast('📹 화면과 음성 녹화를 시작합니다.');
       } catch (err) {
         console.error(err);
@@ -451,7 +472,7 @@ export function renderLessonMode(container, params) {
       mediaRecorder.stop();
       mediaRecorder.stream.getTracks().forEach(t => t.stop());
       isRecording = false;
-      renderWhiteboardMode();
+      updateWhiteboardUI();
       showToast('⏹ 녹화가 중지되었습니다.');
     }
   }
@@ -484,6 +505,20 @@ export function renderLessonMode(container, params) {
       console.error(err);
       showToast('저장 중 오류가 발생했습니다.', 'error');
     }
+  }
+
+  function updateWhiteboardUI() {
+    // Update Record Button
+    const recordBtn = document.getElementById('wb-record');
+    if (recordBtn) {
+      recordBtn.innerHTML = isRecording ? '⏹ 중지' : '🎙 녹음';
+      recordBtn.className = `btn ${isRecording ? 'btn-danger' : 'btn-primary'} btn-sm`;
+    }
+    
+    // Update Tool States
+    document.querySelectorAll('.whiteboard-tool').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.tool === currentTool);
+    });
   }
 
   init();
