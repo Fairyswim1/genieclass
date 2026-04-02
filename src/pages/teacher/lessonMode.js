@@ -5,7 +5,7 @@ import {
   getCurrentTeacher, getClassById, getStudentsByClass,
   praiseStudent, showToast, getStudentById, addPresentation,
   toggleSharePresentation, startQuiz, stopQuiz, listenToQuizSubmissions,
-  saveFile, getPresentationsByStudent
+  saveFile, getPresentationsByStudent, formatDate
 } from '../../store.js';
 import { renderCharacter, getLevelConfig, renderPraiseAnimation } from '../../components/characterAvatar.js';
 
