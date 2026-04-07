@@ -1,57 +1,59 @@
-@import url('https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Jua&family=Gaegu:wght@400;700&family=Nanum+Pen+Script&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@400;500;600;700;900&display=swap');
 
 :root {
-  /* Primary Colors - Warm Honey & Earth Tones */
-  --primary: #D17D39;
-  --primary-light: #E4A16A;
-  --primary-dark: #A65A21;
-  --primary-glow: rgba(209, 125, 57, 0.2);
+  /* Primary Colors - Premium Indigo */
+  --primary: #4F46E5;
+  --primary-light: #6366F1;
+  --primary-dark: #3730A3;
+  --primary-glow: rgba(79, 70, 229, 0.2);
 
-  --secondary: #99A98F;
-  --secondary-light: #B4C4AB;
+  --secondary: #64748B;
+  --secondary-light: #94A3B8;
 
-  /* Accent Colors - Scrapbook Palette */
-  --accent-green: #8BA888;
-  --accent-pink: #E6A4B4;
-  --accent-amber: #F3CA52;
-  --accent-blue: #A2C4D1;
+  /* Accent Colors */
+  --accent-green: #10B981;
+  --accent-pink: #EC4899;
+  --accent-amber: #F59E0B;
+  --accent-blue: #0EA5E9;
+  --accent-purple: #8B5CF6;
 
   /* Semantic Colors */
-  --success: #7E9980;
-  --warning: #E0B445;
-  --error: #D16D6D;
-  --info: #86A3B8;
+  --success: #10B981;
+  --warning: #F59E0B;
+  --error: #EF4444;
+  --info: #3B82F6;
 
-  /* Neutrals - Warm Paper & Wood */
-  --bg-deep: #FDFBF7;
-  --bg-main: #F5F1E9;
+  /* Neutrals - Clean Slate */
+  --bg-deep: #F8FAFC;
+  --bg-main: #F1F5F9;
   --bg-surface: #FFFFFF;
   --bg-card: #FFFFFF;
-  --bg-glass: rgba(255, 255, 255, 0.7);
-  --bg-sidebar: #FFF9F2;
+  --bg-glass: rgba(255, 255, 255, 0.85);
+  --bg-glass-heavy: rgba(255, 255, 255, 0.6);
+  --bg-sidebar: #FFFFFF;
 
-  --text-main: #3E362E;
-  --text-white: #3E362E; /* In this theme, white-text sections should be brown */
-  --text-muted: #8B7E74;
-  --text-dim: #A69689;
+  --text-main: #0F172A;
+  --text-white: #FFFFFF;
+  --text-muted: #475569;
+  --text-dim: #94A3B8;
 
-  --border-subtle: #EBE3D5;
-  --border-main: #D1C7BD;
-  --border-light: #E5D9C8;
-  --border-glow: rgba(209, 125, 57, 0.1);
+  --border-subtle: #F1F5F9;
+  --border-main: #E2E8F0;
+  --border-light: #F8FAFC;
+  --border-glow: rgba(79, 70, 229, 0.1);
 
-  /* Shadows - Soft Paper Shadow */
-  --shadow-sm: 0 2px 4px rgba(62, 54, 46, 0.05);
-  --shadow-md: 0 4px 12px -2px rgba(62, 54, 46, 0.1);
-  --shadow-lg: 0 10px 25px -5px rgba(62, 54, 46, 0.12);
-  --shadow-xl: 0 20px 40px -12px rgba(62, 54, 46, 0.15);
-  --shadow-premium: 0 4px 20px rgba(62, 54, 46, 0.08);
+  /* Shadows - Modern & Clean */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --shadow-premium: 0 0 30px rgba(79, 70, 229, 0.15);
 
-  /* Typography - Friendly & Cozy */
-  --font-sans: 'Gowun Batang', 'Noto Sans KR', serif;
-  --font-title: 'Jua', sans-serif;
-  --font-point: 'Gaegu', cursive;
-  --font-hand: 'Nanum Pen Script', cursive;
+  /* Typography - Professional & Crisp */
+  --font-sans: 'Inter', 'Noto Sans KR', sans-serif;
+  --font-title: 'Inter', 'Noto Sans KR', sans-serif;
+  --font-point: 'Inter', 'Noto Sans KR', sans-serif;
+  --font-hand: 'Inter', 'Noto Sans KR', sans-serif;
 
   /* Spacing */
   --space-unit: 4px;
@@ -61,21 +63,22 @@
   --s-4: 16px;
   --s-6: 24px;
   --s-8: 32px;
+  --s-10: 40px; /* Fixed missing space! */
   --s-12: 48px;
   --s-16: 64px;
   --s-20: 80px;
   --s-24: 96px;
 
-  /* Border Radius - Extra Soft */
-  --r-sm: 8px;
-  --r-md: 14px;
-  --r-lg: 20px;
-  --r-xl: 32px;
+  /* Border Radius - Modern */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 16px;
+  --r-xl: 24px;
   --r-full: 9999px;
 
   /* Animation */
-  --ease-out: cubic-bezier(0.34, 1.56, 0.64, 1); /* Bouncy */
-  --transition-all: all 0.4s var(--ease-out);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-all: all 0.2s var(--ease-out);
 }
 
 /* Reset & Base */
@@ -90,10 +93,6 @@
 body {
   font-family: var(--font-sans);
   background: var(--bg-deep);
-  background-image: 
-    radial-gradient(#EBE3D5 1px, transparent 1px); /* Simple dot pattern like grid paper */
-  background-size: 24px 24px;
-  background-attachment: fixed;
   color: var(--text-main);
   line-height: 1.6;
   min-height: 100vh;
@@ -185,12 +184,12 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.7rem 1.8rem;
-  font-family: var(--font-title);
-  font-size: 1rem;
-  font-weight: 400; /* Jua is thick by default */
-  border-radius: var(--r-md);
-  border: 2px solid transparent;
+  padding: 0.6rem 1.2rem;
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  font-weight: 600;
+  border-radius: var(--r-sm);
+  border: 1px solid transparent;
   cursor: pointer;
   transition: var(--transition-all);
   white-space: nowrap;
@@ -199,26 +198,26 @@ body {
 .btn-primary {
   background: var(--primary);
   color: white;
-  box-shadow: 0 4px 0 0 var(--primary-dark);
+  box-shadow: var(--shadow-sm);
 }
 
 .btn-primary:hover {
   background: var(--primary-light);
-  transform: translateY(2px);
-  box-shadow: 0 2px 0 0 var(--primary-dark);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
 }
 
 .btn-secondary {
   background: var(--bg-surface);
-  border: 2px solid var(--border-main);
+  border: 1px solid var(--border-main);
   color: var(--text-main);
-  box-shadow: 0 4px 0 0 var(--border-main);
+  box-shadow: var(--shadow-sm);
 }
 
 .btn-secondary:hover {
   background: var(--bg-main);
-  transform: translateY(2px);
-  box-shadow: 0 2px 0 0 var(--border-main);
+  border-color: #CBD5E1;
+  transform: translateY(-1px);
 }
 
 .btn-ghost {
@@ -232,17 +231,16 @@ body {
 }
 
 .btn-danger {
-  background: #FFF5F5;
+  background: #FEF2F2;
   color: var(--error);
-  border: 2px solid var(--error);
-  box-shadow: 0 4px 0 0 var(--error);
+  border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
 .btn-danger:hover {
   background: var(--error);
   color: white;
-  transform: translateY(2px);
-  box-shadow: 0 2px 0 0 var(--error);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
 }
 
 .btn-sm {
@@ -258,36 +256,16 @@ body {
 /* Cards & Panels */
 .card {
   background: var(--bg-card);
-  border: 2px solid var(--border-main);
-  border-radius: var(--r-lg);
+  border: 1px solid var(--border-main);
+  border-radius: var(--r-md);
   padding: var(--s-8);
-  box-shadow: var(--shadow-md);
-  transition: var(--transition-all);
-  position: relative;
-}
-
-.card::before {
-  content: '';
-  position: absolute;
-  top: -10px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 40px;
-  height: 20px;
-  background: rgba(209, 125, 57, 0.2); /* Washi tape effect */
-  border-radius: 2px;
-  opacity: 0;
+  box-shadow: var(--shadow-sm);
   transition: var(--transition-all);
 }
 
 .card:hover {
-  border-color: var(--primary-light);
-  transform: scale(1.02) rotate(0.5deg);
-  box-shadow: var(--shadow-lg);
-}
-
-.card:hover::before {
-  opacity: 1;
+  border-color: #CBD5E1;
+  box-shadow: var(--shadow-md);
 }
 
 /* Gradients */
