@@ -8,6 +8,7 @@ import {
   saveFile, getPresentationsByStudent, formatDate
 } from '../../store.js';
 import { renderCharacter, getLevelConfig, renderPraiseAnimation } from '../../components/characterAvatar.js';
+import { getStroke } from 'perfect-freehand';
 
 export function renderLessonMode(container, params) {
   const teacher = getCurrentTeacher();
@@ -329,8 +330,21 @@ export function renderLessonMode(container, params) {
     wbCtx.lineCap = 'round';
     wbCtx.lineJoin = 'round';
 
-    let lastPoint = null;
-    let lastMidPoint = null;
+    let currentPoints = [];
+    let backupCanvas = document.createElement('canvas');
+    let backupCtx = backupCanvas.getContext('2d');
+
+    // Helper for perfect-freehand SVG Path
+    function getSvgPathFromStroke(stroke) {
+      if (!stroke.length) return '';
+      const d = stroke.reduce((acc, [x0, y0], i, arr) => {
+        const [x1, y1] = arr[(i + 1) % arr.length];
+        acc.push(x0, y0, (x0 + x1) / 2, (y0 + y1) / 2);
+        return acc;
+      }, ['M', ...stroke[0], 'Q']);
+      d.push('Z');
+      return d.join(' ');
+    }
 
     // Handle resize
     window.onresize = () => {
@@ -355,7 +369,11 @@ export function renderLessonMode(container, params) {
       wbCtx.scale(dpr, dpr);
       wbCtx.lineCap = 'round';
       wbCtx.lineJoin = 'round';
-      wbCtx.drawImage(tempCanvas, 0, 0, w, h);
+      
+      wbCtx.save();
+      wbCtx.setTransform(1, 0, 0, 1, 0, 0);
+      wbCtx.drawImage(tempCanvas, 0, 0);
+      wbCtx.restore();
     };
 
     const getPos = (e) => {
@@ -366,67 +384,88 @@ export function renderLessonMode(container, params) {
       };
     };
 
-    const getMidPoint = (p1, p2) => {
-      return { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
-    };
-
     const startDrawing = (e) => {
       if (e.button !== undefined && e.button !== 0) return; // Only primary button
       drawing = true;
-      const pos = getPos(e);
-      lastPoint = pos;
-      lastMidPoint = pos;
       
-      wbCtx.beginPath();
-      wbCtx.moveTo(pos.x, pos.y);
+      const pos = getPos(e);
+      const pressure = e.pointerType === 'pen' && e.pressure ? e.pressure : 0.5;
+      currentPoints = [[pos.x, pos.y, pressure]];
+      
+      // 백업 캔버스에 현재까지의 모든 완성된 그림 저장
+      backupCanvas.width = wbCanvas.width;
+      backupCanvas.height = wbCanvas.height;
+      backupCtx.drawImage(wbCanvas, 0, 0);
+
       wbCanvas.setPointerCapture(e.pointerId);
     };
 
     const moveDrawing = (e) => {
       if (!drawing) return;
       
-      // 필압 & 고빈도 터치펜 입력(coalesced events) 처리 - 끊김방지 및 완벽한 곡선 처리
+      // 고빈도 입력 수집
       const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
-      
       for (const ev of events) {
         const pos = getPos(ev);
-        const midPoint = getMidPoint(lastPoint, pos);
-
-        wbCtx.beginPath();
-        wbCtx.strokeStyle = currentTool === 'eraser' ? '#000' : penColor;
-        
-        // 터치펜(pen)에 대해서만 필압 반영, 그 외 마우스/손가락은 기본 굵기 유지
-        const isPen = ev.pointerType === 'pen';
-        const pressure = (isPen && ev.pressure) ? ev.pressure : 0.5;
-        const pressureMod = isPen ? Math.max(0.2, pressure * 2.5) : 1; 
-        
-        wbCtx.lineWidth = currentTool === 'eraser' ? penSize * 15 : penSize * pressureMod;
-        
-        wbCtx.moveTo(lastMidPoint.x, lastMidPoint.y);
-        wbCtx.quadraticCurveTo(lastPoint.x, lastPoint.y, midPoint.x, midPoint.y);
-        wbCtx.stroke();
-
-        lastPoint = pos;
-        lastMidPoint = midPoint;
+        const pressure = ev.pointerType === 'pen' && ev.pressure ? ev.pressure : 0.5;
+        currentPoints.push([pos.x, pos.y, pressure]);
       }
+      
+      // 1. 기존 완성 그림 복원 (물리적 픽셀 크기로)
+      wbCtx.save();
+      wbCtx.setTransform(1, 0, 0, 1, 0, 0);
+      wbCtx.clearRect(0, 0, wbCanvas.width, wbCanvas.height);
+      wbCtx.drawImage(backupCanvas, 0, 0);
+      wbCtx.restore();
+      
+      if (currentPoints.length < 2) return;
+
+      // 2. 현재 그리고 있는 한 획(Stroke) 렌더링
+      const isEraser = currentTool === 'eraser';
+      const strokeSize = isEraser ? penSize * 15 : penSize * 4;
+      
+      const strokePolygon = getStroke(currentPoints, {
+        size: strokeSize,
+        thinning: isEraser ? 0 : 0.6,
+        smoothing: 0.5,
+        streamline: 0.5,
+        simulatePressure: currentPoints[0][2] === 0.5 // 펜 필압이 없으면 시뮬레이션
+      });
+      
+      const pathData = getSvgPathFromStroke(strokePolygon);
+      if (!pathData) return;
+      
+      const path = new Path2D(pathData);
+      
+      wbCtx.save();
+      if (isEraser) {
+        // 진짜 지우개: 투명하게 뚫기
+        wbCtx.globalCompositeOperation = 'destination-out';
+        wbCtx.fillStyle = 'rgba(0,0,0,1)';
+      } else {
+        wbCtx.globalCompositeOperation = 'source-over';
+        wbCtx.fillStyle = penColor;
+      }
+      
+      wbCtx.fill(path);
+      wbCtx.restore();
     };
 
     const stopDrawing = (e) => {
       if (!drawing) return;
-      drawing = false;
+      
       const pos = getPos(e);
+      const pressure = e.pointerType === 'pen' && e.pressure ? e.pressure : 0.5;
+      currentPoints.push([pos.x, pos.y, pressure]);
       
-      // Draw final segment
-      wbCtx.lineTo(pos.x, pos.y);
-      wbCtx.stroke();
-      wbCtx.closePath();
+      moveDrawing(e); // 마지막 상태 렌더링
       
+      drawing = false;
+      currentPoints = [];
       wbCanvas.releasePointerCapture(e.pointerId);
-      lastPoint = null;
-      lastMidPoint = null;
     };
 
-    // Pointer Listeners (Replaces Mouse & Touch)
+    // Pointer Listeners
     wbCanvas.addEventListener('pointerdown', startDrawing);
     wbCanvas.addEventListener('pointermove', moveDrawing);
     wbCanvas.addEventListener('pointerup', stopDrawing);
