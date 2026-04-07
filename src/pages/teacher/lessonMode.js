@@ -385,19 +385,30 @@ export function renderLessonMode(container, params) {
     const moveDrawing = (e) => {
       if (!drawing) return;
       
-      const pos = getPos(e);
-      const midPoint = getMidPoint(lastPoint, pos);
-
-      wbCtx.beginPath();
-      wbCtx.strokeStyle = currentTool === 'eraser' ? '#000' : penColor;
-      wbCtx.lineWidth = currentTool === 'eraser' ? penSize * 15 : penSize; // Eraser slightly larger
+      // 필압 & 고빈도 터치펜 입력(coalesced events) 처리 - 끊김방지 및 완벽한 곡선 처리
+      const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
       
-      wbCtx.moveTo(lastMidPoint.x, lastMidPoint.y);
-      wbCtx.quadraticCurveTo(lastPoint.x, lastPoint.y, midPoint.x, midPoint.y);
-      wbCtx.stroke();
+      for (const ev of events) {
+        const pos = getPos(ev);
+        const midPoint = getMidPoint(lastPoint, pos);
 
-      lastPoint = pos;
-      lastMidPoint = midPoint;
+        wbCtx.beginPath();
+        wbCtx.strokeStyle = currentTool === 'eraser' ? '#000' : penColor;
+        
+        // 터치펜(pen)에 대해서만 필압 반영, 그 외 마우스/손가락은 기본 굵기 유지
+        const isPen = ev.pointerType === 'pen';
+        const pressure = (isPen && ev.pressure) ? ev.pressure : 0.5;
+        const pressureMod = isPen ? Math.max(0.2, pressure * 2.5) : 1; 
+        
+        wbCtx.lineWidth = currentTool === 'eraser' ? penSize * 15 : penSize * pressureMod;
+        
+        wbCtx.moveTo(lastMidPoint.x, lastMidPoint.y);
+        wbCtx.quadraticCurveTo(lastPoint.x, lastPoint.y, midPoint.x, midPoint.y);
+        wbCtx.stroke();
+
+        lastPoint = pos;
+        lastMidPoint = midPoint;
+      }
     };
 
     const stopDrawing = (e) => {
