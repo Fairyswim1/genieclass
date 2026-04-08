@@ -4,25 +4,25 @@
 // ========================================
 
 const PLANT_TYPES = {
-  sunflower: { name: '해바라기', icon: '🌻' },
-  appletree: { name: '사과나무', icon: '🍎' },
-  cactus: { name: '선인장', icon: '🌵' },
-  clover: { name: '네잎클로버', icon: '🍀' }
+  apple: { name: '사과나무', icon: '🍎' },
+  grape: { name: '포도나무', icon: '🍇' },
+  strawberry: { name: '딸기', icon: '🍓' },
+  tangerine: { name: '귤나무', icon: '🍊' }
 };
 
 const GROWTH_STAGES = {
   1: { name: '잠든 씨앗', badge: '🌰', glow: 'rgba(235, 227, 213, 0.4)' },
   2: { name: '파릇파릇 새싹', badge: '🌱', glow: 'rgba(153, 204, 153, 0.4)' },
-  3: { name: '쑥쑥 자란 줄기', badge: '🌿', glow: 'rgba(102, 178, 102, 0.4)' },
-  4: { name: '아름다운 식물', badge: '🌸', glow: 'rgba(230, 164, 180, 0.4)' },
-  5: { name: '마법의 요정 식물', badge: '✨', glow: 'rgba(255, 204, 102, 0.5)' }
+  3: { name: '무럭무럭 줄기', badge: '🌿', glow: 'rgba(102, 178, 102, 0.4)' },
+  4: { name: '활짝 핀 꽃', badge: '🌸', glow: 'rgba(230, 164, 180, 0.4)' },
+  5: { name: '탐스러운 열매', badge: '✨', glow: 'rgba(255, 204, 102, 0.5)' }
 };
 
 const PLANT_LEVEL_ASSETS = {
-  sunflower: ['🌰', '🌱', '🌿', '🌻', '🌞'],
-  appletree: ['🌰', '🌱', '🌿', '🌳', '🍎'],
-  cactus:    ['🌰', '🌱', '🌵', '🌺', '🏜️'],
-  clover:    ['🌰', '🌱', '☘️', '🍀', '🧚']
+  apple:      ['🌰', '🌱', '🌿', '🌸', '🍎'],
+  grape:      ['🌰', '🌱', '🌿', '🌸', '🍇'],
+  strawberry: ['🌰', '🌱', '🌿', '🌸', '🍓'],
+  tangerine:  ['🌰', '🌱', '🌿', '🌸', '🍊']
 };
 
 export const LEVEL_THRESHOLDS = [0, 1, 3, 6, 10]; // Required points for Lv 1, 2, 3, 4, 5
@@ -45,17 +45,19 @@ export function getLevelProgress(totalPoints) {
   return { level, progressPercent, remainingPoints, isMaxLevel: level === 5 };
 }
 
-export function getLevelConfig(level, type = 'sunflower') {
+export function getLevelConfig(level, type = 'apple') {
+  if (type === 'sunflower' || type === 'chick' || !PLANT_TYPES[type]) type = 'apple';
   const stage = GROWTH_STAGES[Math.min(5, Math.max(1, level))] || GROWTH_STAGES[1];
-  const plantName = PLANT_TYPES[type]?.name || '해바라기';
+  const plantName = PLANT_TYPES[type]?.name || '사과나무';
   return {
     ...stage,
-    fullName: `${stage.name} ${plantName}`,
+    fullName: `${stage.name}(${plantName})`,
     emoji: PLANT_LEVEL_ASSETS[type]?.[level - 1] || '🌰'
   };
 }
 
-export function renderCharacter(level, size = 80, type = 'sunflower') {
+export function renderCharacter(level, size = 80, type = 'apple') {
+  if (type === 'sunflower' || type === 'chick' || !PLANT_TYPES[type]) type = 'apple';
   const config = getLevelConfig(level, type);
   const fontSize = size * 0.6;
   const glowSize = size * 0.8;

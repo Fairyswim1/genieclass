@@ -141,7 +141,7 @@ export async function addStudent(name, classId, number = '') {
         loginId: '',   // Initial: empty
         password: '',  // Initial: empty
         characterLevel: 1,
-        characterType: 'sunflower', // Default
+        characterType: 'apple', // Default
         praiseCount: 0,
         totalPoints: 0,
         createdAt: new Date().toISOString(),
