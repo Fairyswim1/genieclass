@@ -7,6 +7,7 @@ import {
   addStudentsBatch, showToast, formatDate
 } from '../../store.js';
 import { parseExcelFile } from '../../utils/excelImport.js';
+import { renderCharacter } from '../../components/characterAvatar.js';
 
 export function renderTeacherDashboard(container) {
   const teacher = getCurrentTeacher();
