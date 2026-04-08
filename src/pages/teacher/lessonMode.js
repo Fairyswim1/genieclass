@@ -30,7 +30,7 @@ export function renderLessonMode(container, params) {
   let wbCanvas, wbCtx;
   let drawing = false;
   let penColor = '#FFFFFF';
-  let penSize = 3;
+  let penSize = 2;
   let currentTool = 'pen';
   let isRecording = false;
   let mediaRecorder = null;
@@ -307,8 +307,10 @@ export function renderLessonMode(container, params) {
           </button>
           <button class="btn btn-secondary btn-sm" id="wb-save">💾 저장</button>
         </div>
-        <div class="whiteboard-canvas-wrap" style="background: #000;">
-          <canvas id="whiteboard-canvas"></canvas>
+        </div>
+        <div class="whiteboard-canvas-wrap" style="background: #000; position: relative;">
+          <canvas id="whiteboard-canvas" style="position: absolute; top: 0; left: 0; z-index: 1; touch-action: none;"></canvas>
+          <canvas id="whiteboard-draft" style="position: absolute; top: 0; left: 0; z-index: 2; pointer-events: none; touch-action: none;"></canvas>
         </div>
       </div>
     `;
@@ -319,26 +321,42 @@ export function renderLessonMode(container, params) {
   function initWhiteboard() {
     wbCanvas = document.getElementById('whiteboard-canvas');
     wbCtx = wbCanvas.getContext('2d');
+    const draftCanvas = document.getElementById('whiteboard-draft');
+    const draftCtx = draftCanvas.getContext('2d');
+    
+    // 기본 터치 제스처/컨텍스트 메뉴 완벽 차단
+    wbCanvas.style.touchAction = 'none';
+    wbCanvas.addEventListener('contextmenu', e => e.preventDefault());
+
     const wrap = wbCanvas.parentElement;
     const dpr = window.devicePixelRatio || 1;
-    const w = wrap.clientWidth;
-    const h = wrap.clientHeight;
-    wbCanvas.width = w * dpr;
-    wbCanvas.height = h * dpr;
-    wbCanvas.style.width = w + 'px';
-    wbCanvas.style.height = h + 'px';
-    wbCtx.scale(dpr, dpr);
+    function setSize() {
+      const w = wrap.clientWidth;
+      const h = wrap.clientHeight;
+      wbCanvas.width = w * dpr;
+      wbCanvas.height = h * dpr;
+      wbCanvas.style.width = w + 'px';
+      wbCanvas.style.height = h + 'px';
+      
+      draftCanvas.width = w * dpr;
+      draftCanvas.height = h * dpr;
+      draftCanvas.style.width = w + 'px';
+      draftCanvas.style.height = h + 'px';
+
+      wbCtx.scale(dpr, dpr);
+      draftCtx.scale(dpr, dpr);
+      wbCtx.lineCap = 'round';
+      wbCtx.lineJoin = 'round';
+      draftCtx.lineCap = 'round';
+      draftCtx.lineJoin = 'round';
+    }
+    setSize();
 
     wbCtx.fillStyle = '#000';
     wbCtx.fillRect(0, 0, wrap.clientWidth, wrap.clientHeight);
-    wbCtx.lineCap = 'round';
-    wbCtx.lineJoin = 'round';
 
     let currentPoints = [];
-    let backupCanvas = document.createElement('canvas');
-    let backupCtx = backupCanvas.getContext('2d');
 
-    // Helper for perfect-freehand SVG Path
     function getSvgPathFromStroke(stroke) {
       if (!stroke.length) return '';
       const d = stroke.reduce((acc, [x0, y0], i, arr) => {
@@ -353,26 +371,12 @@ export function renderLessonMode(container, params) {
     // Handle resize
     window.onresize = () => {
       if (!wbCanvas || !wbCtx) return;
-      const dpr = window.devicePixelRatio || 1;
-      const w = wrap.clientWidth;
-      const h = wrap.clientHeight;
-      
-      // Save current content
       const tempCanvas = document.createElement('canvas');
       tempCanvas.width = wbCanvas.width;
       tempCanvas.height = wbCanvas.height;
       tempCanvas.getContext('2d').drawImage(wbCanvas, 0, 0);
 
-      // Resize
-      wbCanvas.width = w * dpr;
-      wbCanvas.height = h * dpr;
-      wbCanvas.style.width = w + 'px';
-      wbCanvas.style.height = h + 'px';
-      
-      // Restore & Set params
-      wbCtx.scale(dpr, dpr);
-      wbCtx.lineCap = 'round';
-      wbCtx.lineJoin = 'round';
+      setSize();
       
       wbCtx.save();
       wbCtx.setTransform(1, 0, 0, 1, 0, 0);
@@ -389,25 +393,21 @@ export function renderLessonMode(container, params) {
     };
 
     const startDrawing = (e) => {
-      if (e.button !== undefined && e.button !== 0) return; // Only primary button
+      e.preventDefault();
+      if (e.button !== undefined && e.button !== 0) return;
       drawing = true;
       
       const pos = getPos(e);
       const pressure = e.pointerType === 'pen' && e.pressure ? e.pressure : 0.5;
       currentPoints = [[pos.x, pos.y, pressure]];
       
-      // 백업 캔버스에 현재까지의 모든 완성된 그림 저장
-      backupCanvas.width = wbCanvas.width;
-      backupCanvas.height = wbCanvas.height;
-      backupCtx.drawImage(wbCanvas, 0, 0);
-
       wbCanvas.setPointerCapture(e.pointerId);
     };
 
     const moveDrawing = (e) => {
+      e.preventDefault();
       if (!drawing) return;
       
-      // 고빈도 입력 수집
       const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
       for (const ev of events) {
         const pos = getPos(ev);
@@ -415,25 +415,34 @@ export function renderLessonMode(container, params) {
         currentPoints.push([pos.x, pos.y, pressure]);
       }
       
-      // 1. 기존 완성 그림 복원 (물리적 픽셀 크기로)
-      wbCtx.save();
-      wbCtx.setTransform(1, 0, 0, 1, 0, 0);
-      wbCtx.clearRect(0, 0, wbCanvas.width, wbCanvas.height);
-      wbCtx.drawImage(backupCanvas, 0, 0);
-      wbCtx.restore();
-      
       if (currentPoints.length < 2) return;
 
-      // 2. 현재 그리고 있는 한 획(Stroke) 렌더링
       const isEraser = currentTool === 'eraser';
-      const strokeSize = isEraser ? penSize * 15 : penSize * 4;
       
+      if (isEraser) {
+        // Eraser: Direct line segment drawing to wbCanvas (No perfect-freehand delay)
+        const size = penSize * 15;
+        wbCtx.save();
+        wbCtx.globalCompositeOperation = 'destination-out';
+        wbCtx.lineWidth = size;
+        wbCtx.beginPath();
+        const p1 = currentPoints[currentPoints.length - 2];
+        const p2 = currentPoints[currentPoints.length - 1];
+        wbCtx.moveTo(p1[0], p1[1]);
+        wbCtx.lineTo(p2[0], p2[1]);
+        wbCtx.stroke();
+        wbCtx.restore();
+        return;
+      }
+      
+      // Pen: perfect-freehand on draftCanvas
+      const strokeSize = penSize * 2.5;
       const strokePolygon = getStroke(currentPoints, {
         size: strokeSize,
-        thinning: isEraser ? 0 : 0.6,
+        thinning: 0.5,
         smoothing: 0.5,
         streamline: 0.5,
-        simulatePressure: currentPoints[0][2] === 0.5 // 펜 필압이 없으면 시뮬레이션
+        simulatePressure: currentPoints[0][2] === 0.5
       });
       
       const pathData = getSvgPathFromStroke(strokePolygon);
@@ -441,35 +450,45 @@ export function renderLessonMode(container, params) {
       
       const path = new Path2D(pathData);
       
-      wbCtx.save();
-      if (isEraser) {
-        // 진짜 지우개: 투명하게 뚫기
-        wbCtx.globalCompositeOperation = 'destination-out';
-        wbCtx.fillStyle = 'rgba(0,0,0,1)';
-      } else {
-        wbCtx.globalCompositeOperation = 'source-over';
-        wbCtx.fillStyle = penColor;
-      }
-      
-      wbCtx.fill(path);
-      wbCtx.restore();
+      draftCtx.save();
+      draftCtx.setTransform(1, 0, 0, 1, 0, 0);
+      draftCtx.clearRect(0, 0, draftCanvas.width, draftCanvas.height);
+      draftCtx.restore();
+
+      draftCtx.save();
+      draftCtx.fillStyle = penColor;
+      draftCtx.fill(path);
+      draftCtx.restore();
     };
 
     const stopDrawing = (e) => {
+      e.preventDefault();
       if (!drawing) return;
       
       const pos = getPos(e);
       const pressure = e.pointerType === 'pen' && e.pressure ? e.pressure : 0.5;
       currentPoints.push([pos.x, pos.y, pressure]);
       
-      moveDrawing(e); // 마지막 상태 렌더링
+      moveDrawing(e);
+      
+      // 병합: draftCanvas -> wbCanvas
+      if (currentTool === 'pen') {
+        wbCtx.save();
+        wbCtx.setTransform(1, 0, 0, 1, 0, 0);
+        wbCtx.drawImage(draftCanvas, 0, 0);
+        wbCtx.restore();
+        
+        draftCtx.save();
+        draftCtx.setTransform(1, 0, 0, 1, 0, 0);
+        draftCtx.clearRect(0, 0, draftCanvas.width, draftCanvas.height);
+        draftCtx.restore();
+      }
       
       drawing = false;
       currentPoints = [];
       wbCanvas.releasePointerCapture(e.pointerId);
     };
 
-    // Pointer Listeners
     wbCanvas.addEventListener('pointerdown', startDrawing);
     wbCanvas.addEventListener('pointermove', moveDrawing);
     wbCanvas.addEventListener('pointerup', stopDrawing);
