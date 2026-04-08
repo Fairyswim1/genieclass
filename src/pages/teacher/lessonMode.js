@@ -298,6 +298,10 @@ export function renderLessonMode(container, params) {
             <div class="color-dot" data-color="#6BCB77" style="background:#6BCB77"></div>
             <div class="color-dot" data-color="#4F46E5" style="background:#4F46E5"></div>
           </div>
+          <div class="pen-size-control flex items-center gap-sm" style="margin: 0 10px;">
+            <label for="pen-size-slider" style="color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">두께:</label>
+            <input type="range" id="pen-size-slider" min="1" max="10" value="${penSize}" style="width: 80px; accent-color: var(--primary);">
+          </div>
           <button class="btn ${isRecording ? 'btn-danger' : 'btn-primary'} btn-sm" id="wb-record">
             ${isRecording ? '⏹ 중지' : '🎙 녹음'}
           </button>
@@ -497,6 +501,10 @@ export function renderLessonMode(container, params) {
         dot.classList.add('active');
         updateWhiteboardUI();
       });
+    });
+
+    document.getElementById('pen-size-slider')?.addEventListener('input', (e) => {
+      penSize = parseInt(e.target.value, 10);
     });
 
     document.getElementById('wb-record')?.addEventListener('click', handleRecordToggle);
