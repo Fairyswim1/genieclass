@@ -141,7 +141,7 @@ export async function addStudent(name, classId, number = '') {
         loginId: '',   // Initial: empty
         password: '',  // Initial: empty
         characterLevel: 1,
-        characterType: 'chick', // Default
+        characterType: 'sunflower', // Default
         praiseCount: 0,
         totalPoints: 0,
         createdAt: new Date().toISOString(),
@@ -212,7 +212,13 @@ export async function praiseStudent(studentId) {
     if (snap.exists()) {
         const data = snap.data();
         const newPoints = data.totalPoints + 1;
-        const newLevel = Math.min(5, Math.floor(newPoints / 5) + 1);
+        
+        let newLevel = 1;
+        if (newPoints >= 10) newLevel = 5;
+        else if (newPoints >= 6) newLevel = 4;
+        else if (newPoints >= 3) newLevel = 3;
+        else if (newPoints >= 1) newLevel = 2;
+
         await updateDoc(studentRef, {
             praiseCount: increment(1),
             totalPoints: increment(1),

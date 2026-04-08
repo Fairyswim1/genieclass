@@ -79,11 +79,11 @@ export function renderLessonMode(container, params) {
 
           <div class="student-grid" style="grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--s-6);">
             ${students.map(s => {
-      const config = getLevelConfig(s.characterLevel, s.characterType || 'chick');
+      const config = getLevelConfig(s.characterLevel, s.characterType || 'sunflower');
       return `
                 <div class="student-avatar-card card ${selectedStudent?.id === s.id ? 'selected' : ''}" data-student-id="${s.id}">
                   <div class="student-character">
-                    ${renderCharacter(s.characterLevel, 80, s.characterType || 'chick')}
+                    ${renderCharacter(s.characterLevel, 80, s.characterType || 'sunflower')}
                   </div>
                   <div class="student-name">${s.name}</div>
                   <div class="student-praise-count">⭐ ${s.praiseCount}P</div>
@@ -104,9 +104,9 @@ export function renderLessonMode(container, params) {
             <div class="action-panel-body">
                <div class="text-center" style="margin-bottom: var(--s-8);">
                  <div style="width: 120px; height: 120px; margin: 0 auto 15px;">
-                   ${renderCharacter(selectedStudent.characterLevel, 120, selectedStudent.characterType || 'chick')}
+                   ${renderCharacter(selectedStudent.characterLevel, 120, selectedStudent.characterType || 'sunflower')}
                  </div>
-                 <div class="badge badge-purple">${getLevelConfig(selectedStudent.characterLevel, selectedStudent.characterType || 'chick').name}</div>
+                 <div class="badge badge-purple">${getLevelConfig(selectedStudent.characterLevel, selectedStudent.characterType || 'sunflower').name}</div>
                </div>
                <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 10px;">
                  <button class="btn btn-primary" id="btn-praise" style="flex-direction: column; height: 100px; gap: 10px;">

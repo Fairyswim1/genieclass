@@ -10,7 +10,7 @@ import {
   showToast, downloadFile, getStudentByCode,
   submitAssignment, saveFile, updateStudentCharacterType
 } from '../../store.js';
-import { renderCharacter, getLevelConfig, ANIMAL_TYPES } from '../../components/characterAvatar.js';
+import { renderCharacter, getLevelConfig, PLANT_TYPES, getLevelProgress } from '../../components/characterAvatar.js';
 
 export function renderStudentDashboard(container) {
   const student = getCurrentStudent();
@@ -34,6 +34,7 @@ export function renderStudentDashboard(container) {
     let freshStudent = student;
     let cls = null;
     let config = getLevelConfig(student.characterLevel);
+    let progress = getLevelProgress(student.totalPoints || 0);
     let presentations = [];
     let assignments = [];
     let submissions = [];
@@ -43,7 +44,8 @@ export function renderStudentDashboard(container) {
     try {
       freshStudent = await getStudentByCode(student.uniqueCode) || student;
       cls = await getClassById(freshStudent.classId);
-      config = getLevelConfig(freshStudent.characterLevel, freshStudent.characterType || 'chick');
+      config = getLevelConfig(freshStudent.characterLevel, freshStudent.characterType || 'sunflower');
+      progress = getLevelProgress(freshStudent.totalPoints || 0);
 
       [presentations, assignments, submissions, announcements, resources] = await Promise.all([
         getPresentationsByStudent(freshStudent.id),
@@ -69,7 +71,7 @@ export function renderStudentDashboard(container) {
             <div class="student-topbar-title">Genie Class</div>
           </div>
           <div class="student-topbar-user">
-            <div class="student-topbar-avatar">${renderCharacter(freshStudent.characterLevel, 34, freshStudent.characterType || 'chick')}</div>
+            <div class="student-topbar-avatar">${renderCharacter(freshStudent.characterLevel, 34, freshStudent.characterType || 'sunflower')}</div>
             <div class="student-topbar-name">${freshStudent.name}</div>
             <button class="btn btn-ghost btn-sm" id="btn-student-logout" style="margin-left: 10px;">로그아웃</button>
           </div>
@@ -106,15 +108,15 @@ export function renderStudentDashboard(container) {
           <!-- Character & Progress -->
           <section class="card flex items-center gap-lg" style="margin-bottom: var(--s-12); padding: var(--s-8);">
             <div class="student-character-float">
-              ${renderCharacter(freshStudent.characterLevel, 100, freshStudent.characterType || 'chick')}
+              ${renderCharacter(freshStudent.characterLevel, 100, freshStudent.characterType || 'sunflower')}
             </div>
             <div class="flex-1">
               <div class="flex justify-between items-end" style="margin-bottom: var(--s-2);">
                 <span style="font-family: var(--font-title); font-size: 1.2rem;">${config.emoji} ${config.name}</span>
-                <span style="font-family: var(--font-hand); font-size: 1.2rem;">다음 레벨까지 ${Math.max(0, (freshStudent.characterLevel * 5) - freshStudent.totalPoints)}P 남음</span>
+                <span style="font-family: var(--font-hand); font-size: 1.2rem;">${progress.isMaxLevel ? '최고 레벨 도달! 🎉' : `다음 레벨까지 ${progress.remainingPoints}P 남음`}</span>
               </div>
               <div style="background: var(--bg-main); height: 14px; border-radius: 7px; overflow: hidden; border: 2px solid var(--border-main);">
-                <div style="width: ${Math.min(100, (freshStudent.totalPoints % 5) / 5 * 100)}%; height: 100%; background: var(--primary); transition: width 0.5s;"></div>
+                <div style="width: ${progress.progressPercent}%; height: 100%; background: var(--primary); transition: width 0.5s;"></div>
               </div>
             </div>
           </section>
@@ -189,17 +191,17 @@ export function renderStudentDashboard(container) {
       ${!freshStudent.characterType ? `
         <div id="selection-modal" class="modal-backdrop active" style="z-index: 1000;">
           <div class="modal-content animate-up" style="max-width: 500px; text-align: center; background: var(--bg-card);">
-            <h2 class="modal-title" style="margin-bottom: var(--s-4); font-family: var(--font-title);">🐾 나만의 동물 친구 고르기</h2>
-            <p style="color: var(--text-muted); margin-bottom: var(--s-8); font-family: var(--font-sans);">함께 성장할 단짝 친구를 선택해봐요!</p>
+            <h2 class="modal-title" style="margin-bottom: var(--s-4); font-family: var(--font-title);">🌱 나만의 반려 식물 고르기</h2>
+            <p style="color: var(--text-muted); margin-bottom: var(--s-8); font-family: var(--font-sans);">함께 성장할 단짝 식물을 선택해봐요!</p>
             <div class="grid" style="grid-template-columns: 1fr 1fr; gap: var(--s-4); margin-bottom: var(--s-8);">
-              ${Object.entries(ANIMAL_TYPES).map(([id, info]) => `
+              ${Object.entries(PLANT_TYPES).map(([id, info]) => `
                 <div class="card selection-card" data-type="${id}" style="cursor: pointer; padding: var(--s-6); transition: all 0.3s var(--ease-out); border: 2px solid var(--border-main);">
                   <div style="font-size: 3rem; margin-bottom: 10px;">${info.icon}</div>
                   <div style="font-family: var(--font-title); font-size: 1.2rem;">${info.name}</div>
                 </div>
               `).join('')}
             </div>
-            <button class="btn btn-primary btn-lg w-full" id="btn-confirm-selection" disabled>이 친구로 할래요!</button>
+            <button class="btn btn-primary btn-lg w-full" id="btn-confirm-selection" disabled>이 식물로 할래요!</button>
           </div>
         </div>
         <style>
@@ -327,7 +329,7 @@ export function renderStudentDashboard(container) {
         if (!selectedType) return;
         try {
           await updateStudentCharacterType(freshStudent.id, selectedType);
-          showToast(`${ANIMAL_TYPES[selectedType].name}와(과) 친구가 되었어요! 🎉`);
+          showToast(`${PLANT_TYPES[selectedType].name}와(과) 단짝이 되었어요! 🎉`);
           render();
         } catch (err) {
           showToast('선택 중 오류가 발생했습니다.', 'error');

@@ -39,7 +39,7 @@ export function renderCharacter(level, size = 80, type = 'chick') {
   const config = getLevelConfig(level, type);
   const fontSize = size * 0.6;
   const glowSize = size * 0.8;
-  
+
   // Lv 1 is always an egg
   const displayEmoji = level === 1 ? '🥚' : (ANIMAL_LEVEL_ASSETS[type]?.[level - 1] || '🥚');
 
@@ -94,7 +94,7 @@ export function renderPraiseAnimation(container) {
     display: flex; align-items: center; justify-content: center;
   `;
   anim.innerHTML = '<span style="font-size:3.5rem; animation: starGrow 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;">💝</span>';
-  
+
   const style = document.createElement('style');
   style.textContent = `
     @keyframes starGrow {
@@ -104,7 +104,7 @@ export function renderPraiseAnimation(container) {
     }
   `;
   document.head.appendChild(style);
-  
+
   container.style.position = 'relative';
   container.appendChild(anim);
   setTimeout(() => anim.remove(), 700);

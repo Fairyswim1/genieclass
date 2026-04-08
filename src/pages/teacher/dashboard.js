@@ -303,7 +303,7 @@ export function renderTeacherDashboard(container) {
                     <td><span class="student-code">${s.uniqueCode}</span></td>
                     <td>
                       <div class="flex items-center gap-sm">
-                        ${renderCharacter(s.characterLevel, 32, s.characterType || 'chick')}
+                        ${renderCharacter(s.characterLevel, 32, s.characterType || 'sunflower')}
                         <span class="badge badge-primary">Lv.${s.characterLevel}</span>
                       </div>
                     </td>
