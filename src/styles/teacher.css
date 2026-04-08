@@ -510,3 +510,57 @@
     font-weight: 500;
     color: var(--primary);
 }
+
+/* Student Action Panel (Drawer) */
+.student-action-panel {
+    position: fixed;
+    top: 0;
+    right: -400px;
+    width: 360px;
+    height: 100vh;
+    background: var(--bg-card);
+    box-shadow: -4px 0 24px rgba(45, 55, 72, 0.1);
+    padding: var(--s-10) var(--s-8);
+    transition: right 0.4s var(--ease-out-elastic);
+    z-index: 2000;
+    border-left: 1px solid var(--border-main);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.student-action-panel.open {
+    right: 0;
+}
+
+.action-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--s-10);
+    padding-bottom: var(--s-4);
+    border-bottom: 1px solid var(--border-main);
+}
+
+.action-panel-header h3 {
+    color: var(--text-main);
+}
+
+.action-panel-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+
+.modal-close {
+    font-size: 1.5rem;
+    color: var(--text-muted);
+    cursor: pointer;
+    background: none;
+    border: none;
+    transition: color 0.2s;
+}
+
+.modal-close:hover {
+    color: var(--danger);
+}
