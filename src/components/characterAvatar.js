@@ -1,47 +1,66 @@
 // ========================================
-// Genie Class - Animal Character System
-// 성장하는 귀여운 동물 친구들
+// Genie Class - Plant Character System
+// 성장하는 귀여운 반려 식물들
 // ========================================
 
-const ANIMAL_TYPES = {
-  chick: { name: '병아리', icon: '🐤' },
-  puppy: { name: '강아지', icon: '🐶' },
-  kitty: { name: '고양이', icon: '🐱' },
-  bunny: { name: '토끼', icon: '🐰' }
+const PLANT_TYPES = {
+  sunflower: { name: '해바라기', icon: '🌻' },
+  appletree: { name: '사과나무', icon: '🍎' },
+  cactus: { name: '선인장', icon: '🌵' },
+  clover: { name: '네잎클로버', icon: '🍀' }
 };
 
 const GROWTH_STAGES = {
-  1: { name: '신비로운 알', badge: '🥚', glow: 'rgba(235, 227, 213, 0.4)' },
-  2: { name: '아기 동물 친구', badge: '👶', glow: 'rgba(243, 202, 82, 0.3)' },
-  3: { name: '쑥쑥 자란 어린이', badge: '🌱', glow: 'rgba(153, 169, 143, 0.3)' },
-  4: { name: '듬직한 어른', badge: '💼', glow: 'rgba(230, 164, 180, 0.3)' },
-  5: { name: '위대한 대장님', badge: '🦸', glow: 'rgba(209, 125, 57, 0.4)' }
+  1: { name: '잠든 씨앗', badge: '🌰', glow: 'rgba(235, 227, 213, 0.4)' },
+  2: { name: '파릇파릇 새싹', badge: '🌱', glow: 'rgba(153, 204, 153, 0.4)' },
+  3: { name: '쑥쑥 자란 줄기', badge: '🌿', glow: 'rgba(102, 178, 102, 0.4)' },
+  4: { name: '아름다운 식물', badge: '🌸', glow: 'rgba(230, 164, 180, 0.4)' },
+  5: { name: '마법의 요정 식물', badge: '✨', glow: 'rgba(255, 204, 102, 0.5)' }
 };
 
-const ANIMAL_LEVEL_ASSETS = {
-  chick: ['🥚', '🐣', '🐥', '🐔', '🐓'],
-  puppy: ['🥚', '🐶', '🐕', '🐩', '🐺'],
-  kitty: ['🥚', '🐱', '🐈', '🐈‍⬛', '🐯'],
-  bunny: ['🥚', '🐰', '🐇', '🎠', '🦄']
+const PLANT_LEVEL_ASSETS = {
+  sunflower: ['🌰', '🌱', '🌿', '🌻', '🌞'],
+  appletree: ['🌰', '🌱', '🌿', '🌳', '🍎'],
+  cactus:    ['🌰', '🌱', '🌵', '🌺', '🏜️'],
+  clover:    ['🌰', '🌱', '☘️', '🍀', '🧚']
 };
 
-export function getLevelConfig(level, type = 'chick') {
+export const LEVEL_THRESHOLDS = [0, 1, 3, 6, 10]; // Required points for Lv 1, 2, 3, 4, 5
+
+export function getLevelProgress(totalPoints) {
+  let level = 1;
+  for (let i = LEVEL_THRESHOLDS.length - 1; i >= 0; i--) {
+     if (totalPoints >= LEVEL_THRESHOLDS[i]) {
+        level = i + 1;
+        break;
+     }
+  }
+  const currentThreshold = LEVEL_THRESHOLDS[level - 1];
+  const nextThreshold = level < 5 ? LEVEL_THRESHOLDS[level] : currentThreshold;
+  const pointsInCurrentLevel = totalPoints - currentThreshold;
+  const pointsNeededForNext = level < 5 ? nextThreshold - currentThreshold : 0;
+  const progressPercent = level < 5 ? (pointsInCurrentLevel / pointsNeededForNext) * 100 : 100;
+  const remainingPoints = level < 5 ? nextThreshold - totalPoints : 0;
+  
+  return { level, progressPercent, remainingPoints, isMaxLevel: level === 5 };
+}
+
+export function getLevelConfig(level, type = 'sunflower') {
   const stage = GROWTH_STAGES[Math.min(5, Math.max(1, level))] || GROWTH_STAGES[1];
-  const animalName = ANIMAL_TYPES[type]?.name || '병아리';
+  const plantName = PLANT_TYPES[type]?.name || '해바라기';
   return {
     ...stage,
-    fullName: `${stage.name} ${animalName}`,
-    emoji: ANIMAL_LEVEL_ASSETS[type]?.[level - 1] || '🥚'
+    fullName: `${stage.name} ${plantName}`,
+    emoji: PLANT_LEVEL_ASSETS[type]?.[level - 1] || '🌰'
   };
 }
 
-export function renderCharacter(level, size = 80, type = 'chick') {
+export function renderCharacter(level, size = 80, type = 'sunflower') {
   const config = getLevelConfig(level, type);
   const fontSize = size * 0.6;
   const glowSize = size * 0.8;
-
-  // Lv 1 is always an egg
-  const displayEmoji = level === 1 ? '🥚' : (ANIMAL_LEVEL_ASSETS[type]?.[level - 1] || '🥚');
+  
+  const displayEmoji = level === 1 ? '🌰' : (PLANT_LEVEL_ASSETS[type]?.[level - 1] || '🌰');
 
   return `
     <div class="character-avatar" style="
@@ -94,7 +113,7 @@ export function renderPraiseAnimation(container) {
     display: flex; align-items: center; justify-content: center;
   `;
   anim.innerHTML = '<span style="font-size:3.5rem; animation: starGrow 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;">💝</span>';
-
+  
   const style = document.createElement('style');
   style.textContent = `
     @keyframes starGrow {
@@ -104,10 +123,10 @@ export function renderPraiseAnimation(container) {
     }
   `;
   document.head.appendChild(style);
-
+  
   container.style.position = 'relative';
   container.appendChild(anim);
   setTimeout(() => anim.remove(), 700);
 }
 
-export { ANIMAL_TYPES };
+export { PLANT_TYPES };
