@@ -8,7 +8,8 @@ import {
   getResourcesByClass, getStudentById, formatDate,
   listenToActiveQuiz, listenToQuizSubmissions, submitQuizSolution,
   showToast, downloadFile, getStudentByCode,
-  submitAssignment, saveFile, updateStudentCharacterType
+  submitAssignment, saveFile, updateStudentCharacterType,
+  getPresentationsByClass, toggleSharePresentation
 } from '../../store.js';
 import { renderCharacter, getLevelConfig, PLANT_TYPES, getLevelProgress } from '../../components/characterAvatar.js';
 
@@ -40,6 +41,7 @@ export function renderStudentDashboard(container) {
     let submissions = [];
     let announcements = [];
     let resources = [];
+    let sharedPresentations = [];
 
     try {
       freshStudent = await getStudentByCode(student.uniqueCode) || student;
@@ -47,13 +49,16 @@ export function renderStudentDashboard(container) {
       config = getLevelConfig(freshStudent.characterLevel, freshStudent.characterType || 'sunflower');
       progress = getLevelProgress(freshStudent.totalPoints || 0);
 
-      [presentations, assignments, submissions, announcements, resources] = await Promise.all([
-        getPresentationsByStudent(freshStudent.id),
+      let allPresentations = [];
+      [assignments, submissions, announcements, resources, allPresentations] = await Promise.all([
         cls ? getAssignmentsByClass(cls.id) : [],
         getSubmissionsByStudent(freshStudent.id),
         cls ? getAnnouncementsByClass(cls.id) : [],
         cls ? getResourcesByClass(cls.id) : [],
+        cls ? getPresentationsByClass(cls.id) : [],
       ]);
+      presentations = allPresentations.filter(p => p.studentId === freshStudent.id);
+      sharedPresentations = allPresentations.filter(p => p.studentId !== freshStudent.id && p.shared === true);
     } catch (err) {
       console.error('Data loading error:', err);
     }
@@ -88,10 +93,6 @@ export function renderStudentDashboard(container) {
 
           <section class="student-stats-row">
             <div class="card stat-card stat-card-featured">
-              <div class="stat-card-label">나의 칭찬</div>
-              <div class="stat-card-value-display" style="color: var(--accent-amber)">⭐ ${freshStudent.praiseCount}</div>
-            </div>
-            <div class="card stat-card">
               <div class="stat-card-label">발표 기록</div>
               <div class="stat-card-value-display">${presentations.length}</div>
             </div>
@@ -166,7 +167,7 @@ export function renderStudentDashboard(container) {
             <div class="section-card card">
               <div class="section-card-header">
                 <span style="font-size: 1.2rem;">📢</span>
-                <h2 class="section-card-title">우리 반 소식</h2>
+                <h2 class="section-card-title">공지사항</h2>
               </div>
               <div class="flex flex-col gap-sm">
                  ${announcements.length === 0 ? '<p class="text-center" style="color: var(--text-dim); padding: 20px;">새로운 소식이 없습니다.</p>' : announcements.map(ann => `
@@ -184,7 +185,64 @@ export function renderStudentDashboard(container) {
               </div>
             </div>
           </div>
+
+          <div class="student-grid" style="margin-top: var(--s-12);">
+            <!-- My Presentations -->
+            <div class="section-card card">
+              <div class="section-card-header">
+                <span style="font-size: 1.2rem;">🎤</span>
+                <h2 class="section-card-title">나의 발표 기록</h2>
+              </div>
+              <div class="grid" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--s-4);">
+                 ${presentations.length === 0 ? '<p class="text-center" style="color: var(--text-dim); padding: 20px;">발표 기록이 없습니다.</p>' : presentations.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt)).map(p => `
+                   <div class="card presentation-item" style="padding: 10px;">
+                     <div class="flex justify-between items-center" style="margin-bottom: 5px;">
+                        <span class="badge badge-main">${formatDate(p.createdAt)}</span>
+                        <button class="btn btn-sm ${p.shared ? 'btn-danger' : 'btn-primary'} btn-toggle-share" data-id="${p.id}">${p.shared ? '공유 끄기' : '친구와 공유'}</button>
+                     </div>
+                     <img src="${p.whiteboardImage?.url}" style="width:100%; aspect-ratio: 16/9; object-fit: contain; background: #000; border-radius: 4px; margin-bottom: 5px; cursor:pointer;" class="img-preview" onclick="window.open('${p.whiteboardImage?.url}')"/>
+                     ${p.audioData ? `
+                       <button class="btn btn-secondary w-full btn-sm btn-play-video" data-url="${p.audioData.url}">🎬 발표 영상 보기</button>
+                     ` : `<button class="btn btn-ghost w-full btn-sm" disabled>영상 없음</button>`}
+                   </div>
+                 `).join('')}
+              </div>
+            </div>
+
+            <!-- Shared Presentations -->
+            <div class="section-card card">
+              <div class="section-card-header">
+                <span style="font-size: 1.2rem;">👀</span>
+                <h2 class="section-card-title">친구들의 멋진 발표</h2>
+              </div>
+              <div class="grid" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--s-4);">
+                 ${sharedPresentations.length === 0 ? '<p class="text-center" style="color: var(--text-dim); padding: 20px;">공유된 발표가 없습니다.</p>' : sharedPresentations.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt)).map(p => `
+                   <div class="card presentation-item" style="padding: 10px;">
+                     <div class="flex justify-between items-center" style="margin-bottom: 5px;">
+                        <span class="badge badge-purple">학우 공유</span>
+                        <span style="font-size: 0.8rem; font-weight: 600;">${formatDate(p.createdAt)}</span>
+                     </div>
+                     <img src="${p.whiteboardImage?.url}" style="width:100%; aspect-ratio: 16/9; object-fit: contain; background: #000; border-radius: 4px; margin-bottom: 5px; cursor:pointer;" class="img-preview" onclick="window.open('${p.whiteboardImage?.url}')"/>
+                     ${p.audioData ? `
+                       <button class="btn btn-secondary w-full btn-sm btn-play-video" data-url="${p.audioData.url}">🎬 발표 영상 보기</button>
+                     ` : `<button class="btn btn-ghost w-full btn-sm" disabled>영상 없음</button>`}
+                   </div>
+                 `).join('')}
+              </div>
+            </div>
+          </div>
         </main>
+      </div>
+
+      <!-- Video Modal -->
+      <div class="modal-backdrop" id="video-modal" style="z-index: 2000;">
+        <div class="modal-content" style="max-width: 1000px; width: 90%; background: #000; padding: 0;">
+          <div class="modal-header" style="background: rgba(0,0,0,0.5); position: absolute; top: 0; left: 0; right: 0; z-index: 10;">
+             <h3 class="modal-title" style="color: #fff;">발표 영상</h3>
+             <button class="modal-close" style="color: #fff; background: rgba(255,255,255,0.1);" id="close-video-modal">✕</button>
+          </div>
+          <video id="player" controls style="width: 100%; aspect-ratio: 16/9; display: block; border-radius: var(--r-lg);">소스가 없습니다.</video>
+        </div>
       </div>
 
       <!-- Character Selection Modal -->
@@ -310,6 +368,42 @@ export function renderStudentDashboard(container) {
   }
 
   function bindEvents(assignments, freshStudent) {
+    // Media Playback Modal
+    const videoModal = document.getElementById('video-modal');
+    const player = document.getElementById('player');
+    if (videoModal && player) {
+        document.querySelectorAll('.btn-play-video').forEach(btn => {
+            btn.addEventListener('click', () => {
+                player.src = btn.dataset.url;
+                videoModal.classList.add('active');
+                player.play();
+            });
+        });
+        document.getElementById('close-video-modal')?.addEventListener('click', () => {
+            player.pause(); player.src = '';
+            videoModal.classList.remove('active');
+        });
+        videoModal.addEventListener('click', (e) => {
+            if (e.target === videoModal) {
+                player.pause(); player.src = '';
+                videoModal.classList.remove('active');
+            }
+        });
+    }
+
+    // Toggle Share
+    document.querySelectorAll('.btn-toggle-share').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            try {
+                await toggleSharePresentation(btn.dataset.id);
+                showToast('공유 상태가 변경되었습니다.');
+                render();
+            } catch (err) {
+                showToast('오류가 발생했습니다.', 'error');
+            }
+        });
+    });
+
     // Selection Modal Events
     const modal = document.getElementById('selection-modal');
     if (modal) {

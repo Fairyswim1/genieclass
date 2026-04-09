@@ -653,6 +653,9 @@ export function renderLessonMode(container, params) {
                     <button class="btn btn-secondary w-full" onclick="window.open('${p.whiteboardImage?.url}')">
                       🖼️ 원본 이미지 보기
                     </button>
+                    <button class="btn ${p.shared ? 'btn-danger' : 'btn-purple'} w-full btn-toggle-share" data-id="${p.id}">
+                      ${p.shared ? '👀 반 전체 공유 중 (끄기)' : '🙌 반 전체에 공유하기'}
+                    </button>
                   </div>
                 </div>
               `).join('')}
@@ -688,6 +691,19 @@ export function renderLessonMode(container, params) {
         player.src = btn.dataset.url;
         videoModal.classList.add('active');
         player.play();
+      });
+    });
+
+    document.querySelectorAll('.btn-toggle-share').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        try {
+          await toggleSharePresentation(btn.dataset.id);
+          showToast('공유 상태가 변경되었습니다.');
+          studentPresentations = await getPresentationsByStudent(selectedStudent.id);
+          render();
+        } catch (err) {
+          showToast('오류가 발생했습니다.', 'error');
+        }
       });
     });
 
