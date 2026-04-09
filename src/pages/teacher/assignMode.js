@@ -33,12 +33,13 @@ export function renderAssignMode(container, params) {
     container.innerHTML = `
       <div class="teacher-layout page-enter">
         <main class="main-content" style="max-width: 1400px; margin: 0 auto;">
-          <header class="page-header flex justify-between items-center" style="margin-bottom: var(--s-8);">
-            <div class="animate-up">
-              <button class="btn btn-ghost btn-sm" id="btn-back-dashboard" style="margin-bottom: var(--s-2);">← 대시보드로</button>
-              <h1 class="page-title">${cls.name} <span class="badge badge-purple" style="vertical-align: middle; margin-left: 10px;">관리 모드</span></h1>
-              <p class="page-subtitle">수업 소식, 과제 및 학습 자료를 관리합니다.</p>
-            </div>
+          <header class="premium-header-banner animate-up">
+            <button class="btn btn-ghost btn-sm" id="btn-back-dashboard" style="margin-bottom: var(--s-4);">← 대시보드로</button>
+            <h1 class="page-title">
+              ${cls.name}
+              <span class="badge badge-purple" style="font-size: 1rem;">관리 모드</span>
+            </h1>
+            <p class="page-subtitle" style="color: var(--text-muted); margin-top: var(--s-2);">수업 소식, 과제 및 학습 자료를 관리합니다.</p>
           </header>
 
           <div class="tabs" style="margin-bottom: var(--s-12); max-width: 600px;">
@@ -73,31 +74,47 @@ export function renderAssignMode(container, params) {
               </div>
             </div>
 
-            <div class="feed-list">
+            <div class="board-container">
               ${announcements.length === 0 ? `
-                <div class="empty-state">
-                  <div class="empty-state-icon">📢</div>
-                  <p>등록된 공지사항이 없습니다.</p>
+                <div class="empty-board">
+                  <div class="empty-board-icon">📢</div>
+                  <p style="font-size: 1.1rem; font-weight: 600; color: var(--text-main); margin-bottom: 8px;">등록된 학급 공지사항이 없습니다.</p>
+                  <p style="font-size: 0.9rem;">우측 상단의 '+ 공지 작성' 버튼을 눌러 새 소식을 등록해보세요.</p>
                 </div>
-              ` : announcements.map(ann => `
-                <div class="feed-item">
-                  <div class="feed-item-header">
-                    <h3 class="feed-item-title">${ann.title}</h3>
-                    <button class="btn btn-danger btn-sm delete-btn" data-type="ann" data-id="${ann.id}">삭제</button>
-                  </div>
-                  <p class="feed-item-body" style="white-space: pre-line;">${ann.content}</p>
-                  ${ann.files && ann.files.length > 0 ? `
-                    <div class="flex gap-sm" style="margin-top: var(--s-4); flex-wrap: wrap;">
-                      ${ann.files.map(f => `
-                        <div class="badge badge-blue" style="cursor: pointer;" onclick="window.downloadFile('${f.id}')">📎 ${f.name}</div>
-                      `).join('')}
-                    </div>
-                  ` : ''}
-                  <div class="feed-item-footer">
-                    <span>작성일: ${formatDate(ann.createdAt)}</span>
-                  </div>
-                </div>
-              `).join('')}
+              ` : `
+                <table class="board-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 60px; text-align: center;">번호</th>
+                      <th>제목 및 내용</th>
+                      <th style="width: 120px; text-align: center;">작성일</th>
+                      <th style="width: 80px; text-align: center;">관리</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${announcements.map((ann, idx) => `
+                      <tr>
+                        <td style="text-align: center; color: var(--text-dim);">${announcements.length - idx}</td>
+                        <td>
+                          <div class="board-title-cell">${ann.title}</div>
+                          <div style="font-size: 0.9rem; color: var(--text-muted); margin-top: 8px; white-space: pre-line;">${ann.content}</div>
+                          ${ann.files && ann.files.length > 0 ? `
+                            <div class="flex gap-sm" style="margin-top: 10px; flex-wrap: wrap;">
+                              ${ann.files.map(f => `
+                                <div class="badge badge-blue" style="cursor: pointer; font-size: 0.75rem;" onclick="window.downloadFile('${f.id}')">📎 ${f.name}</div>
+                              `).join('')}
+                            </div>
+                          ` : ''}
+                        </td>
+                        <td style="text-align: center; color: var(--text-dim); font-size: 0.85rem;">${formatDate(ann.createdAt)}</td>
+                        <td style="text-align: center;">
+                          <button class="btn btn-ghost btn-sm delete-btn" data-type="ann" data-id="${ann.id}" style="color: var(--error); padding: 4px 8px;">삭제</button>
+                        </td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              `}
             </div>
           </div>
 
@@ -131,29 +148,42 @@ export function renderAssignMode(container, params) {
               </div>
             </div>
 
-            <div class="feed-list">
-              ${(await Promise.all(assignments.map(async a => {
+            <div class="${assignments.length === 0 ? '' : 'grid'}" style="grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: var(--s-6);">
+              ${assignments.length === 0 ? `
+                <div class="empty-board">
+                  <div class="empty-board-icon">📝</div>
+                  <p style="font-size: 1.1rem; font-weight: 600; color: var(--text-main); margin-bottom: 8px;">출제된 과제가 없습니다.</p>
+                  <p style="font-size: 0.9rem;">새로운 과제를 만들어 학생들의 제출 현황을 한눈에 파악하세요.</p>
+                </div>
+              ` : (await Promise.all(assignments.map(async a => {
       const subs = await getSubmissionsByAssignment(a.id);
+      const isDuePast = a.dueDate && new Date(a.dueDate) < new Date();
       return `
-                  <div class="feed-item homework-item">
-                    <div class="feed-item-header">
-                      <h3 class="feed-item-title">${a.title}</h3>
-                      <button class="btn btn-danger btn-sm delete-btn" data-type="assign" data-id="${a.id}">삭제</button>
-                    </div>
-                    <p class="feed-item-body" style="white-space: pre-line;">${a.description}</p>
-                    <div class="feed-item-footer" style="flex-wrap: wrap; gap: var(--s-4);">
-                      <span class="badge badge-purple">📅 기한: ${a.dueDate || '없음'}</span>
-                      <span class="badge badge-green">👥 제출: ${subs.length} / ${students.length}명</span>
-                      <span>생성일: ${formatDate(a.createdAt)}</span>
-                    </div>
-                    ${subs.length > 0 ? `
-                      <div class="flex gap-sm" style="margin-top: var(--s-4); flex-wrap: wrap;">
-                         ${(await Promise.all(subs.map(async s => {
-        const std = await getStudentById(s.studentId);
-        return std ? `<span class="badge badge-blue" style="opacity: 0.8;">${std.name}</span>` : '';
-      }))).join('')}
+                  <div class="card homework-item" style="padding: var(--s-6); display: flex; flex-direction: column; border-top: 4px solid var(--primary);">
+                    <div class="flex justify-between items-start" style="margin-bottom: var(--s-4);">
+                      <div class="flex flex-col gap-sm">
+                        <span class="badge ${isDuePast ? 'badge-danger' : 'badge-green'}" style="align-self: flex-start;">${a.dueDate ? (isDuePast ? '마감됨' : '진행중') : '기한 없음'}</span>
+                        <h3 style="font-size: 1.25rem; font-weight: 700; word-break: keep-all; line-height: 1.4;">${a.title}</h3>
                       </div>
-                    ` : ''}
+                      <button class="btn btn-ghost btn-sm delete-btn" data-type="assign" data-id="${a.id}" style="color: var(--error);">삭제</button>
+                    </div>
+                    
+                    <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: var(--s-6); flex: 1; white-space: pre-line;">${a.description}</p>
+                    
+                    <div style="background: var(--bg-main); padding: var(--s-4); border-radius: var(--r-sm); margin-bottom: var(--s-4);">
+                      <div class="flex justify-between items-center" style="margin-bottom: 8px;">
+                        <span style="font-size: 0.85rem; color: var(--text-dim); font-weight: 600;">제출 현황</span>
+                        <span style="font-size: 0.9rem; font-weight: 700; color: var(--primary);">${subs.length} <span style="color: var(--text-muted); font-weight: 400;">/ ${students.length}명</span></span>
+                      </div>
+                      <div style="width: 100%; height: 6px; background: var(--border-subtle); border-radius: 3px; overflow: hidden;">
+                        <div style="width: ${students.length ? (subs.length / students.length) * 100 : 0}%; height: 100%; background: var(--primary);"></div>
+                      </div>
+                    </div>
+                    
+                    <div class="flex justify-between items-center" style="font-size: 0.85rem; color: var(--text-dim);">
+                      <span>마감: <strong style="color: var(--text-main); font-weight: 500;">${a.dueDate || '없음'}</strong></span>
+                      <span>등록일: ${formatDate(a.createdAt)}</span>
+                    </div>
                   </div>
                 `;
     }))).join('')}
@@ -188,24 +218,28 @@ export function renderAssignMode(container, params) {
 
             <div class="grid" style="grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--s-6);">
               ${resources.length === 0 ? `
-                <div class="empty-state w-full" style="grid-column: 1 / -1;">
-                  <div class="empty-state-icon">📁</div>
-                  <p>업로드된 학습 자료가 없습니다.</p>
+                <div class="empty-board w-full" style="grid-column: 1 / -1;">
+                  <div class="empty-board-icon">📁</div>
+                  <p style="font-size: 1.1rem; font-weight: 600; color: var(--text-main); margin-bottom: 8px;">업로드된 학습 자료가 없습니다.</p>
+                  <p style="font-size: 0.9rem;">학생들에게 필요한 수업 참고 자료를 공유해보세요.</p>
                 </div>
               ` : resources.map(res => `
-                <div class="card" style="padding: var(--s-6);">
+                <div class="card" style="padding: var(--s-6); display: flex; flex-direction: column; height: 100%;">
                   <div class="flex justify-between items-start" style="margin-bottom: var(--s-4);">
-                    <h3 style="font-size: 1.1rem; font-weight: 700;">${res.title}</h3>
-                    <button class="btn btn-ghost btn-sm delete-btn" data-type="res" data-id="${res.id}" style="color: var(--error);">삭제</button>
+                    <h3 style="font-size: 1.15rem; font-weight: 700; word-break: keep-all; line-height: 1.3;">${res.title}</h3>
+                    <button class="btn btn-ghost btn-sm delete-btn" data-type="res" data-id="${res.id}" style="color: var(--error); padding: 4px;">삭제</button>
                   </div>
-                  <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: var(--s-4);">${res.description}</p>
-                  <div class="flex flex-col gap-sm">
-                    ${res.files.map(f => `
-                       <div class="interactive-item" style="padding: var(--s-2) var(--s-3); margin-bottom: 0;" onclick="window.downloadFile('${f.id}')">
-                         <span style="font-size: 0.85rem; font-weight: 500;">📎 ${f.name}</span>
-                         <span style="font-size: 1.2rem;">📥</span>
+                  <p style="font-size: 0.95rem; color: var(--text-muted); margin-bottom: var(--s-6); flex: 1;">${res.description || '설명 없음'}</p>
+                  
+                  <div class="flex flex-col gap-sm" style="border-top: 1px solid var(--border-subtle); padding-top: var(--s-4);">
+                     ${res.files && res.files.length > 0 ? res.files.map(f => `
+                       <div class="flex justify-between items-center interactive-item" style="padding: 8px 12px; background: var(--bg-main); border-radius: var(--r-sm); cursor: pointer;" onclick="window.downloadFile('${f.id}')">
+                         <span style="font-size: 0.85rem; font-weight: 500; color: var(--primary); display: flex; align-items: center; gap: 8px;">
+                           <i>📎</i> <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;">${f.name}</span>
+                         </span>
+                         <span style="font-size: 1.1rem;">📥</span>
                        </div>
-                    `).join('')}
+                    `).join('') : '<span style="font-size: 0.85rem; color: var(--text-dim);">첨부 파일 없음</span>'}
                   </div>
                 </div>
               `).join('')}
