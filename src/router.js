@@ -65,7 +65,14 @@ function matchRoute(hash) {
 
 export function initRouter() {
     const handleRoute = () => {
-        const hash = window.location.hash.slice(1) || '/';
+        let hash = window.location.hash.slice(1) || '/';
+        
+        // If it is the Electron app, bypass the landing page and force teacher mode
+        if (hash === '/' && navigator.userAgent.includes('ElectronApp')) {
+            window.location.hash = '/teacher/login';
+            return;
+        }
+
         const app = document.getElementById('app');
 
         // Clean up previous page
