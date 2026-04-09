@@ -10,6 +10,13 @@ app.commandLine.appendSwitch('touch-events', 'enabled');
 app.commandLine.appendSwitch('disable-smooth-scrolling');
 app.commandLine.appendSwitch('enable-features', 'TouchpadOverscrollHistoryNavigation'); // 스와이프 뒤로가기 방지를 위해 개별 컨트롤
 
+// 극한의 터치 딜레이 최적화 플래그 추가
+app.commandLine.appendSwitch('disable-touch-drag-drop'); // 터치-드래그 충돌 방지
+app.commandLine.appendSwitch('enable-gpu-rasterization'); // GPU 렌더링 활성화
+app.commandLine.appendSwitch('enable-zero-copy'); // 비디오/캔버스 메모리 복사 지연 방지
+app.commandLine.appendSwitch('ignore-gpu-blocklist'); // 모든 하드웨어 가속 강제 사용
+app.commandLine.appendSwitch('disable-vsync-for-mushrooms'); // 불필요 Vsync 오버헤드 최소화 (선택적)
+
 async function createWindow() {
   const mainWindow = new BrowserWindow({
     width: 1920,
