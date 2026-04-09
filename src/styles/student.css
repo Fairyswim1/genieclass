@@ -246,9 +246,12 @@
 
 /* Animation Utils */
 .student-character-float {
-    width: 140px;
-    height: 140px;
-    margin: 0 auto var(--s-6);
+    width: 80px;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
     animation: bounce 4s ease-in-out infinite;
     filter: drop-shadow(4px 10px 0px rgba(62, 54, 46, 0.05));
 }

@@ -106,9 +106,9 @@ export function renderStudentDashboard(container) {
           </section>
 
           <!-- Character & Progress -->
-          <section class="card flex items-center gap-lg" style="margin-bottom: var(--s-12); padding: var(--s-8);">
+          <section class="card flex items-center gap-md" style="margin-bottom: var(--s-6); padding: var(--s-4) var(--s-6);">
             <div class="student-character-float">
-              ${renderCharacter(freshStudent.characterLevel, 100, freshStudent.characterType || 'sunflower')}
+              ${renderCharacter(freshStudent.characterLevel, 70, freshStudent.characterType || 'sunflower')}
             </div>
             <div class="flex-1">
               <div class="flex justify-between items-end" style="margin-bottom: var(--s-2);">
