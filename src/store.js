@@ -281,13 +281,19 @@ export async function getPresentationsByClass(classId) {
     return snapshot.docs.map(doc => doc.data());
 }
 
-export async function toggleSharePresentation(presentationId) {
+export async function toggleSharePresentation(presentationId, title = null) {
     const ref = doc(db, COLLECTIONS.PRESENTATIONS, presentationId);
     const snap = await getDoc(ref);
     if (snap.exists()) {
-        const currentShared = snap.data().shared;
-        await updateDoc(ref, { shared: !currentShared });
-        return { ...snap.data(), shared: !currentShared };
+        const data = snap.data();
+        const currentShared = data.shared;
+        const updates = { shared: !currentShared };
+        // 공유를 켜는 상태이면서 title이 전달된 경우만 제목 지정
+        if (!currentShared && title) {
+            updates.title = title;
+        }
+        await updateDoc(ref, updates);
+        return { ...data, ...updates };
     }
     return null;
 }

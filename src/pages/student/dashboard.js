@@ -198,7 +198,7 @@ export function renderStudentDashboard(container) {
                    <div class="card presentation-item" style="padding: 10px;">
                      <div class="flex justify-between items-center" style="margin-bottom: 5px;">
                         <span class="badge badge-main">${formatDate(p.createdAt)}</span>
-                        <button class="btn btn-sm ${p.shared ? 'btn-danger' : 'btn-primary'} btn-toggle-share" data-id="${p.id}">${p.shared ? '공유 끄기' : '친구와 공유'}</button>
+                        <button class="btn btn-sm ${p.shared ? 'btn-danger' : 'btn-primary'} btn-toggle-share" data-id="${p.id}" data-shared="${p.shared}">${p.shared ? '공유 끄기' : '친구와 공유'}</button>
                      </div>
                      <img src="${p.whiteboardImage?.url}" style="width:100%; aspect-ratio: 16/9; object-fit: contain; background: #000; border-radius: 4px; margin-bottom: 5px; cursor:pointer;" class="img-preview" onclick="window.open('${p.whiteboardImage?.url}')"/>
                      ${p.audioData ? `
@@ -215,17 +215,21 @@ export function renderStudentDashboard(container) {
                 <span style="font-size: 1.2rem;">👀</span>
                 <h2 class="section-card-title">친구들의 멋진 발표</h2>
               </div>
-              <div class="grid" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--s-4);">
+              <div class="flex flex-col gap-sm">
                  ${sharedPresentations.length === 0 ? '<p class="text-center" style="color: var(--text-dim); padding: 20px;">공유된 발표가 없습니다.</p>' : sharedPresentations.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt)).map(p => `
-                   <div class="card presentation-item" style="padding: 10px;">
-                     <div class="flex justify-between items-center" style="margin-bottom: 5px;">
+                   <div class="card presentation-item flex items-center justify-between" style="padding: 12px 16px; margin: 0;">
+                     <div class="flex items-center gap-md">
                         <span class="badge badge-purple">학우 공유</span>
-                        <span style="font-size: 0.8rem; font-weight: 600;">${formatDate(p.createdAt)}</span>
+                        <span style="font-weight: 700; font-size: 1.05rem;">${p.title || '제목 없는 발표'}</span>
                      </div>
-                     <img src="${p.whiteboardImage?.url}" style="width:100%; aspect-ratio: 16/9; object-fit: contain; background: #000; border-radius: 4px; margin-bottom: 5px; cursor:pointer;" class="img-preview" onclick="window.open('${p.whiteboardImage?.url}')"/>
-                     ${p.audioData ? `
-                       <button class="btn btn-secondary w-full btn-sm btn-play-video" data-url="${p.audioData.url}">🎬 발표 영상 보기</button>
-                     ` : `<button class="btn btn-ghost w-full btn-sm" disabled>영상 없음</button>`}
+                     <div class="flex items-center gap-sm">
+                        <span style="font-size: 0.85rem; color: var(--text-dim); margin-right: 10px;">${formatDate(p.createdAt)}</span>
+                        ${p.audioData ? `
+                          <button class="btn btn-secondary btn-sm btn-play-video" data-url="${p.audioData.url}">🎬 영상보기</button>
+                        ` : `
+                          <button class="btn btn-ghost btn-sm" onclick="window.open('${p.whiteboardImage?.url}')">🖼️ 보기</button>
+                        `}
+                     </div>
                    </div>
                  `).join('')}
               </div>
@@ -394,9 +398,21 @@ export function renderStudentDashboard(container) {
     // Toggle Share
     document.querySelectorAll('.btn-toggle-share').forEach(btn => {
         btn.addEventListener('click', async () => {
+            const presentationId = btn.dataset.id;
+            const isShared = btn.dataset.shared === 'true';
+            
+            let title = null;
+            if (!isShared) {
+                 title = prompt('공유할 발표의 제목을 입력해주세요 (예: 기하 1-6프린트 1번 문제):');
+                 if (title === null || title.trim() === '') {
+                     showToast('제목 작성이 취소되어 공유가 보류되었습니다.', 'info');
+                     return;
+                 }
+            }
+
             try {
-                await toggleSharePresentation(btn.dataset.id);
-                showToast('공유 상태가 변경되었습니다.');
+                await toggleSharePresentation(presentationId, title);
+                showToast(isShared ? '공유가 해제되었습니다.' : '공유 완료!');
                 render();
             } catch (err) {
                 showToast('오류가 발생했습니다.', 'error');

@@ -653,7 +653,7 @@ export function renderLessonMode(container, params) {
                     <button class="btn btn-secondary w-full" onclick="window.open('${p.whiteboardImage?.url}')">
                       🖼️ 원본 이미지 보기
                     </button>
-                    <button class="btn ${p.shared ? 'btn-danger' : 'btn-purple'} w-full btn-toggle-share" data-id="${p.id}">
+                    <button class="btn ${p.shared ? 'btn-danger' : 'btn-purple'} w-full btn-toggle-share" data-id="${p.id}" data-shared="${p.shared}">
                       ${p.shared ? '👀 반 전체 공유 중 (끄기)' : '🙌 반 전체에 공유하기'}
                     </button>
                   </div>
@@ -696,9 +696,21 @@ export function renderLessonMode(container, params) {
 
     document.querySelectorAll('.btn-toggle-share').forEach(btn => {
       btn.addEventListener('click', async () => {
+        const presentationId = btn.dataset.id;
+        const isShared = btn.dataset.shared === 'true';
+        
+        let title = null;
+        if (!isShared) {
+            title = prompt('반 전체에 공유할 제목을 입력하세요 (예: 1번 문제 풀이):');
+            if (title === null || title.trim() === '') {
+                showToast('제목이 필요합니다.', 'error');
+                return;
+            }
+        }
+        
         try {
-          await toggleSharePresentation(btn.dataset.id);
-          showToast('공유 상태가 변경되었습니다.');
+          await toggleSharePresentation(presentationId, title);
+          showToast(isShared ? '공유가 중지되었습니다.' : '공유 완료!');
           studentPresentations = await getPresentationsByStudent(selectedStudent.id);
           render();
         } catch (err) {
