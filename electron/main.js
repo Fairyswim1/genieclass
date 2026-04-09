@@ -10,43 +10,6 @@ app.commandLine.appendSwitch('touch-events', 'enabled');
 app.commandLine.appendSwitch('disable-smooth-scrolling');
 app.commandLine.appendSwitch('enable-features', 'TouchpadOverscrollHistoryNavigation'); // 스와이프 뒤로가기 방지를 위해 개별 컨트롤
 
-import http from 'http';
-import fs from 'fs';
-
-function serveLocalApp() {
-  return new Promise((resolve) => {
-    const distPath = path.join(__dirname, '../dist');
-    const server = http.createServer((req, res) => {
-      let urlPath = req.url.split('?')[0].split('#')[0];
-      if (urlPath === '/') urlPath = '/index.html';
-      
-      let filePath = path.join(distPath, urlPath);
-      if (!fs.existsSync(filePath)) {
-        filePath = path.join(distPath, 'index.html'); // SPA fallback
-      }
-      
-      const ext = path.extname(filePath);
-      const mimeTypes = {
-        '.html': 'text/html',
-        '.js': 'text/javascript',
-        '.css': 'text/css',
-        '.png': 'image/png',
-        '.jpg': 'image/jpeg',
-        '.svg': 'image/svg+xml',
-        '.json': 'application/json'
-      };
-      
-      res.writeHead(200, { 'Content-Type': mimeTypes[ext] || 'application/octet-stream' });
-      fs.createReadStream(filePath).pipe(res);
-    });
-    
-    // 포트를 자동 할당받되 'localhost'로 열어야 파이어베이스 구글 로그인이 허용됨
-    server.listen(0, 'localhost', () => {
-      resolve(`http://localhost:${server.address().port}`);
-    });
-  });
-}
-
 async function createWindow() {
   const mainWindow = new BrowserWindow({
     width: 1920,
@@ -68,9 +31,8 @@ async function createWindow() {
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173');
   } else {
-    // prodUrl: file:// 대신 가상의 로컬 호스트 서버로 우회하여 브라우저랑 100% 동일한 환경 구성
-    const localUrl = await serveLocalApp();
-    mainWindow.loadURL(localUrl);
+    // 라이브 웹사이트와 다이렉트로 연동 (이제 코드를 고쳐도 exe 빌드를 다시 할 필요 없음)
+    mainWindow.loadURL('https://genieclass.vercel.app/');
   }
 
   // 브라우저의 기본 마우스/터치 기능 통제 방어 (Pinch-zoom, Swipe Navigation 방지)
