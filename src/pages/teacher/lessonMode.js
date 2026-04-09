@@ -307,7 +307,6 @@ export function renderLessonMode(container, params) {
           </button>
           <button class="btn btn-secondary btn-sm" id="wb-save">💾 저장</button>
         </div>
-        </div>
         <div class="whiteboard-canvas-wrap" style="background: #000; position: relative;">
           <canvas id="whiteboard-canvas" style="position: absolute; top: 0; left: 0; z-index: 1; touch-action: none;"></canvas>
           <canvas id="whiteboard-draft" style="position: absolute; top: 0; left: 0; z-index: 2; pointer-events: none; touch-action: none;"></canvas>
