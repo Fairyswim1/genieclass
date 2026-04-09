@@ -71,21 +71,21 @@
 
 /* Student Dashboard Content */
 .student-dashboard {
-    padding: var(--s-12);
+    padding: var(--s-8) var(--s-12);
     max-width: 1400px;
     margin: 0 auto;
     animation: slideUpFade 0.7s var(--ease-out);
 }
 
 .student-welcome {
-    margin-bottom: var(--s-12);
-    text-align: center;
+    margin-bottom: var(--s-6);
+    text-align: left;
 }
 
 .student-welcome-title {
     font-family: var(--font-title);
-    font-size: 3.5rem;
-    font-weight: 400;
+    font-size: 2.2rem;
+    font-weight: 700;
     letter-spacing: -0.02em;
     margin-bottom: var(--s-2);
     color: var(--text-main);
@@ -98,7 +98,7 @@
 
 .student-welcome-subtitle {
     font-family: var(--font-hand);
-    font-size: 1.8rem;
+    font-size: 1.1rem;
     color: var(--text-muted);
 }
 
