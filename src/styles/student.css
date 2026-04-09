@@ -71,14 +71,14 @@
 
 /* Student Dashboard Content */
 .student-dashboard {
-    padding: var(--s-8) var(--s-12);
+    padding: var(--s-4) var(--s-6) var(--s-12);
     max-width: 1400px;
     margin: 0 auto;
     animation: slideUpFade 0.7s var(--ease-out);
 }
 
 .student-welcome {
-    margin-bottom: var(--s-6);
+    margin-bottom: var(--s-4);
     text-align: left;
 }
 
@@ -106,8 +106,8 @@
 .student-stats-row {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: var(--s-10);
-    margin-bottom: var(--s-12);
+    gap: var(--s-6);
+    margin-bottom: var(--s-8);
 }
 
 .stat-card {
