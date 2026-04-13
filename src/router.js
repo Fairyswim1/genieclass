@@ -65,13 +65,21 @@ function matchRoute(hash) {
 
 export function initRouter() {
     const handleRoute = () => {
+        const path = window.location.pathname;
         let hash = window.location.hash.slice(1) || '/';
         
+        // Handle direct path-based entry (e.g., genieclass.vercel.app/student or /s)
+        if ((path === '/student' || path === '/s') && (hash === '/' || hash === '')) {
+            window.location.hash = '/student';
+            return;
+        }
+
         // Android(Capacitor) 또는 Electron 앱에서만 교사 모드 강제 진입
+        // 웹 브라우저에서는 이 로직을 타지 않도록 확실히 체크
         const isCapacitor = window.Capacitor && window.Capacitor.isNativePlatform;
         const isElectron = navigator.userAgent.includes('ElectronApp');
         
-        if (hash === '/' && (isCapacitor || isElectron)) {
+        if (hash === '/' && path === '/' && (isCapacitor || isElectron)) {
             window.location.hash = '/teacher/login';
             return;
         }
