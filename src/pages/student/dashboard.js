@@ -34,7 +34,7 @@ export function renderStudentDashboard(container) {
   async function render() {
     let freshStudent = student;
     let cls = null;
-    let config = getLevelConfig(student.characterLevel);
+    let config = getLevelConfig(student.characterLevel, student.characterType || 'apple');
     let progress = getLevelProgress(student.totalPoints || 0);
     let presentations = [];
     let assignments = [];
@@ -46,7 +46,7 @@ export function renderStudentDashboard(container) {
     try {
       freshStudent = await getStudentByCode(student.uniqueCode) || student;
       cls = await getClassById(freshStudent.classId);
-      config = getLevelConfig(freshStudent.characterLevel, freshStudent.characterType || 'sunflower');
+      config = getLevelConfig(freshStudent.characterLevel, freshStudent.characterType || 'apple');
       progress = getLevelProgress(freshStudent.totalPoints || 0);
 
       let allPresentations = [];
@@ -76,7 +76,7 @@ export function renderStudentDashboard(container) {
             <div class="student-topbar-title">Genie Class</div>
           </div>
           <div class="student-topbar-user">
-            <div class="student-topbar-avatar">${renderCharacter(freshStudent.characterLevel, 34, freshStudent.characterType || 'sunflower')}</div>
+            <div class="student-topbar-avatar">${renderCharacter(freshStudent.characterLevel, 34, freshStudent.characterType || 'apple', freshStudent.totalPoints)}</div>
             <div class="student-topbar-name">${freshStudent.name}</div>
             <button class="btn btn-ghost btn-sm" id="btn-student-logout" style="margin-left: 10px;">로그아웃</button>
           </div>
@@ -109,7 +109,7 @@ export function renderStudentDashboard(container) {
           <!-- Character & Progress -->
           <section class="card flex items-center gap-md" style="margin-bottom: var(--s-6); padding: var(--s-4) var(--s-6);">
             <div class="student-character-float">
-              ${renderCharacter(freshStudent.characterLevel, 70, freshStudent.characterType || 'sunflower')}
+              ${renderCharacter(freshStudent.characterLevel, 70, freshStudent.characterType || 'apple', freshStudent.totalPoints)}
             </div>
             <div class="flex-1">
               <div class="flex justify-between items-end" style="margin-bottom: var(--s-2);">

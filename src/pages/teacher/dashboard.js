@@ -303,11 +303,11 @@ export function renderTeacherDashboard(container) {
                     <td><span class="student-code">${s.uniqueCode}</span></td>
                     <td>
                       <div class="flex items-center gap-sm">
-                        ${renderCharacter(s.characterLevel, 32, s.characterType || 'sunflower')}
+                        ${renderCharacter(s.characterLevel, 32, s.characterType || 'apple', s.totalPoints)}
                         <span class="badge badge-primary">Lv.${s.characterLevel}</span>
                       </div>
                     </td>
-                    <td><span class="badge badge-gold">⭐ ${s.praiseCount}</span></td>
+                    <td><span class="badge badge-gold">⭐ ${s.totalPoints}</span></td>
                     <td><button class="btn btn-ghost btn-sm delete-student-btn" data-student-id="${s.id}" style="color:var(--red);font-size:0.8rem">삭제</button></td>
                   </tr>
                 `).join('')}
