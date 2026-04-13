@@ -479,7 +479,7 @@ export function renderStudentDashboard(container) {
             
             ${assignment.files && assignment.files.length > 0 ? `
               <div style="margin-bottom: var(--s-8);">
-                <div class="input-label">첨부 자료</div>
+                <div class="input-label">교사 첨부 자료</div>
                 <div class="flex gap-sm" style="flex-wrap: wrap;">
                   ${assignment.files.map(f => `<button class="btn btn-secondary btn-sm" onclick="window.downloadFile('${f.id}')">📎 ${f.name}</button>`).join('')}
                 </div>
@@ -490,21 +490,35 @@ export function renderStudentDashboard(container) {
 
             <div class="form-section">
               <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: var(--s-4);">내 제출물</h3>
-              ${sub ? `
-                <div class="card" style="background: rgba(16, 185, 129, 0.05); border-color: var(--success); padding: var(--s-4);">
-                  <p style="color: var(--success); font-weight: 600;">과제가 성공적으로 제출되었습니다.</p>
-                  <p style="font-size: 0.85rem; color: var(--text-dim); margin-top: 5px;">제출 일시: ${formatDate(sub.createdAt)}</p>
-                </div>
-              ` : `
+              
+              <div id="submission-status-view" class="${sub ? '' : 'hidden'}">
+                ${sub ? `
+                  <div class="card" style="background: rgba(16, 185, 129, 0.05); border-color: var(--success); padding: var(--s-6); margin-bottom: var(--s-4);">
+                    <div class="flex justify-between items-center" style="margin-bottom: var(--s-4);">
+                       <p style="color: var(--success); font-weight: 600;">과제가 제출되었습니다.</p>
+                       <span style="font-size: 0.85rem; color: var(--text-dim);">제출: ${formatDate(sub.createdAt)}</span>
+                    </div>
+                    <div class="flex gap-sm" style="flex-wrap: wrap; margin-bottom: var(--s-4);">
+                      ${sub.files.map(f => `<button class="btn btn-ghost btn-sm" style="border: 1px solid var(--border-subtle);" onclick="window.downloadFile('${f.id}')">📎 ${f.name}</button>`).join('')}
+                    </div>
+                    <button class="btn btn-outline btn-sm w-full" id="btn-edit-submission">제출물 수정하기</button>
+                  </div>
+                ` : ''}
+              </div>
+
+              <div id="submission-form-view" class="${sub ? 'hidden' : ''}">
                 <div class="drop-zone" style="background: var(--bg-surface); border-style: dashed; padding: var(--s-12); border-radius: var(--r-lg);" id="submission-dropzone">
                    <div style="font-size: 2rem; margin-bottom: 10px;">📤</div>
                    <div style="font-weight: 600;">파일을 드래그하거나 클릭하여 업로드</div>
-                   <div style="font-size: 0.85rem; color: var(--text-dim); margin-top: 5px;">모든 파일 형식(HTML 등) 여러 개 업로드 가능</div>
+                   <div style="font-size: 0.85rem; color: var(--text-dim); margin-top: 5px;">${sub ? '새로 업로드하면 기존 파일이 대체됩니다.' : '여러 파일 업로드(HTML 등) 가능'}</div>
                    <div id="selected-files-list" style="margin-top: 15px; font-size: 0.9rem; color: var(--primary); font-weight: 500;"></div>
                    <input type="file" id="submission-file" class="hidden" multiple />
                 </div>
-                <button class="btn btn-primary btn-lg w-full" style="margin-top: var(--s-6);" id="btn-submit-assignment">과제 제출하기</button>
-              `}
+                <div class="flex gap-md" style="margin-top: var(--s-6);">
+                  ${sub ? `<button class="btn btn-ghost btn-lg flex-1" id="btn-cancel-edit">취소</button>` : ''}
+                  <button class="btn btn-primary btn-lg ${sub ? 'flex-1' : 'w-full'}" id="btn-submit-assignment">${sub ? '수정 완료' : '과제 제출하기'}</button>
+                </div>
+              </div>
             </div>
           </div>
         </main>
@@ -512,9 +526,26 @@ export function renderStudentDashboard(container) {
     `;
 
     document.getElementById('btn-back-dashboard')?.addEventListener('click', () => { activeView = 'dashboard'; render(); });
+    
+    const statusView = document.getElementById('submission-status-view');
+    const formView = document.getElementById('submission-form-view');
+    const editBtn = document.getElementById('btn-edit-submission');
+    const cancelEditBtn = document.getElementById('btn-cancel-edit');
     const dropzone = document.getElementById('submission-dropzone');
     const fileInput = document.getElementById('submission-file');
     const fileListDisplay = document.getElementById('selected-files-list');
+
+    editBtn?.addEventListener('click', () => {
+      statusView.classList.add('hidden');
+      formView.classList.remove('hidden');
+    });
+
+    cancelEditBtn?.addEventListener('click', () => {
+      formView.classList.add('hidden');
+      statusView.classList.remove('hidden');
+      fileInput.value = '';
+      if (fileListDisplay) fileListDisplay.innerHTML = '';
+    });
     
     dropzone?.addEventListener('click', () => fileInput.click());
     
@@ -534,7 +565,7 @@ export function renderStudentDashboard(container) {
           files.push({ id: saved.id, name: saved.name });
         }
         await submitAssignment(assignment.id, freshStudent.id, { files, shared: true });
-        showToast('과제가 제출되었습니다! 🎉');
+        showToast(sub ? '제출물이 수정되었습니다! 🎉' : '과제가 제출되었습니다! 🎉');
         activeView = 'dashboard';
         render();
       } catch (err) { showToast('제출 중 오류 발생', 'error'); }

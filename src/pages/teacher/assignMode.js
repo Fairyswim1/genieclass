@@ -3,7 +3,7 @@
 // ========================================
 import {
   getCurrentTeacher, getClassById, getStudentsByClass,
-  createAssignment, getAssignmentsByClass, deleteAssignment,
+  createAssignment, getAssignmentsByClass, deleteAssignment, updateAssignment,
   createAnnouncement, getAnnouncementsByClass, deleteAnnouncement,
   addResource, getResourcesByClass, deleteResource,
   getSubmissionsByAssignment, saveFile, showToast, formatDate,
@@ -17,6 +17,7 @@ export function renderAssignMode(container, params) {
   const classId = params.id;
   let cls = null;
   let activeTab = 'announcements'; // 'announcements', 'assignments', 'resources'
+  let editingAssignmentId = null;
 
   async function init() {
     cls = await getClassById(classId);
@@ -51,10 +52,19 @@ export function renderAssignMode(container, params) {
                 <span class="badge ${isDuePast ? 'badge-danger' : 'badge-green'}" style="align-self: flex-start;">${a.dueDate ? (isDuePast ? '마감됨' : '진행중') : '기한 없음'}</span>
                 <h3 style="font-size: 1.25rem; font-weight: 700; word-break: keep-all; line-height: 1.4;">${a.title}</h3>
               </div>
-              <button class="btn btn-ghost btn-sm delete-btn" data-type="assign" data-id="${a.id}" style="color: var(--error);">삭제</button>
+              <div class="flex gap-sm">
+                <button class="btn btn-ghost btn-sm edit-btn" data-type="assign" data-id="${a.id}" style="color: var(--primary);">수정</button>
+                <button class="btn btn-ghost btn-sm delete-btn" data-type="assign" data-id="${a.id}" style="color: var(--error);">삭제</button>
+              </div>
             </div>
             
-            <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: var(--s-6); flex: 1; white-space: pre-line;">${a.description}</p>
+            <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: var(--s-4); flex-shrink: 0; white-space: pre-line;">${a.description}</p>
+            
+            ${a.files && a.files.length > 0 ? `
+              <div style="margin-bottom: var(--s-6); display: flex; flex-wrap: wrap; gap: 6px;">
+                ${a.files.map(f => `<button class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 2px 8px; background: var(--bg-main);" onclick="window.downloadFile('${f.id}')">📎 ${f.name}</button>`).join('')}
+              </div>
+            ` : ''}
             
             <div style="background: var(--bg-main); padding: var(--s-4); border-radius: var(--r-sm); margin-bottom: var(--s-4);">
               <div class="flex justify-between items-center" style="margin-bottom: 8px;">
@@ -302,14 +312,40 @@ export function renderAssignMode(container, params) {
     });
 
     // Forms Toggle
-    const setupToggle = (btnId, formId, cancelId) => {
-      document.getElementById(btnId)?.addEventListener('click', () => document.getElementById(formId).classList.remove('hidden'));
-      document.getElementById(cancelId)?.addEventListener('click', () => document.getElementById(formId).classList.add('hidden'));
-    };
+    document.getElementById('btn-new-announcement')?.addEventListener('click', () => {
+      document.getElementById('announcement-form').classList.remove('hidden');
+    });
+    document.getElementById('btn-cancel-announcement')?.addEventListener('click', () => {
+      document.getElementById('announcement-form').classList.add('hidden');
+    });
 
-    setupToggle('btn-new-announcement', 'announcement-form', 'btn-cancel-announcement');
-    setupToggle('btn-new-assignment', 'assignment-form', 'btn-cancel-assignment');
-    setupToggle('btn-new-resource', 'resource-form', 'btn-cancel-resource');
+    document.getElementById('btn-new-assignment')?.addEventListener('click', () => {
+      editingAssignmentId = null;
+      document.getElementById('assignment-form').classList.remove('hidden');
+      document.querySelector('#assignment-form .section-title')?.remove();
+      const titleEl = document.createElement('h3');
+      titleEl.className = 'section-title';
+      titleEl.textContent = '새 과제 만들기';
+      document.getElementById('assignment-form').prepend(titleEl);
+      
+      document.getElementById('assign-title').value = '';
+      document.getElementById('assign-desc').value = '';
+      document.getElementById('assign-due').value = '';
+      document.getElementById('assign-files').value = '';
+      document.getElementById('assign-selected-files').innerHTML = '';
+      document.getElementById('btn-submit-assignment').textContent = '과제 생성';
+    });
+    document.getElementById('btn-cancel-assignment')?.addEventListener('click', () => {
+      document.getElementById('assignment-form').classList.add('hidden');
+      editingAssignmentId = null;
+    });
+
+    document.getElementById('btn-new-resource')?.addEventListener('click', () => {
+      document.getElementById('resource-form').classList.remove('hidden');
+    });
+    document.getElementById('btn-cancel-resource')?.addEventListener('click', () => {
+      document.getElementById('resource-form').classList.add('hidden');
+    });
 
     // File selection UI updates - using delegation for more stability
     document.addEventListener('change', (e) => {
@@ -347,19 +383,35 @@ export function renderAssignMode(container, params) {
       const title = document.getElementById('assign-title').value.trim();
       const description = document.getElementById('assign-desc').value.trim();
       const dueDate = document.getElementById('assign-due').value;
-      if (!title) return;
+      if (!title) { showToast('제목을 입력하세요.', 'error'); return; }
 
       const fileInput = document.getElementById('assign-files');
       const files = [];
       try {
-        for (const file of fileInput.files) {
-          const saved = await saveFile(file);
-          files.push({ id: saved.id, name: saved.name });
+        if (fileInput.files.length > 0) {
+          for (const file of fileInput.files) {
+            const saved = await saveFile(file);
+            files.push({ id: saved.id, name: saved.name });
+          }
         }
-        await createAssignment(classId, { title, description, dueDate, files });
-        showToast('과제가 생성되었습니다.');
+        
+        if (editingAssignmentId) {
+          const updateData = { title, description, dueDate };
+          // Only update files if new files were selected
+          if (files.length > 0) updateData.files = files;
+          await updateAssignment(editingAssignmentId, updateData);
+          showToast('과제가 수정되었습니다.');
+        } else {
+          await createAssignment(classId, { title, description, dueDate, files });
+          showToast('과제가 생성되었습니다.');
+        }
+        
+        editingAssignmentId = null;
         render();
-      } catch (err) { showToast('오류 발생', 'error'); }
+      } catch (err) { 
+        console.error(err);
+        showToast('오류 발생', 'error'); 
+      }
     });
 
     // Submit Resource
@@ -381,6 +433,40 @@ export function renderAssignMode(container, params) {
         showToast('자료가 등록되었습니다.');
         render();
       } catch (err) { showToast('오류 발생', 'error'); }
+    });
+
+    // Edit Buttons
+    document.querySelectorAll('.edit-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const type = btn.dataset.type;
+        const id = btn.dataset.id;
+        
+        if (type === 'assign') {
+          const assignments = await getAssignmentsByClass(classId);
+          const a = assignments.find(item => item.id === id);
+          if (!a) return;
+          
+          editingAssignmentId = id;
+          document.getElementById('assignment-form').classList.remove('hidden');
+          
+          document.querySelector('#assignment-form .section-title')?.remove();
+          const titleEl = document.createElement('h3');
+          titleEl.className = 'section-title';
+          titleEl.textContent = '과제 수정하기';
+          document.getElementById('assignment-form').prepend(titleEl);
+          
+          document.getElementById('assign-title').value = a.title;
+          document.getElementById('assign-desc').value = a.description;
+          document.getElementById('assign-due').value = a.dueDate || '';
+          document.getElementById('btn-submit-assignment').textContent = '수정 완료';
+          
+          const filesInfo = a.files ? a.files.map(f => `📎 ${f.name}`).join(', ') : '';
+          document.getElementById('assign-selected-files').innerHTML = filesInfo ? `기존 파일: ${filesInfo} (새 파일 선택 시 대체됨)` : '';
+          
+          // Scroll to form
+          document.getElementById('assignment-form').scrollIntoView({ behavior: 'smooth' });
+        }
+      });
     });
 
     // Delete Buttons

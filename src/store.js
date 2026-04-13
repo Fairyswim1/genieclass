@@ -363,6 +363,20 @@ export async function deleteAssignment(assignmentId) {
     await deleteDoc(doc(db, COLLECTIONS.ASSIGNMENTS, assignmentId));
 }
 
+export async function updateAssignment(assignmentId, data) {
+    const ref = doc(db, COLLECTIONS.ASSIGNMENTS, assignmentId);
+    const updates = {
+        title: data.title,
+        description: data.description || '',
+        dueDate: data.dueDate || null,
+        updatedAt: new Date().toISOString(),
+    };
+    if (data.files) {
+        updates.files = data.files;
+    }
+    await updateDoc(ref, updates);
+}
+
 // ========== Submissions ==========
 export async function submitAssignment(assignmentId, studentId, data) {
     const q = query(collection(db, COLLECTIONS.SUBMISSIONS),
