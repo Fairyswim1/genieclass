@@ -9,9 +9,13 @@
     "build": "vite build",
     "preview": "vite preview",
     "electron:dev": "concurrently -k \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
-    "electron:build": "npm run build && electron-builder"
+    "electron:build": "npm run build && electron-packager . \"Genie Class\" --platform=win32 --arch=x64 --out=release --overwrite",
+    "android:sync": "npm run build && npx cap sync android",
+    "android:open": "npx cap open android"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.3.0",
+    "@electron/packager": "^19.1.0",
     "concurrently": "^9.2.1",
     "electron": "^41.2.0",
     "electron-builder": "^26.8.1",
@@ -19,8 +23,28 @@
     "wait-on": "^9.0.4"
   },
   "dependencies": {
+    "@capacitor/android": "^8.3.0",
+    "@capacitor/core": "^8.3.0",
+    "@capacitor/filesystem": "^8.1.2",
+    "@codetrix-studio/capacitor-google-auth": "^3.4.0-rc.4",
+    "capacitor-voice-recorder": "^7.0.6",
     "firebase": "^12.10.0",
     "perfect-freehand": "^1.2.3",
     "xlsx": "^0.18.5"
+  },
+  "build": {
+    "appId": "com.genieclass.app",
+    "productName": "지니클래스 칠판",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis"
+    }
   }
 }

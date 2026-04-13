@@ -67,8 +67,9 @@ export function initRouter() {
     const handleRoute = () => {
         let hash = window.location.hash.slice(1) || '/';
         
-        // If it is the Electron app, bypass the landing page and force teacher mode
-        if (hash === '/' && navigator.userAgent.includes('ElectronApp')) {
+        // Electron 또는 Android(Capacitor) 앱에서는 랜딩 페이지를 건너뛰고 교사 모드로 진입
+        const isNativeApp = navigator.userAgent.includes('ElectronApp') || window.Capacitor;
+        if (hash === '/' && isNativeApp) {
             window.location.hash = '/teacher/login';
             return;
         }

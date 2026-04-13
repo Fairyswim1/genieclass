@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "469620615366",
+    "project_id": "genieclass-296aa",
+    "storage_bucket": "genieclass-296aa.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:469620615366:android:d1660fc7cc1c657c880fc7",
+        "android_client_info": {
+          "package_name": "com.genieclass.board"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "469620615366-knv2qsusp9l4hfrfara8g4fbmormbj91.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.genieclass.board",
+            "certificate_hash": "da749d56b0cf274b1c2f3ae90a3bf1ccb1316f60"
+          }
+        },
+        {
+          "client_id": "469620615366-2ibdumut7vci9v3ir8tv48cfjirr52j3.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB0j2IXZOWq5GB0rogKz0EEdhGa7hY7F-0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "469620615366-2ibdumut7vci9v3ir8tv48cfjirr52j3.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

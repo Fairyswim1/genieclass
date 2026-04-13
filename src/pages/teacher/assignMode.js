@@ -179,8 +179,32 @@ export function renderAssignMode(container, params) {
                         <div style="width: ${students.length ? (subs.length / students.length) * 100 : 0}%; height: 100%; background: var(--primary);"></div>
                       </div>
                     </div>
+
+                    <details style="margin-bottom: var(--s-4); border: 1px solid var(--border-subtle); border-radius: var(--r-sm); background: var(--bg-surface);">
+                      <summary style="padding: var(--s-3); cursor: pointer; font-size: 0.9rem; font-weight: 600; color: var(--text-main); outline: none;">학생별 상세 제출 확인</summary>
+                      <div style="padding: var(--s-3); padding-top: 0; display: flex; flex-direction: column; gap: var(--s-2); max-height: 250px; overflow-y: auto;">
+                        ${students.map(st => {
+                          const sub = subs.find(s => s.studentId === st.id);
+                          return `
+                            <div class="flex justify-between items-center" style="padding: 8px; background: var(--bg-main); border-radius: var(--r-sm); gap: 10px;">
+                              <span style="font-size: 0.9rem; font-weight: 500; flex-shrink: 0;">${st.name}</span>
+                              ${sub ? `
+                                <div class="flex flex-col items-end" style="gap: 4px;">
+                                  <span class="badge badge-green" style="align-self: flex-end;">${formatDate(sub.createdAt)} 제출</span>
+                                  ${sub.files && sub.files.length > 0 ? `
+                                    <div class="flex gap-sm flex-wrap justify-end" style="margin-top: 4px;">
+                                      ${sub.files.map(f => `<button class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 2px 6px;" onclick="window.downloadFile('${f.id}')">📎 ${f.name}</button>`).join('')}
+                                    </div>
+                                  ` : '<span style="font-size: 0.8rem; color: var(--text-dim);">첨부 파일 없음</span>'}
+                                </div>
+                              ` : `<span class="badge badge-purple" style="flex-shrink: 0;">미제출</span>`}
+                            </div>
+                          `;
+                        }).join('')}
+                      </div>
+                    </details>
                     
-                    <div class="flex justify-between items-center" style="font-size: 0.85rem; color: var(--text-dim);">
+                    <div class="flex justify-between items-center" style="font-size: 0.85rem; color: var(--text-dim); margin-top: auto;">
                       <span>마감: <strong style="color: var(--text-main); font-weight: 500;">${a.dueDate || '없음'}</strong></span>
                       <span>등록일: ${formatDate(a.createdAt)}</span>
                     </div>

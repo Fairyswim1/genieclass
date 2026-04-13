@@ -3,9 +3,13 @@
 // ========================================
 import {
     signInWithPopup,
+    signInWithCredential,
+    GoogleAuthProvider,
     signOut,
     onAuthStateChanged
 } from 'firebase/auth';
+import { Capacitor } from '@capacitor/core';
+import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 import {
     collection,
     doc,
@@ -60,8 +64,21 @@ function generateStudentCode() {
 // ========== Teacher Auth ==========
 export async function loginWithGoogle() {
     try {
-        const result = await signInWithPopup(auth, googleProvider);
-        const user = result.user;
+        let user;
+        if (Capacitor.isNativePlatform()) {
+             GoogleAuth.initialize({
+                  clientId: '469620615366-2ibdumut7vci9v3ir8tv48cfjirr52j3.apps.googleusercontent.com',
+                  scopes: ['profile', 'email'],
+                  grantOfflineAccess: true,
+             });
+             const googleUser = await GoogleAuth.signIn();
+             const credential = GoogleAuthProvider.credential(googleUser.authentication.idToken);
+             const result = await signInWithCredential(auth, credential);
+             user = result.user;
+        } else {
+             const result = await signInWithPopup(auth, googleProvider);
+             user = result.user;
+        }
 
         // Check if teacher exists in Firestore, if not create
         const teacherDoc = await getDoc(doc(db, COLLECTIONS.TEACHERS, user.uid));
@@ -77,7 +94,7 @@ export async function loginWithGoogle() {
         return { data: user };
     } catch (error) {
         console.error('Login error:', error);
-        return { error: '구글 로그인 중 오류가 발생했습니다.' };
+        return { error: '구글 로그인 중 오류가 발생했습니다: ' + error.message };
     }
 }
 
@@ -229,6 +246,28 @@ export async function praiseStudent(studentId) {
     return null;
 }
 
+export async function addStudentPoints(studentId, pointsToAdd) {
+    const studentRef = doc(db, COLLECTIONS.STUDENTS, studentId);
+    const snap = await getDoc(studentRef);
+    if (snap.exists()) {
+        const data = snap.data();
+        const newPoints = data.totalPoints + pointsToAdd;
+        
+        let newLevel = 1;
+        if (newPoints >= 10) newLevel = 5;
+        else if (newPoints >= 6) newLevel = 4;
+        else if (newPoints >= 3) newLevel = 3;
+        else if (newPoints >= 1) newLevel = 2;
+
+        await updateDoc(studentRef, {
+            totalPoints: increment(pointsToAdd),
+            characterLevel: newLevel
+        });
+        return { ...data, totalPoints: newPoints, characterLevel: newLevel };
+    }
+    return null;
+}
+
 export async function updateStudentCharacterType(studentId, type) {
     const ref = doc(db, COLLECTIONS.STUDENTS, studentId);
     await updateDoc(ref, { characterType: type });
@@ -259,12 +298,6 @@ export async function addPresentation(studentId, classId, data) {
         createdAt: new Date().toISOString(),
     };
     await setDoc(doc(db, COLLECTIONS.PRESENTATIONS, id), presentation);
-
-    // Add points for presentation
-    const studentRef = doc(db, COLLECTIONS.STUDENTS, studentId);
-    await updateDoc(studentRef, {
-        totalPoints: increment(2)
-    });
 
     return presentation;
 }

@@ -499,7 +499,8 @@ export function renderStudentDashboard(container) {
                 <div class="drop-zone" style="background: var(--bg-surface); border-style: dashed; padding: var(--s-12); border-radius: var(--r-lg);" id="submission-dropzone">
                    <div style="font-size: 2rem; margin-bottom: 10px;">📤</div>
                    <div style="font-weight: 600;">파일을 드래그하거나 클릭하여 업로드</div>
-                   <div style="font-size: 0.85rem; color: var(--text-dim); margin-top: 5px;">이미지, PDF, 문서 파일 지원</div>
+                   <div style="font-size: 0.85rem; color: var(--text-dim); margin-top: 5px;">모든 파일 형식(HTML 등) 여러 개 업로드 가능</div>
+                   <div id="selected-files-list" style="margin-top: 15px; font-size: 0.9rem; color: var(--primary); font-weight: 500;"></div>
                    <input type="file" id="submission-file" class="hidden" multiple />
                 </div>
                 <button class="btn btn-primary btn-lg w-full" style="margin-top: var(--s-6);" id="btn-submit-assignment">과제 제출하기</button>
@@ -513,7 +514,16 @@ export function renderStudentDashboard(container) {
     document.getElementById('btn-back-dashboard')?.addEventListener('click', () => { activeView = 'dashboard'; render(); });
     const dropzone = document.getElementById('submission-dropzone');
     const fileInput = document.getElementById('submission-file');
+    const fileListDisplay = document.getElementById('selected-files-list');
+    
     dropzone?.addEventListener('click', () => fileInput.click());
+    
+    fileInput?.addEventListener('change', () => {
+      if (fileInput.files.length > 0) {
+        const names = Array.from(fileInput.files).map(f => `📎 ${f.name}`).join('<br/>');
+        if (fileListDisplay) fileListDisplay.innerHTML = names;
+      }
+    });
 
     document.getElementById('btn-submit-assignment')?.addEventListener('click', async () => {
       if (fileInput.files.length === 0) { showToast('제출할 파일을 선택해주세요.', 'error'); return; }
