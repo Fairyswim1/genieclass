@@ -30,6 +30,80 @@ export function renderAssignMode(container, params) {
     const resources = await getResourcesByClass(classId);
     const students = await getStudentsByClass(classId);
 
+    // Pre-calculate assignments HTML with submissions
+    let assignmentsHtml = '';
+    if (assignments.length === 0) {
+      assignmentsHtml = `
+        <div class="empty-board">
+          <div class="empty-board-icon">📝</div>
+          <p style="font-size: 1.1rem; font-weight: 600; color: var(--text-main); margin-bottom: 8px;">출제된 과제가 없습니다.</p>
+          <p style="font-size: 0.9rem;">새로운 과제를 만들어 학생들의 제출 현황을 한눈에 파악하세요.</p>
+        </div>
+      `;
+    } else {
+      const assignmentCards = await Promise.all(assignments.map(async a => {
+        const subs = await getSubmissionsByAssignment(a.id);
+        const isDuePast = a.dueDate && new Date(a.dueDate) < new Date();
+        return `
+          <div class="card homework-item" style="padding: var(--s-6); display: flex; flex-direction: column; border-top: 4px solid var(--primary);">
+            <div class="flex justify-between items-start" style="margin-bottom: var(--s-4);">
+              <div class="flex flex-col gap-sm">
+                <span class="badge ${isDuePast ? 'badge-danger' : 'badge-green'}" style="align-self: flex-start;">${a.dueDate ? (isDuePast ? '마감됨' : '진행중') : '기한 없음'}</span>
+                <h3 style="font-size: 1.25rem; font-weight: 700; word-break: keep-all; line-height: 1.4;">${a.title}</h3>
+              </div>
+              <button class="btn btn-ghost btn-sm delete-btn" data-type="assign" data-id="${a.id}" style="color: var(--error);">삭제</button>
+            </div>
+            
+            <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: var(--s-6); flex: 1; white-space: pre-line;">${a.description}</p>
+            
+            <div style="background: var(--bg-main); padding: var(--s-4); border-radius: var(--r-sm); margin-bottom: var(--s-4);">
+              <div class="flex justify-between items-center" style="margin-bottom: 8px;">
+                <span style="font-size: 0.85rem; color: var(--text-dim); font-weight: 600;">제출 현황</span>
+                <span style="font-size: 0.9rem; font-weight: 700; color: var(--primary);">${subs.length} <span style="color: var(--text-muted); font-weight: 400;">/ ${students.length}명</span></span>
+              </div>
+              <div style="width: 100%; height: 6px; background: var(--border-subtle); border-radius: 3px; overflow: hidden;">
+                <div style="width: ${students.length ? (subs.length / students.length) * 100 : 0}%; height: 100%; background: var(--primary);"></div>
+              </div>
+            </div>
+
+            <details style="margin-bottom: var(--s-4); border: 1px solid var(--border-subtle); border-radius: var(--r-sm); background: var(--bg-surface);">
+              <summary style="padding: var(--s-3); cursor: pointer; font-size: 0.9rem; font-weight: 600; color: var(--text-main); outline: none;">학생별 상세 제출 확인</summary>
+              <div style="padding: var(--s-3); padding-top: 0; display: flex; flex-direction: column; gap: var(--s-2); max-height: 250px; overflow-y: auto;">
+                ${students.map(st => {
+                  const sub = subs.find(s => s.studentId === st.id);
+                  return `
+                    <div class="flex justify-between items-center" style="padding: 8px; background: var(--bg-main); border-radius: var(--r-sm); gap: 10px;">
+                      <span style="font-size: 0.9rem; font-weight: 500; flex-shrink: 0;">${st.name}</span>
+                      ${sub ? `
+                        <div class="flex flex-col items-end" style="gap: 4px;">
+                          <span class="badge badge-green" style="align-self: flex-end;">${formatDate(sub.createdAt)} 제출</span>
+                          ${sub.files && sub.files.length > 0 ? `
+                            <div class="flex gap-sm flex-wrap justify-end" style="margin-top: 4px;">
+                              ${sub.files.map(f => `<button class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 2px 6px;" onclick="window.downloadFile('${f.id}')">📎 ${f.name}</button>`).join('')}
+                            </div>
+                          ` : '<span style="font-size: 0.8rem; color: var(--text-dim);">첨부 파일 없음</span>'}
+                        </div>
+                      ` : `<span class="badge badge-purple" style="flex-shrink: 0;">미제출</span>`}
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </details>
+            
+            <div class="flex justify-between items-center" style="font-size: 0.85rem; color: var(--text-dim); margin-top: auto;">
+              <span>마감: <strong style="color: var(--text-main); font-weight: 500;">${a.dueDate || '없음'}</strong></span>
+              <span>등록일: ${formatDate(a.createdAt)}</span>
+            </div>
+          </div>
+        `;
+      }));
+      assignmentsHtml = `
+        <div class="grid" style="grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: var(--s-6);">
+          ${assignmentCards.join('')}
+        </div>
+      `;
+    }
+
     container.innerHTML = `
       <div class="teacher-layout page-enter">
         <main class="main-content" style="max-width: 1400px; margin: 0 auto;">
@@ -58,23 +132,23 @@ export function renderAssignMode(container, params) {
             <div id="announcement-form" class="card hidden" style="margin-bottom: var(--s-8);">
               <div class="form-group">
                 <label class="input-label">공지 제목</label>
-                <input type="text" class="input-field" id="ann-title" placeholder="제목을 입력하세요" />
+                <input type="text" class="input-field" id="ann-title" placeholder="공지 제목을 입력하세요" />
               </div>
               <div class="form-group">
                 <label class="input-label">내용</label>
-                <textarea class="input-field" id="ann-content" rows="4" placeholder="학생들에게 전달할 내용을 입력하세요"></textarea>
+                <textarea class="input-field" id="ann-content" rows="4" placeholder="공지 내용을 입력하세요"></textarea>
               </div>
               <div class="form-group">
-                <label class="input-label">파일 첨부</label>
+                <label class="input-label">첨부 파일</label>
                 <input type="file" id="ann-files" multiple class="input-field" style="padding: 10px;" />
               </div>
               <div class="flex gap-md justify-end">
                 <button class="btn btn-ghost" id="btn-cancel-announcement">취소</button>
-                <button class="btn btn-primary" id="btn-submit-announcement">게시하기</button>
+                <button class="btn btn-primary" id="btn-submit-announcement">공지 게시</button>
               </div>
             </div>
 
-            <div class="board-container">
+            <div class="card" style="padding: var(--s-6);">
               ${announcements.length === 0 ? `
                 <div class="empty-board">
                   <div class="empty-board-icon">📢</div>
@@ -141,77 +215,14 @@ export function renderAssignMode(container, params) {
               <div class="form-group">
                 <label class="input-label">참조 파일</label>
                 <input type="file" id="assign-files" multiple class="input-field" style="padding: 10px;" />
+                <div id="assign-selected-files" style="margin-top: 8px; font-size: 0.85rem; color: var(--primary); font-weight: 500;"></div>
               </div>
               <div class="flex gap-md justify-end">
                 <button class="btn btn-ghost" id="btn-cancel-assignment">취소</button>
                 <button class="btn btn-primary" id="btn-submit-assignment">과제 생성</button>
               </div>
             </div>
-
-            <div class="${assignments.length === 0 ? '' : 'grid'}" style="grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: var(--s-6);">
-              ${assignments.length === 0 ? `
-                <div class="empty-board">
-                  <div class="empty-board-icon">📝</div>
-                  <p style="font-size: 1.1rem; font-weight: 600; color: var(--text-main); margin-bottom: 8px;">출제된 과제가 없습니다.</p>
-                  <p style="font-size: 0.9rem;">새로운 과제를 만들어 학생들의 제출 현황을 한눈에 파악하세요.</p>
-                </div>
-              ` : (await Promise.all(assignments.map(async a => {
-      const subs = await getSubmissionsByAssignment(a.id);
-      const isDuePast = a.dueDate && new Date(a.dueDate) < new Date();
-      return `
-                  <div class="card homework-item" style="padding: var(--s-6); display: flex; flex-direction: column; border-top: 4px solid var(--primary);">
-                    <div class="flex justify-between items-start" style="margin-bottom: var(--s-4);">
-                      <div class="flex flex-col gap-sm">
-                        <span class="badge ${isDuePast ? 'badge-danger' : 'badge-green'}" style="align-self: flex-start;">${a.dueDate ? (isDuePast ? '마감됨' : '진행중') : '기한 없음'}</span>
-                        <h3 style="font-size: 1.25rem; font-weight: 700; word-break: keep-all; line-height: 1.4;">${a.title}</h3>
-                      </div>
-                      <button class="btn btn-ghost btn-sm delete-btn" data-type="assign" data-id="${a.id}" style="color: var(--error);">삭제</button>
-                    </div>
-                    
-                    <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: var(--s-6); flex: 1; white-space: pre-line;">${a.description}</p>
-                    
-                    <div style="background: var(--bg-main); padding: var(--s-4); border-radius: var(--r-sm); margin-bottom: var(--s-4);">
-                      <div class="flex justify-between items-center" style="margin-bottom: 8px;">
-                        <span style="font-size: 0.85rem; color: var(--text-dim); font-weight: 600;">제출 현황</span>
-                        <span style="font-size: 0.9rem; font-weight: 700; color: var(--primary);">${subs.length} <span style="color: var(--text-muted); font-weight: 400;">/ ${students.length}명</span></span>
-                      </div>
-                      <div style="width: 100%; height: 6px; background: var(--border-subtle); border-radius: 3px; overflow: hidden;">
-                        <div style="width: ${students.length ? (subs.length / students.length) * 100 : 0}%; height: 100%; background: var(--primary);"></div>
-                      </div>
-                    </div>
-
-                    <details style="margin-bottom: var(--s-4); border: 1px solid var(--border-subtle); border-radius: var(--r-sm); background: var(--bg-surface);">
-                      <summary style="padding: var(--s-3); cursor: pointer; font-size: 0.9rem; font-weight: 600; color: var(--text-main); outline: none;">학생별 상세 제출 확인</summary>
-                      <div style="padding: var(--s-3); padding-top: 0; display: flex; flex-direction: column; gap: var(--s-2); max-height: 250px; overflow-y: auto;">
-                        ${students.map(st => {
-                          const sub = subs.find(s => s.studentId === st.id);
-                          return `
-                            <div class="flex justify-between items-center" style="padding: 8px; background: var(--bg-main); border-radius: var(--r-sm); gap: 10px;">
-                              <span style="font-size: 0.9rem; font-weight: 500; flex-shrink: 0;">${st.name}</span>
-                              ${sub ? `
-                                <div class="flex flex-col items-end" style="gap: 4px;">
-                                  <span class="badge badge-green" style="align-self: flex-end;">${formatDate(sub.createdAt)} 제출</span>
-                                  ${sub.files && sub.files.length > 0 ? `
-                                    <div class="flex gap-sm flex-wrap justify-end" style="margin-top: 4px;">
-                                      ${sub.files.map(f => `<button class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 2px 6px;" onclick="window.downloadFile('${f.id}')">📎 ${f.name}</button>`).join('')}
-                                    </div>
-                                  ` : '<span style="font-size: 0.8rem; color: var(--text-dim);">첨부 파일 없음</span>'}
-                                </div>
-                              ` : `<span class="badge badge-purple" style="flex-shrink: 0;">미제출</span>`}
-                            </div>
-                          `;
-                        }).join('')}
-                      </div>
-                    </details>
-                    
-                    <div class="flex justify-between items-center" style="font-size: 0.85rem; color: var(--text-dim); margin-top: auto;">
-                      <span>마감: <strong style="color: var(--text-main); font-weight: 500;">${a.dueDate || '없음'}</strong></span>
-                      <span>등록일: ${formatDate(a.createdAt)}</span>
-                    </div>
-                  </div>
-                `;
-    }))).join('')}
-            </div>
+            ${assignmentsHtml}
           </div>
 
           <!-- 수업 자료 섹션 (New) -->
@@ -233,6 +244,7 @@ export function renderAssignMode(container, params) {
               <div class="form-group">
                 <label class="input-label">자료 파일</label>
                 <input type="file" id="res-files" multiple class="input-field" style="padding: 10px;" />
+                <div id="res-selected-files" style="margin-top: 8px; font-size: 0.85rem; color: var(--primary); font-weight: 500;"></div>
               </div>
               <div class="flex gap-md justify-end">
                 <button class="btn btn-ghost" id="btn-cancel-resource">취소</button>
@@ -297,6 +309,16 @@ export function renderAssignMode(container, params) {
     setupToggle('btn-new-announcement', 'announcement-form', 'btn-cancel-announcement');
     setupToggle('btn-new-assignment', 'assignment-form', 'btn-cancel-assignment');
     setupToggle('btn-new-resource', 'resource-form', 'btn-cancel-resource');
+
+    // File selection UI updates
+    document.getElementById('assign-files')?.addEventListener('change', (e) => {
+      const list = document.getElementById('assign-selected-files');
+      if (list) list.innerHTML = Array.from(e.target.files).map(f => `📎 ${f.name}`).join(', ');
+    });
+    document.getElementById('res-files')?.addEventListener('change', (e) => {
+      const list = document.getElementById('res-selected-files');
+      if (list) list.innerHTML = Array.from(e.target.files).map(f => `📎 ${f.name}`).join(', ');
+    });
 
     // Submit Announcement
     document.getElementById('btn-submit-announcement')?.addEventListener('click', async () => {
