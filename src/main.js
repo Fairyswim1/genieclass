@@ -22,6 +22,8 @@ addRoute('/teacher/login', (container) => renderTeacherLogin(container));
 addRoute('/teacher/dashboard', (container) => renderTeacherDashboard(container));
 addRoute('/teacher/class/:id/lesson', (container, params) => renderLessonMode(container, params));
 addRoute('/teacher/class/:id/assign', (container, params) => renderAssignMode(container, params));
+addRoute('/student', (container) => renderStudentLogin(container));
+addRoute('/s', (container) => renderStudentLogin(container));
 addRoute('/student/login', (container) => renderStudentLogin(container));
 addRoute('/student/dashboard', (container) => renderStudentDashboard(container));
 

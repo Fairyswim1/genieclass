@@ -67,9 +67,11 @@ export function initRouter() {
     const handleRoute = () => {
         let hash = window.location.hash.slice(1) || '/';
         
-        // Electron 또는 Android(Capacitor) 앱에서는 랜딩 페이지를 건너뛰고 교사 모드로 진입
-        const isNativeApp = navigator.userAgent.includes('ElectronApp') || window.Capacitor;
-        if (hash === '/' && isNativeApp) {
+        // Android(Capacitor) 또는 Electron 앱에서만 교사 모드 강제 진입
+        const isCapacitor = window.Capacitor && window.Capacitor.isNativePlatform;
+        const isElectron = navigator.userAgent.includes('ElectronApp');
+        
+        if (hash === '/' && (isCapacitor || isElectron)) {
             window.location.hash = '/teacher/login';
             return;
         }
