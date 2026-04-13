@@ -7,7 +7,7 @@ import {
   createAnnouncement, getAnnouncementsByClass, deleteAnnouncement,
   addResource, getResourcesByClass, deleteResource,
   getSubmissionsByAssignment, saveFile, showToast, formatDate,
-  getStudentById
+  getStudentById, downloadFile as storeDownloadFile
 } from '../../store.js';
 
 export function renderAssignMode(container, params) {
@@ -112,8 +112,9 @@ export function renderAssignMode(container, params) {
             <h1 class="page-title">
               ${cls.name}
               <span class="badge badge-purple" style="font-size: 1rem;">관리 모드</span>
+              <span style="font-size: 0.7rem; opacity: 0.5; font-weight: 400; margin-left: 8px;">v1.0.1-rev1</span>
             </h1>
-            <p class="page-subtitle" style="color: var(--text-muted); margin-top: var(--s-2);">수업 소식, 과제 및 학습 자료를 관리합니다. <span style="font-size: 0.7rem; opacity: 0.5;">v1.0.1</span></p>
+            <p class="page-subtitle" style="color: var(--text-muted); margin-top: var(--s-2);">수업 소식, 과제 및 학습 자료를 관리합니다.</p>
           </header>
 
           <div class="tabs" style="margin-bottom: var(--s-12); max-width: 600px;">
@@ -397,9 +398,8 @@ export function renderAssignMode(container, params) {
     });
   }
 
-  // Global download for window
   window.downloadFile = (fileId) => {
-    import('../../store.js').then(m => m.downloadFile(fileId));
+    storeDownloadFile(fileId);
   };
 
   init();
