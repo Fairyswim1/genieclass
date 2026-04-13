@@ -113,7 +113,7 @@ export function renderAssignMode(container, params) {
               ${cls.name}
               <span class="badge badge-purple" style="font-size: 1rem;">관리 모드</span>
             </h1>
-            <p class="page-subtitle" style="color: var(--text-muted); margin-top: var(--s-2);">수업 소식, 과제 및 학습 자료를 관리합니다.</p>
+            <p class="page-subtitle" style="color: var(--text-muted); margin-top: var(--s-2);">수업 소식, 과제 및 학습 자료를 관리합니다. <span style="font-size: 0.7rem; opacity: 0.5;">v1.0.1</span></p>
           </header>
 
           <div class="tabs" style="margin-bottom: var(--s-12); max-width: 600px;">
@@ -310,14 +310,16 @@ export function renderAssignMode(container, params) {
     setupToggle('btn-new-assignment', 'assignment-form', 'btn-cancel-assignment');
     setupToggle('btn-new-resource', 'resource-form', 'btn-cancel-resource');
 
-    // File selection UI updates
-    document.getElementById('assign-files')?.addEventListener('change', (e) => {
-      const list = document.getElementById('assign-selected-files');
-      if (list) list.innerHTML = Array.from(e.target.files).map(f => `📎 ${f.name}`).join(', ');
-    });
-    document.getElementById('res-files')?.addEventListener('change', (e) => {
-      const list = document.getElementById('res-selected-files');
-      if (list) list.innerHTML = Array.from(e.target.files).map(f => `📎 ${f.name}`).join(', ');
+    // File selection UI updates - using delegation for more stability
+    document.addEventListener('change', (e) => {
+      if (e.target.id === 'assign-files') {
+        const list = document.getElementById('assign-selected-files');
+        if (list) list.innerHTML = Array.from(e.target.files).map(f => `📎 ${f.name}`).join(', ');
+      }
+      if (e.target.id === 'res-files') {
+        const list = document.getElementById('res-selected-files');
+        if (list) list.innerHTML = Array.from(e.target.files).map(f => `📎 ${f.name}`).join(', ');
+      }
     });
 
     // Submit Announcement
