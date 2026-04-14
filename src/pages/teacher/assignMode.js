@@ -235,6 +235,11 @@ export function renderAssignMode(container, params) {
                 <label class="input-label">마감 기한</label>
                 <input type="date" class="input-field" id="assign-due" />
               </div>
+              <div class="form-group">
+                <label class="input-label">구글 드라이브 폴더 주소 (선택)</label>
+                <input type="text" class="input-field" id="assign-drive-url" placeholder="https://drive.google.com/drive/folders/..." />
+                <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">입력 시 학생의 제출물이 해당 드라이브로 자동 복사됩니다.</div>
+              </div>
                <div class="form-group">
                 <label class="input-label">참조 파일</label>
                 <div class="drop-zone" id="assign-dropzone">
@@ -320,7 +325,13 @@ export function renderAssignMode(container, params) {
     bindEvents();
   }
 
-  function updateFileListUI(type) {
+  function extractDriveFolderId(url) {
+    if (!url) return null;
+    const match = url.match(/folders\/([a-zA-Z0-9_-]{25,})/);
+    return match ? match[1] : (url.length > 20 ? url : null); // Simple ID fallback
+  }
+
+  function renderFileListUI(type) {
     let queue = [];
     let existing = [];
     let listId = "";
@@ -454,6 +465,7 @@ export function renderAssignMode(container, params) {
       document.getElementById('assign-title').value = '';
       document.getElementById('assign-desc').value = '';
       document.getElementById('assign-due').value = '';
+      document.getElementById('assign-drive-url').value = '';
       updateFileListUI('assign');
       document.getElementById('btn-submit-assignment').textContent = '과제 생성';
     });
@@ -498,6 +510,9 @@ export function renderAssignMode(container, params) {
       const title = document.getElementById('assign-title').value.trim();
       const description = document.getElementById('assign-desc').value.trim();
       const dueDate = document.getElementById('assign-due').value;
+      const driveUrl = document.getElementById('assign-drive-url').value.trim();
+      const driveFolderId = extractDriveFolderId(driveUrl);
+
       if (!title) { showToast('제목을 입력하세요.', 'error'); return; }
 
       try {
@@ -510,11 +525,13 @@ export function renderAssignMode(container, params) {
         // Final files set = Existing (filtered) + Newly uploaded
         const finalFiles = [...existingFilesQueue, ...uploadedFiles];
         
+        const assignData = { title, description, dueDate, files: finalFiles, driveFolderId };
+        
         if (editingAssignmentId) {
-          await updateAssignment(editingAssignmentId, { title, description, dueDate, files: finalFiles });
+          await updateAssignment(editingAssignmentId, assignData);
           showToast('과제가 수정되었습니다.');
         } else {
-          await createAssignment(classId, { title, description, dueDate, files: finalFiles });
+          await createAssignment(classId, assignData);
           showToast('과제가 생성되었습니다.');
         }
         
@@ -572,6 +589,7 @@ export function renderAssignMode(container, params) {
           document.getElementById('assign-title').value = a.title;
           document.getElementById('assign-desc').value = a.description;
           document.getElementById('assign-due').value = a.dueDate || '';
+          document.getElementById('assign-drive-url').value = a.driveFolderId ? `https://drive.google.com/drive/folders/${a.driveFolderId}` : '';
           document.getElementById('btn-submit-assignment').textContent = '수정 완료';
           
           assignFilesQueue = [];

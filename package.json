@@ -32,6 +32,8 @@
     "@codetrix-studio/capacitor-google-auth": "^3.4.0-rc.4",
     "capacitor-voice-recorder": "^7.0.6",
     "firebase": "^12.10.0",
+    "firebase-admin": "^13.8.0",
+    "googleapis": "^171.4.0",
     "perfect-freehand": "^1.2.3",
     "xlsx": "^0.18.5"
   },

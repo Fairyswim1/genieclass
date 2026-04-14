@@ -599,6 +599,10 @@ export function renderStudentDashboard(container) {
 
     document.getElementById('btn-submit-assignment')?.addEventListener('click', async () => {
       if (submissionFilesQueue.length === 0) { showToast('제출할 파일을 선택해주세요.', 'error'); return; }
+      const submitBtn = document.getElementById('btn-submit-assignment');
+      submitBtn.disabled = true;
+      submitBtn.textContent = '제출 중...';
+      
       try {
         const files = [];
         for (const file of submissionFilesQueue) {
@@ -606,11 +610,30 @@ export function renderStudentDashboard(container) {
           files.push({ id: saved.id, name: saved.name });
         }
         await submitAssignment(assignment.id, freshStudent.id, { files, shared: true });
+        
+        // Google Drive Sync (Background)
+        if (assignment.driveFolderId) {
+          fetch('/api/sync-to-drive', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              studentName: freshStudent.name,
+              assignmentTitle: assignment.title,
+              files: files,
+              driveFolderId: assignment.driveFolderId
+            })
+          }).catch(console.error);
+        }
+
         showToast(sub ? '제출물이 수정되었습니다! 🎉' : '과제가 제출되었습니다! 🎉');
         submissionFilesQueue = [];
         activeView = 'dashboard';
         render();
-      } catch (err) { showToast('제출 중 오류 발생', 'error'); }
+      } catch (err) { 
+        showToast('제출 중 오류 발생', 'error'); 
+        submitBtn.disabled = false;
+        submitBtn.textContent = sub ? '수정 완료' : '과제 제출하기';
+      }
     });
   }
 
