@@ -30,21 +30,21 @@ const GROWTH_STAGES = {
 };
 
 const PLANT_LEVEL_ASSETS = {
-  apple:      ['🌰', '🌱', '🌿', '🌸', '🍎'],
-  grape:      ['🌰', '🌱', '🌿', '🌸', '🍇'],
+  apple: ['🌰', '🌱', '🌿', '🌸', '🍎'],
+  grape: ['🌰', '🌱', '🌿', '🌸', '🍇'],
   strawberry: ['🌰', '🌱', '🌿', '🌸', '🍓'],
-  tangerine:  ['🌰', '🌱', '🌿', '🌸', '🍊'],
-  baobab:     ['🌰', '🌱', '🌿', '🌸', '🌳'],
+  tangerine: ['🌰', '🌱', '🌿', '🌸', '🍊'],
+  baobab: ['🌰', '🌱', '🌿', '🌸', '🌳'],
   watermelon: ['🌰', '🌱', '🌿', '🌸', '🍉'],
-  pineapple:  ['🌰', '🌱', '🌿', '🌸', '🍍'],
-  banana:     ['🌰', '🌱', '🌿', '🌸', '🍌'],
-  peach:      ['🌰', '🌱', '🌿', '🌸', '🍑'],
-  cherry:     ['🌰', '🌱', '🌿', '🌸', '🍒'],
-  melon:      ['🌰', '🌱', '🌿', '🌸', '🍈'],
-  lemon:      ['🌰', '🌱', '🌿', '🌸', '🍋'],
-  blueberry:  ['🌰', '🌱', '🌿', '🌸', '🫐'],
-  coconut:    ['🌰', '🌱', '🌿', '🌸', '🥥'],
-  mango:      ['🌰', '🌱', '🌿', '🌸', '🥭']
+  pineapple: ['🌰', '🌱', '🌿', '🌸', '🍍'],
+  banana: ['🌰', '🌱', '🌿', '🌸', '🍌'],
+  peach: ['🌰', '🌱', '🌿', '🌸', '🍑'],
+  cherry: ['🌰', '🌱', '🌿', '🌸', '🍒'],
+  melon: ['🌰', '🌱', '🌿', '🌸', '🍈'],
+  lemon: ['🌰', '🌱', '🌿', '🌸', '🍋'],
+  blueberry: ['🌰', '🌱', '🌿', '🌸', '🫐'],
+  coconut: ['🌰', '🌱', '🌿', '🌸', '🥥'],
+  mango: ['🌰', '🌱', '🌿', '🌸', '🥭']
 };
 
 export const LEVEL_THRESHOLDS = [0, 1, 3, 6, 10]; // Required points for Lv 1, 2, 3, 4, 5
@@ -52,10 +52,10 @@ export const LEVEL_THRESHOLDS = [0, 1, 3, 6, 10]; // Required points for Lv 1, 2
 export function getLevelProgress(totalPoints) {
   let level = 1;
   for (let i = LEVEL_THRESHOLDS.length - 1; i >= 0; i--) {
-     if (totalPoints >= LEVEL_THRESHOLDS[i]) {
-        level = i + 1;
-        break;
-     }
+    if (totalPoints >= LEVEL_THRESHOLDS[i]) {
+      level = i + 1;
+      break;
+    }
   }
   const currentThreshold = LEVEL_THRESHOLDS[level - 1];
   const nextThreshold = level < 5 ? LEVEL_THRESHOLDS[level] : currentThreshold;
@@ -63,7 +63,7 @@ export function getLevelProgress(totalPoints) {
   const pointsNeededForNext = level < 5 ? nextThreshold - currentThreshold : 0;
   const progressPercent = level < 5 ? (pointsInCurrentLevel / pointsNeededForNext) * 100 : 100;
   const remainingPoints = level < 5 ? nextThreshold - totalPoints : 0;
-  
+
   // 열매 개수 계산: 10P(lv5)에서 1개, 이후 3P마다 1개씩 추가
   const fruitCount = level === 5 ? (1 + Math.floor((totalPoints - 10) / 3)) : 0;
 
@@ -87,10 +87,10 @@ export function renderCharacter(level, size = 80, type = 'apple', totalPoints = 
   const config = getLevelConfig(safeLevel, type);
   const fontSize = size * 0.6;
   const glowSize = size * 0.8;
-  
+
   const fruitEmoji = PLANT_LEVEL_ASSETS[type]?.[4] || '🍎';
   const displayEmoji = safeLevel === 1 ? '🌰' : (PLANT_LEVEL_ASSETS[type]?.[safeLevel - 1] || '🌰');
-  
+
   // 무한 성장 로직 (Level 5일 때만 적용)
   const fruitCount = safeLevel === 5 ? (1 + Math.floor((Math.max(10, totalPoints) - 10) / 3)) : 1;
 
@@ -100,11 +100,11 @@ export function renderCharacter(level, size = 80, type = 'apple', totalPoints = 
     const fruits = [];
     const displayCount = Math.min(10, fruitCount);
     for (let i = 0; i < displayCount; i++) {
-       const angle = (i / displayCount) * Math.PI * 2;
-       const offset = i === 0 ? 0 : size * 0.25;
-       const x = Math.cos(angle) * offset;
-       const y = Math.sin(angle) * offset;
-       fruits.push(`<div style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) translate(${x}px, ${y}px); font-size: ${fontSize * (i === 0 ? 1 : 0.7)}px;">${fruitEmoji}</div>`);
+      const angle = (i / displayCount) * Math.PI * 2;
+      const offset = i === 0 ? 0 : size * 0.25;
+      const x = Math.cos(angle) * offset;
+      const y = Math.sin(angle) * offset;
+      fruits.push(`<div style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) translate(${x}px, ${y}px); font-size: ${fontSize * (i === 0 ? 1 : 0.7)}px;">${fruitEmoji}</div>`);
     }
     content = fruits.join('');
   } else {
@@ -163,7 +163,7 @@ export function renderPraiseAnimation(container) {
     display: flex; align-items: center; justify-content: center;
   `;
   anim.innerHTML = '<span style="font-size:3.5rem; animation: starGrow 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;">💝</span>';
-  
+
   const style = document.createElement('style');
   style.textContent = `
     @keyframes starGrow {
@@ -173,7 +173,7 @@ export function renderPraiseAnimation(container) {
     }
   `;
   document.head.appendChild(style);
-  
+
   container.style.position = 'relative';
   container.appendChild(anim);
   setTimeout(() => anim.remove(), 700);

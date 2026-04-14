@@ -26,6 +26,9 @@ export function renderStudentDashboard(container) {
   let unsubscribeQuiz = null;
   let unsubscribeSubmissions = null;
 
+  // File Queue for assignment submissions
+  let submissionFilesQueue = [];
+
   async function init() {
     await render();
     startQuizListener();
@@ -525,7 +528,31 @@ export function renderStudentDashboard(container) {
       </div>
     `;
 
-    document.getElementById('btn-back-dashboard')?.addEventListener('click', () => { activeView = 'dashboard'; render(); });
+    function updateSubmissionFileListUI() {
+      const listContainer = document.getElementById('submission-file-list');
+      if (!listContainer) return;
+      
+      listContainer.innerHTML = submissionFilesQueue.map((f, idx) => `
+        <div class="file-queue-item" style="border-left: 4px solid var(--primary);">
+          <div class="file-item-info">
+            <span style="font-size: 1.1rem;">📄</span>
+            <span class="file-item-name">${f.name}</span>
+          </div>
+          <button class="btn-remove-file" onclick="window.removeQueuedSubmissionFile(${idx})">✕</button>
+        </div>
+      `).join('');
+    }
+
+    window.removeQueuedSubmissionFile = (index) => {
+      submissionFilesQueue.splice(index, 1);
+      updateSubmissionFileListUI();
+    };
+
+    document.getElementById('btn-back-dashboard')?.addEventListener('click', () => { 
+      submissionFilesQueue = []; 
+      activeView = 'dashboard'; 
+      render(); 
+    });
     
     const statusView = document.getElementById('submission-status-view');
     const formView = document.getElementById('submission-form-view');
@@ -536,36 +563,51 @@ export function renderStudentDashboard(container) {
     const fileListDisplay = document.getElementById('selected-files-list');
 
     editBtn?.addEventListener('click', () => {
+      submissionFilesQueue = [];
       statusView.classList.add('hidden');
       formView.classList.remove('hidden');
+      updateSubmissionFileListUI();
     });
 
     cancelEditBtn?.addEventListener('click', () => {
+      submissionFilesQueue = [];
       formView.classList.add('hidden');
       statusView.classList.remove('hidden');
-      fileInput.value = '';
-      if (fileListDisplay) fileListDisplay.innerHTML = '';
     });
     
     dropzone?.addEventListener('click', () => fileInput.click());
     
     fileInput?.addEventListener('change', () => {
       if (fileInput.files.length > 0) {
-        const names = Array.from(fileInput.files).map(f => `📎 ${f.name}`).join('<br/>');
-        if (fileListDisplay) fileListDisplay.innerHTML = names;
+        submissionFilesQueue = [...submissionFilesQueue, ...Array.from(fileInput.files)];
+        fileInput.value = '';
+        updateSubmissionFileListUI();
+      }
+    });
+
+    // Handle Drop
+    dropzone?.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
+    dropzone?.addEventListener('dragleave', () => { dropzone.classList.remove('dragover'); });
+    dropzone?.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('dragover');
+      if (e.dataTransfer.files.length > 0) {
+        submissionFilesQueue = [...submissionFilesQueue, ...Array.from(e.dataTransfer.files)];
+        updateSubmissionFileListUI();
       }
     });
 
     document.getElementById('btn-submit-assignment')?.addEventListener('click', async () => {
-      if (fileInput.files.length === 0) { showToast('제출할 파일을 선택해주세요.', 'error'); return; }
+      if (submissionFilesQueue.length === 0) { showToast('제출할 파일을 선택해주세요.', 'error'); return; }
       try {
         const files = [];
-        for (const file of fileInput.files) {
+        for (const file of submissionFilesQueue) {
           const saved = await saveFile(file);
           files.push({ id: saved.id, name: saved.name });
         }
         await submitAssignment(assignment.id, freshStudent.id, { files, shared: true });
         showToast(sub ? '제출물이 수정되었습니다! 🎉' : '과제가 제출되었습니다! 🎉');
+        submissionFilesQueue = [];
         activeView = 'dashboard';
         render();
       } catch (err) { showToast('제출 중 오류 발생', 'error'); }

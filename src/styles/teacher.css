@@ -649,3 +649,95 @@
     margin-bottom: var(--s-4);
     opacity: 0.5;
 }
+
+/* Drop-zone & File Upload UI */
+.drop-zone {
+    width: 100%;
+    min-height: 120px;
+    padding: var(--s-8);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    border: 2px dashed var(--border-main);
+    border-radius: var(--r-lg);
+    background: var(--bg-main);
+    cursor: pointer;
+    transition: var(--transition-all);
+    color: var(--text-muted);
+}
+
+.drop-zone:hover, .drop-zone.dragover {
+    border-color: var(--primary);
+    background: var(--primary-glow);
+    color: var(--primary);
+}
+
+.drop-zone-icon {
+    font-size: 2.5rem;
+    margin-bottom: var(--s-3);
+}
+
+.file-queue-list {
+    margin-top: var(--s-4);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.file-queue-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 16px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--r-md);
+    animation: slideIn 0.3s ease-out;
+}
+
+.file-item-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--text-main);
+    overflow: hidden;
+}
+
+.file-item-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 300px;
+}
+
+.btn-remove-file {
+    color: var(--text-dim);
+    font-size: 1.25rem;
+    padding: 4px;
+    line-height: 1;
+    cursor: pointer;
+    transition: color 0.2s;
+    background: none;
+    border: none;
+}
+
+.btn-remove-file:hover {
+    color: var(--danger);
+}
+
+@keyframes slideIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Label Enhancements */
+.form-group .input-label {
+    display: block;
+    margin-bottom: var(--s-2);
+    font-weight: 600;
+    color: var(--text-main);
+}

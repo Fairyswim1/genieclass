@@ -19,6 +19,12 @@ export function renderAssignMode(container, params) {
   let activeTab = 'announcements'; // 'announcements', 'assignments', 'resources'
   let editingAssignmentId = null;
 
+  // File Queues for forms
+  let annFilesQueue = []; // Array of File objects for NEW uploads
+  let assignFilesQueue = []; // Array of File objects for NEW uploads
+  let resFilesQueue = []; // Array of File objects for NEW uploads
+  let existingFilesQueue = []; // Array of {id, name} objects for EDITING
+
   async function init() {
     cls = await getClassById(classId);
     if (!cls) { window.location.hash = '/teacher/dashboard'; return; }
@@ -149,9 +155,15 @@ export function renderAssignMode(container, params) {
                 <label class="input-label">내용</label>
                 <textarea class="input-field" id="ann-content" rows="4" placeholder="공지 내용을 입력하세요"></textarea>
               </div>
-              <div class="form-group">
+               <div class="form-group">
                 <label class="input-label">첨부 파일</label>
-                <input type="file" id="ann-files" multiple class="input-field" style="padding: 10px;" />
+                <div class="drop-zone" id="ann-dropzone">
+                  <div class="drop-zone-icon">📁</div>
+                  <div style="font-weight: 600;">클래스 공지에 포함할 파일을 드래그하거나 클릭하세요</div>
+                  <div style="font-size: 0.85rem; opacity: 0.7; margin-top: 5px;">여러 파일을 동시에 올릴 수 있습니다</div>
+                  <input type="file" id="ann-files" multiple class="hidden" />
+                </div>
+                <div id="ann-file-list" class="file-queue-list"></div>
               </div>
               <div class="flex gap-md justify-end">
                 <button class="btn btn-ghost" id="btn-cancel-announcement">취소</button>
@@ -223,10 +235,15 @@ export function renderAssignMode(container, params) {
                 <label class="input-label">마감 기한</label>
                 <input type="date" class="input-field" id="assign-due" />
               </div>
-              <div class="form-group">
+               <div class="form-group">
                 <label class="input-label">참조 파일</label>
-                <input type="file" id="assign-files" multiple class="input-field" style="padding: 10px;" />
-                <div id="assign-selected-files" style="margin-top: 8px; font-size: 0.85rem; color: var(--primary); font-weight: 500;"></div>
+                <div class="drop-zone" id="assign-dropzone">
+                  <div class="drop-zone-icon">📝</div>
+                  <div style="font-weight: 600;">과제 설명에 필요한 파일을 드래그하거나 클릭하세요</div>
+                  <div style="font-size: 0.85rem; opacity: 0.7; margin-top: 5px;">이미지, 문서, HTML 등 여러 파일 가능</div>
+                  <input type="file" id="assign-files" multiple class="hidden" />
+                </div>
+                <div id="assign-file-list" class="file-queue-list"></div>
               </div>
               <div class="flex gap-md justify-end">
                 <button class="btn btn-ghost" id="btn-cancel-assignment">취소</button>
@@ -252,10 +269,14 @@ export function renderAssignMode(container, params) {
                 <label class="input-label">자료 설명 (선택)</label>
                 <input type="text" class="input-field" id="res-desc" placeholder="예: 3강 참고용 PDF입니다" />
               </div>
-              <div class="form-group">
+               <div class="form-group">
                 <label class="input-label">자료 파일</label>
-                <input type="file" id="res-files" multiple class="input-field" style="padding: 10px;" />
-                <div id="res-selected-files" style="margin-top: 8px; font-size: 0.85rem; color: var(--primary); font-weight: 500;"></div>
+                <div class="drop-zone" id="res-dropzone">
+                  <div class="drop-zone-icon">📄</div>
+                  <div style="font-weight: 600;">학습 자료 파일을 드래그하거나 클릭하여 추가하세요</div>
+                  <input type="file" id="res-files" multiple class="hidden" />
+                </div>
+                <div id="res-file-list" class="file-queue-list"></div>
               </div>
               <div class="flex gap-md justify-end">
                 <button class="btn btn-ghost" id="btn-cancel-resource">취소</button>
@@ -299,6 +320,106 @@ export function renderAssignMode(container, params) {
     bindEvents();
   }
 
+  function updateFileListUI(type) {
+    let queue = [];
+    let existing = [];
+    let listId = "";
+    
+    if (type === 'ann') { queue = annFilesQueue; listId = "ann-file-list"; }
+    else if (type === 'assign') { queue = assignFilesQueue; existing = existingFilesQueue; listId = "assign-file-list"; }
+    else if (type === 'res') { queue = resFilesQueue; listId = "res-file-list"; }
+
+    const listContainer = document.getElementById(listId);
+    if (!listContainer) return;
+
+    let html = "";
+    
+    // Existing files (for assignment editing)
+    existing.forEach((f, idx) => {
+      html += `
+        <div class="file-queue-item" style="border-left: 4px solid var(--success);">
+          <div class="file-item-info">
+            <span style="font-size: 1.1rem;">📎</span>
+            <span class="file-item-name">${f.name} <small style="color: var(--text-dim);">(기존)</small></span>
+          </div>
+          <button class="btn-remove-file" onclick="window.removeQueuedFile('${type}', ${idx}, true)">✕</button>
+        </div>
+      `;
+    });
+
+    // New queue files
+    queue.forEach((f, idx) => {
+      html += `
+        <div class="file-queue-item" style="border-left: 4px solid var(--primary);">
+          <div class="file-item-info">
+            <span style="font-size: 1.1rem;">📄</span>
+            <span class="file-item-name">${f.name}</span>
+          </div>
+          <button class="btn-remove-file" onclick="window.removeQueuedFile('${type}', ${idx}, false)">✕</button>
+        </div>
+      `;
+    });
+
+    listContainer.innerHTML = html;
+  }
+
+  window.removeQueuedFile = (type, index, isExisting) => {
+    if (type === 'ann') annFilesQueue.splice(index, 1);
+    else if (type === 'assign') {
+      if (isExisting) existingFilesQueue.splice(index, 1);
+      else assignFilesQueue.splice(index, 1);
+    }
+    else if (type === 'res') resFilesQueue.splice(index, 1);
+    
+    updateFileListUI(type);
+  };
+
+  function setupDropZone(dropZoneId, fileInputId, type) {
+    const dropZone = document.getElementById(dropZoneId);
+    const fileInput = document.getElementById(fileInputId);
+    if (!dropZone || !fileInput) return;
+
+    dropZone.addEventListener('click', () => fileInput.click());
+    
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('dragover');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('dragover');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      if (e.dataTransfer.files.length > 0) {
+        addFilesToQueue(type, e.dataTransfer.files);
+      }
+    });
+
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files.length > 0) {
+        addFilesToQueue(type, fileInput.files);
+        fileInput.value = ''; // Reset so same file can be selected again if removed
+      }
+    });
+  }
+
+  function addFilesToQueue(type, files) {
+    const fileArray = Array.from(files);
+    
+    const filterDuplicates = (queue, newFiles) => {
+      return newFiles.filter(nf => !queue.some(qf => qf.name === nf.name && qf.size === nf.size));
+    };
+
+    if (type === 'ann') annFilesQueue = [...annFilesQueue, ...filterDuplicates(annFilesQueue, fileArray)];
+    else if (type === 'assign') assignFilesQueue = [...assignFilesQueue, ...filterDuplicates(assignFilesQueue, fileArray)];
+    else if (type === 'res') resFilesQueue = [...resFilesQueue, ...filterDuplicates(resFilesQueue, fileArray)];
+    
+    updateFileListUI(type);
+  }
+
   function bindEvents() {
     document.getElementById('btn-back-dashboard')?.addEventListener('click', () => {
       window.location.hash = '/teacher/dashboard';
@@ -321,6 +442,8 @@ export function renderAssignMode(container, params) {
 
     document.getElementById('btn-new-assignment')?.addEventListener('click', () => {
       editingAssignmentId = null;
+      assignFilesQueue = [];
+      existingFilesQueue = [];
       document.getElementById('assignment-form').classList.remove('hidden');
       document.querySelector('#assignment-form .section-title')?.remove();
       const titleEl = document.createElement('h3');
@@ -331,8 +454,7 @@ export function renderAssignMode(container, params) {
       document.getElementById('assign-title').value = '';
       document.getElementById('assign-desc').value = '';
       document.getElementById('assign-due').value = '';
-      document.getElementById('assign-files').value = '';
-      document.getElementById('assign-selected-files').innerHTML = '';
+      updateFileListUI('assign');
       document.getElementById('btn-submit-assignment').textContent = '과제 생성';
     });
     document.getElementById('btn-cancel-assignment')?.addEventListener('click', () => {
@@ -347,17 +469,10 @@ export function renderAssignMode(container, params) {
       document.getElementById('resource-form').classList.add('hidden');
     });
 
-    // File selection UI updates - using delegation for more stability
-    document.addEventListener('change', (e) => {
-      if (e.target.id === 'assign-files') {
-        const list = document.getElementById('assign-selected-files');
-        if (list) list.innerHTML = Array.from(e.target.files).map(f => `📎 ${f.name}`).join(', ');
-      }
-      if (e.target.id === 'res-files') {
-        const list = document.getElementById('res-selected-files');
-        if (list) list.innerHTML = Array.from(e.target.files).map(f => `📎 ${f.name}`).join(', ');
-      }
-    });
+    // Set up dropzones
+    setupDropZone('ann-dropzone', 'ann-files', 'ann');
+    setupDropZone('assign-dropzone', 'assign-files', 'assign');
+    setupDropZone('res-dropzone', 'res-files', 'res');
 
     // Submit Announcement
     document.getElementById('btn-submit-announcement')?.addEventListener('click', async () => {
@@ -365,15 +480,15 @@ export function renderAssignMode(container, params) {
       const content = document.getElementById('ann-content').value.trim();
       if (!title) { showToast('제목을 입력하세요.', 'error'); return; }
 
-      const fileInput = document.getElementById('ann-files');
       const files = [];
       try {
-        for (const file of fileInput.files) {
+        for (const file of annFilesQueue) {
           const saved = await saveFile(file);
           files.push({ id: saved.id, name: saved.name });
         }
         await createAnnouncement(classId, { title, content, files });
         showToast('공지사항이 게시되었습니다.');
+        annFilesQueue = [];
         render();
       } catch (err) { showToast('오류가 발생했습니다.', 'error'); }
     });
@@ -385,28 +500,27 @@ export function renderAssignMode(container, params) {
       const dueDate = document.getElementById('assign-due').value;
       if (!title) { showToast('제목을 입력하세요.', 'error'); return; }
 
-      const fileInput = document.getElementById('assign-files');
-      const files = [];
       try {
-        if (fileInput.files.length > 0) {
-          for (const file of fileInput.files) {
-            const saved = await saveFile(file);
-            files.push({ id: saved.id, name: saved.name });
-          }
+        const uploadedFiles = [];
+        for (const file of assignFilesQueue) {
+          const saved = await saveFile(file);
+          uploadedFiles.push({ id: saved.id, name: saved.name });
         }
         
+        // Final files set = Existing (filtered) + Newly uploaded
+        const finalFiles = [...existingFilesQueue, ...uploadedFiles];
+        
         if (editingAssignmentId) {
-          const updateData = { title, description, dueDate };
-          // Only update files if new files were selected
-          if (files.length > 0) updateData.files = files;
-          await updateAssignment(editingAssignmentId, updateData);
+          await updateAssignment(editingAssignmentId, { title, description, dueDate, files: finalFiles });
           showToast('과제가 수정되었습니다.');
         } else {
-          await createAssignment(classId, { title, description, dueDate, files });
+          await createAssignment(classId, { title, description, dueDate, files: finalFiles });
           showToast('과제가 생성되었습니다.');
         }
         
         editingAssignmentId = null;
+        assignFilesQueue = [];
+        existingFilesQueue = [];
         render();
       } catch (err) { 
         console.error(err);
@@ -423,14 +537,14 @@ export function renderAssignMode(container, params) {
       const fileInput = document.getElementById('res-files');
       if (fileInput.files.length === 0) { showToast('최소 하나의 파일을 첨부하세요.', 'error'); return; }
 
-      const files = [];
       try {
-        for (const file of fileInput.files) {
+        for (const file of resFilesQueue) {
           const saved = await saveFile(file);
           files.push({ id: saved.id, name: saved.name });
         }
         await addResource(classId, { title, description, files });
         showToast('자료가 등록되었습니다.');
+        resFilesQueue = [];
         render();
       } catch (err) { showToast('오류 발생', 'error'); }
     });
@@ -460,8 +574,9 @@ export function renderAssignMode(container, params) {
           document.getElementById('assign-due').value = a.dueDate || '';
           document.getElementById('btn-submit-assignment').textContent = '수정 완료';
           
-          const filesInfo = a.files ? a.files.map(f => `📎 ${f.name}`).join(', ') : '';
-          document.getElementById('assign-selected-files').innerHTML = filesInfo ? `기존 파일: ${filesInfo} (새 파일 선택 시 대체됨)` : '';
+          assignFilesQueue = [];
+          existingFilesQueue = a.files ? [...a.files] : [];
+          updateFileListUI('assign');
           
           // Scroll to form
           document.getElementById('assignment-form').scrollIntoView({ behavior: 'smooth' });
