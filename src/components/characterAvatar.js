@@ -95,18 +95,26 @@ export function renderCharacter(level, size = 80, type = 'apple', totalPoints = 
   const fruitCount = safeLevel === 5 ? (1 + Math.floor((Math.max(10, totalPoints) - 10) / 3)) : 1;
 
   let content = '';
-  if (safeLevel === 5 && fruitCount > 1) {
-    // 여러 개의 열매를 주렁주렁 렌더링
-    const fruits = [];
-    const displayCount = Math.min(10, fruitCount);
-    for (let i = 0; i < displayCount; i++) {
-      const angle = (i / displayCount) * Math.PI * 2;
-      const offset = i === 0 ? 0 : size * 0.25;
-      const x = Math.cos(angle) * offset;
-      const y = Math.sin(angle) * offset;
-      fruits.push(`<div style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) translate(${x}px, ${y}px); font-size: ${fontSize * (i === 0 ? 1 : 0.7)}px;">${fruitEmoji}</div>`);
+  if (safeLevel === 5) {
+    if (fruitCount === 1) {
+      content = `<div style="font-size: ${fontSize}px;">${fruitEmoji}</div>`;
+    } else if (fruitCount === 2) {
+      content = `<div style="font-size: ${fontSize * 0.85}px; display: flex; gap: 4px;">${fruitEmoji}<span>${fruitEmoji}</span></div>`;
+    } else if (fruitCount === 3) {
+      content = `<div style="display: flex; flex-direction: column; align-items: center; gap: -5px;">
+        <div style="font-size: ${fontSize * 0.65}px; display: flex; gap: 2px;">${fruitEmoji}${fruitEmoji}</div>
+        <div style="font-size: ${fontSize * 0.65}px;">${fruitEmoji}</div>
+      </div>`;
+    } else {
+      // 4개 이상일 때: 사과나무 (더 이상 징그럽지 않게 큰 나무 하나로 표현)
+      content = `<div style="font-size: ${fontSize * 1.1}px; position: relative; display: flex; align-items: center; justify-content: center;">
+        🌳
+        <div style="position: absolute; top: 20%; left: 50%; transform: translateX(-50%); display: flex; gap: 2px;">
+           <span style="font-size: 0.3em; filter: drop-shadow(1px 1px 1px rgba(0,0,0,0.2));">${fruitEmoji}</span>
+           <span style="font-size: 0.3em; filter: drop-shadow(1px 1px 1px rgba(0,0,0,0.2)); margin-top: 5px;">${fruitEmoji}</span>
+        </div>
+      </div>`;
     }
-    content = fruits.join('');
   } else {
     content = `<div style="font-size: ${fontSize}px;">${displayEmoji}</div>`;
   }
