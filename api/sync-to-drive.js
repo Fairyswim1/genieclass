@@ -35,11 +35,19 @@ export default async function handler(req, res) {
     const results = [];
 
     for (const fileInfo of files) {
+      console.log(`[Sync] Processing file: ${fileInfo.name}`);
       try {
         // 2. Download from Firebase Storage
-        // fileInfo.id is the unique ID in storage
-        const file = bucket.file(`files/${fileInfo.id}_${fileInfo.name}`);
+        const fileName = `files/${fileInfo.id}_${fileInfo.name}`;
+        const file = bucket.file(fileName);
+        
+        const [exists] = await file.exists();
+        if (!exists) {
+          throw new Error(`File not found in Storage: ${fileName}`);
+        }
+
         const [buffer] = await file.download();
+        console.log(`[Sync] Downloaded ${fileInfo.name} (${buffer.length} bytes)`);
 
         // 3. Upload to Google Drive
         const driveResponse = await drive.files.create({
@@ -48,14 +56,14 @@ export default async function handler(req, res) {
             parents: [driveFolderId]
           },
           media: {
-            mimeType: 'application/octet-stream',
             body: buffer
           }
         });
 
+        console.log(`[Sync] Uploaded to Drive: ${driveResponse.data.id}`);
         results.push({ name: fileInfo.name, driveFileId: driveResponse.data.id });
       } catch (fileErr) {
-        console.error(`Error syncing file ${fileInfo.name}:`, fileErr);
+        console.error(`[Sync] Error for ${fileInfo.name}:`, fileErr);
         results.push({ name: fileInfo.name, error: fileErr.message });
       }
     }

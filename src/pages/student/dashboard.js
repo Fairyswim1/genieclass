@@ -613,6 +613,7 @@ export function renderStudentDashboard(container) {
         
         // Google Drive Sync (Background)
         if (assignment.driveFolderId) {
+          showToast('구글 드라이브로 과제를 복사하는 중입니다...', 'info');
           fetch('/api/sync-to-drive', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -622,7 +623,20 @@ export function renderStudentDashboard(container) {
               files: files,
               driveFolderId: assignment.driveFolderId
             })
-          }).catch(console.error);
+          })
+          .then(res => res.json())
+          .then(data => {
+            if (data.status === 'success') {
+              showToast('구글 드라이브 동기화 완료! ✅', 'success');
+            } else {
+              console.error('Drive sync failed:', data);
+              showToast('드라이브 전송 실패 (설정 확인 필요)', 'warning');
+            }
+          })
+          .catch(err => {
+            console.error('Drive Sync Error:', err);
+            showToast('드라이브 전송 중 오류 발생', 'error');
+          });
         }
 
         showToast(sub ? '제출물이 수정되었습니다! 🎉' : '과제가 제출되었습니다! 🎉');

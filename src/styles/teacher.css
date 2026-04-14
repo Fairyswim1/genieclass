@@ -679,22 +679,25 @@
     margin-bottom: var(--s-3);
 }
 
+/* File Queue Styles (Shared) */
 .file-queue-list {
-    margin-top: var(--s-4);
+    margin-top: 15px;
     display: flex;
     flex-direction: column;
     gap: 8px;
+    max-height: 300px;
+    overflow-y: auto;
 }
 
 .file-queue-item {
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    justify-content: space-between;
     padding: 10px 16px;
-    background: var(--bg-surface);
-    border: 1px solid var(--border-subtle);
+    background: var(--bg-main);
+    border: 1px solid var(--border-main);
     border-radius: var(--r-md);
-    animation: slideIn 0.3s ease-out;
+    animation: slideIn 0.3s ease-out forwards;
 }
 
 .file-item-info {
@@ -726,7 +729,7 @@
 }
 
 .btn-remove-file:hover {
-    color: var(--danger);
+    color: var(--error);
 }
 
 @keyframes slideIn {
