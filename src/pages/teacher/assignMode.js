@@ -331,7 +331,7 @@ export function renderAssignMode(container, params) {
     return match ? match[1] : (url.length > 20 ? url : null); // Simple ID fallback
   }
 
-  function renderFileListUI(type) {
+  function updateFileListUI(type) {
     let queue = [];
     let existing = [];
     let listId = "";

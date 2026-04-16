@@ -514,7 +514,7 @@ export function renderStudentDashboard(container) {
                    <div style="font-size: 2rem; margin-bottom: 10px;">📤</div>
                    <div style="font-weight: 600;">파일을 드래그하거나 클릭하여 업로드</div>
                    <div style="font-size: 0.85rem; color: var(--text-dim); margin-top: 5px;">${sub ? '새로 업로드하면 기존 파일이 대체됩니다.' : '여러 파일 업로드(HTML 등) 가능'}</div>
-                   <div id="selected-files-list" style="margin-top: 15px; font-size: 0.9rem; color: var(--primary); font-weight: 500;"></div>
+                   <div id="submission-file-list" style="margin-top: 15px; font-size: 0.9rem; color: var(--primary); font-weight: 500;"></div>
                    <input type="file" id="submission-file" class="hidden" multiple />
                 </div>
                 <div class="flex gap-md" style="margin-top: var(--s-6);">
@@ -560,7 +560,7 @@ export function renderStudentDashboard(container) {
     const cancelEditBtn = document.getElementById('btn-cancel-edit');
     const dropzone = document.getElementById('submission-dropzone');
     const fileInput = document.getElementById('submission-file');
-    const fileListDisplay = document.getElementById('selected-files-list');
+    const fileListDisplay = document.getElementById('submission-file-list');
 
     editBtn?.addEventListener('click', () => {
       submissionFilesQueue = [];
