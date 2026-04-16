@@ -22,7 +22,8 @@ import {
     updateDoc,
     increment,
     serverTimestamp,
-    orderBy
+    orderBy,
+    onSnapshot
 } from 'firebase/firestore';
 import { auth, db, storage, googleProvider } from './firebase.js';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -341,6 +342,7 @@ export async function createAssignment(classId, data) {
         description: data.description || '',
         dueDate: data.dueDate || null,
         files: data.files || [],
+        driveFolderId: data.driveFolderId || null,
         createdAt: new Date().toISOString(),
     };
     await setDoc(doc(db, COLLECTIONS.ASSIGNMENTS, id), assignment);
@@ -369,6 +371,7 @@ export async function updateAssignment(assignmentId, data) {
         title: data.title,
         description: data.description || '',
         dueDate: data.dueDate || null,
+        driveFolderId: data.driveFolderId || null,
         updatedAt: new Date().toISOString(),
     };
     if (data.files) {
