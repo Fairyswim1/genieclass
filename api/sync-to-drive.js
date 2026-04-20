@@ -82,14 +82,20 @@ export default async function handler(req, res) {
           media: {
             mimeType: mimeType,
             body: stream
-          }
+          },
+          supportsAllDrives: true,
+          includeItemsFromAllDrives: true
         });
 
         console.log(`[Sync] Uploaded to Drive: ${driveResponse.data.id}`);
         results.push({ name: fileInfo.name, driveFileId: driveResponse.data.id });
       } catch (fileErr) {
+        let errorMsg = fileErr.message;
+        if (errorMsg.includes('storage quota')) {
+          errorMsg = '구글 드라이브 용량 부족 (공유 드라이브 사용 권장)';
+        }
         console.error(`[Sync] Error for ${fileInfo.name}:`, fileErr.message, fileErr.stack);
-        results.push({ name: fileInfo.name, error: fileErr.message });
+        results.push({ name: fileInfo.name, error: errorMsg });
       }
     }
 

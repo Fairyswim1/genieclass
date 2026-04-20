@@ -644,10 +644,17 @@ export function renderStudentDashboard(container) {
           .then(res => res.json())
           .then(data => {
             if (data.status === 'success') {
-              showToast('구글 드라이브 동기화 완료! ✅', 'success');
+              // Check if all files succeeded
+              const failed = data.results.filter(r => r.error);
+              if (failed.length === 0) {
+                showToast('구글 드라이브 동기화 완료! ✅', 'success');
+              } else {
+                console.error('Some files failed to sync:', failed);
+                showToast(`드라이브 전송 부분 실패: ${failed[0].error}`, 'warning');
+              }
             } else {
               console.error('Drive sync failed:', data);
-              showToast('드라이브 전송 실패 (설정 확인 필요)', 'warning');
+              showToast(data.error || '드라이브 전송 실패 (설정 확인 필요)', 'warning');
             }
           })
           .catch(err => {

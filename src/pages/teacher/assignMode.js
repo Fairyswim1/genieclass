@@ -238,7 +238,10 @@ export function renderAssignMode(container, params) {
               <div class="form-group">
                 <label class="input-label">구글 드라이브 폴더 주소 (선택)</label>
                 <input type="text" class="input-field" id="assign-drive-url" placeholder="https://drive.google.com/drive/folders/..." />
-                <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">입력 시 학생의 제출물이 해당 드라이브로 자동 복사됩니다.</div>
+                <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">
+                  입력 시 제출물이 해당 드라이브로 자동 복사됩니다.<br/>
+                  <span style="color: var(--primary); font-weight: 600;">※ 중요: 개인 폴더보다는 '공유 드라이브' 폴더를 권장합니다 (용량 이슈 방지).</span>
+                </div>
               </div>
                <div class="form-group">
                 <label class="input-label">참조 파일</label>
