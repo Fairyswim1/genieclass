@@ -342,7 +342,6 @@ export async function createAssignment(classId, data) {
         description: data.description || '',
         dueDate: data.dueDate || null,
         files: data.files || [],
-        driveFolderId: data.driveFolderId || null,
         createdAt: new Date().toISOString(),
     };
     await setDoc(doc(db, COLLECTIONS.ASSIGNMENTS, id), assignment);
@@ -371,7 +370,6 @@ export async function updateAssignment(assignmentId, data) {
         title: data.title,
         description: data.description || '',
         dueDate: data.dueDate || null,
-        driveFolderId: data.driveFolderId || null,
         updatedAt: new Date().toISOString(),
     };
     if (data.files) {

@@ -1,6 +1,3 @@
-// ========================================
-// Teacher Assignment & Content Mode (v2.0)
-// ========================================
 import {
   getCurrentTeacher, getClassById, getStudentsByClass,
   createAssignment, getAssignmentsByClass, deleteAssignment, updateAssignment,
@@ -9,6 +6,7 @@ import {
   getSubmissionsByAssignment, saveFile, showToast, formatDate,
   getStudentById, downloadFile as storeDownloadFile
 } from '../../store.js';
+import JSZip from 'jszip';
 
 export function renderAssignMode(container, params) {
   const teacher = getCurrentTeacher();
@@ -59,6 +57,7 @@ export function renderAssignMode(container, params) {
                 <h3 style="font-size: 1.25rem; font-weight: 700; word-break: keep-all; line-height: 1.4;">${a.title}</h3>
               </div>
               <div class="flex gap-sm">
+                <button class="btn btn-secondary btn-sm bulk-download-btn" data-id="${a.id}" data-title="${a.title}">📂 전체 다운로드</button>
                 <button class="btn btn-ghost btn-sm edit-btn" data-type="assign" data-id="${a.id}" style="color: var(--primary);">수정</button>
                 <button class="btn btn-ghost btn-sm delete-btn" data-type="assign" data-id="${a.id}" style="color: var(--error);">삭제</button>
               </div>
@@ -235,14 +234,6 @@ export function renderAssignMode(container, params) {
                 <label class="input-label">마감 기한</label>
                 <input type="date" class="input-field" id="assign-due" />
               </div>
-              <div class="form-group">
-                <label class="input-label">구글 드라이브 폴더 주소 (선택)</label>
-                <input type="text" class="input-field" id="assign-drive-url" placeholder="https://drive.google.com/drive/folders/..." />
-                <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">
-                  입력 시 제출물이 해당 드라이브로 자동 복사됩니다.<br/>
-                  <span style="color: var(--primary); font-weight: 600;">※ 중요: 개인 폴더보다는 '공유 드라이브' 폴더를 권장합니다 (용량 이슈 방지).</span>
-                </div>
-              </div>
                <div class="form-group">
                 <label class="input-label">참조 파일</label>
                 <div class="drop-zone" id="assign-dropzone">
@@ -326,12 +317,6 @@ export function renderAssignMode(container, params) {
     `;
 
     bindEvents();
-  }
-
-  function extractDriveFolderId(url) {
-    if (!url) return null;
-    const match = url.match(/folders\/([a-zA-Z0-9_-]{25,})/);
-    return match ? match[1] : (url.length > 20 ? url : null); // Simple ID fallback
   }
 
   function updateFileListUI(type) {
@@ -468,7 +453,6 @@ export function renderAssignMode(container, params) {
       document.getElementById('assign-title').value = '';
       document.getElementById('assign-desc').value = '';
       document.getElementById('assign-due').value = '';
-      document.getElementById('assign-drive-url').value = '';
       updateFileListUI('assign');
       document.getElementById('btn-submit-assignment').textContent = '과제 생성';
     });
@@ -513,8 +497,6 @@ export function renderAssignMode(container, params) {
       const title = document.getElementById('assign-title').value.trim();
       const description = document.getElementById('assign-desc').value.trim();
       const dueDate = document.getElementById('assign-due').value;
-      const driveUrl = document.getElementById('assign-drive-url').value.trim();
-      const driveFolderId = extractDriveFolderId(driveUrl);
 
       if (!title) { showToast('제목을 입력하세요.', 'error'); return; }
 
@@ -528,7 +510,7 @@ export function renderAssignMode(container, params) {
         // Final files set = Existing (filtered) + Newly uploaded
         const finalFiles = [...existingFilesQueue, ...uploadedFiles];
         
-        const assignData = { title, description, dueDate, files: finalFiles, driveFolderId };
+        const assignData = { title, description, dueDate, files: finalFiles };
         
         if (editingAssignmentId) {
           await updateAssignment(editingAssignmentId, assignData);
@@ -592,7 +574,6 @@ export function renderAssignMode(container, params) {
           document.getElementById('assign-title').value = a.title;
           document.getElementById('assign-desc').value = a.description;
           document.getElementById('assign-due').value = a.dueDate || '';
-          document.getElementById('assign-drive-url').value = a.driveFolderId ? `https://drive.google.com/drive/folders/${a.driveFolderId}` : '';
           document.getElementById('btn-submit-assignment').textContent = '수정 완료';
           
           assignFilesQueue = [];
@@ -618,6 +599,70 @@ export function renderAssignMode(container, params) {
         render();
       });
     });
+    // Bulk Download
+    document.querySelectorAll('.bulk-download-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.id;
+        const title = btn.dataset.title;
+        await handleBulkDownload(id, title);
+      });
+    });
+  }
+
+  async function handleBulkDownload(assignmentId, assignmentTitle) {
+    try {
+      const [subs, allStudents] = await Promise.all([
+        getSubmissionsByAssignment(assignmentId),
+        getStudentsByClass(classId)
+      ]);
+
+      if (!subs || subs.length === 0) {
+        showToast('제출된 과제가 없습니다.', 'info');
+        return;
+      }
+
+      showToast('압축 파일 생성 중... 잠시만 기다려주세요.', 'info');
+      const zip = new JSZip();
+      
+      // 순차적으로 다운로드하여 브라우저 과부하 방지
+      for (const sub of subs) {
+        const student = allStudents.find(s => s.id === sub.studentId);
+        const stName = student ? student.name : '알수없음';
+        const stNum = student ? (student.number || '') : '';
+        const prefix = stNum ? `${stNum}_${stName}` : stName;
+
+        if (sub.files && sub.files.length > 0) {
+          for (const f of sub.files) {
+            try {
+              // store.js에서 파일 정보(URL) 가져오기
+              const fileInfo = await import('../../store.js').then(m => m.getFileById(f.id));
+              if (fileInfo && fileInfo.url) {
+                const response = await fetch(fileInfo.url);
+                const blob = await response.blob();
+                zip.file(`${prefix}_${f.name}`, blob);
+              }
+            } catch (err) {
+              console.error(`Failed to download ${f.name}:`, err);
+            }
+          }
+        }
+      }
+
+      const content = await zip.generateAsync({ type: "blob" });
+      const url = window.URL.createObjectURL(content);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${assignmentTitle}_전체제출물.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      showToast('압축 및 다운로드가 완료되었습니다!');
+    } catch (err) {
+      console.error('Bulk download error:', err);
+      showToast('일괄 다운로드 중 오류가 발생했습니다.', 'error');
+    }
   }
 
   window.downloadFile = (fileId) => {
