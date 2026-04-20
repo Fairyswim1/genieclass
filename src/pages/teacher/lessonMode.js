@@ -40,6 +40,11 @@ export function renderLessonMode(container, params) {
   let recordedBlob = null;
   let recordingTimer = null;
   let recordingSeconds = 0;
+  
+  // New: Mirror Canvas for live recording
+  let recordingCanvas = null;
+  let recordingCtx = null;
+  let recordingReqId = null;
 
   async function init() {
     cls = await getClassById(classId);
@@ -542,194 +547,168 @@ export function renderLessonMode(container, params) {
   // Track recording mode: 'video' (canvas + audio) or 'audio' (audio only)
   let recordingMode = null;
 
+  function renderRecordingFrame() {
+    if (!isRecording || !recordingCtx) return;
+    
+    const draftCanvas = document.getElementById('whiteboard-draft');
+    if (!draftCanvas) return;
+
+    // Composite: wbCanvas (bottom) + draftCanvas (top)
+    recordingCtx.setTransform(1, 0, 0, 1, 0, 0);
+    recordingCtx.clearRect(0, 0, recordingCanvas.width, recordingCanvas.height);
+    
+    // Draw Background/Permanent lines
+    recordingCtx.drawImage(wbCanvas, 0, 0);
+    // Draw active stroke
+    recordingCtx.drawImage(draftCanvas, 0, 0);
+    
+    recordingReqId = requestAnimationFrame(renderRecordingFrame);
+  }
+
   async function handleRecordToggle() {
     if (!isRecording) {
-      if (window.Capacitor && window.Capacitor.isNativePlatform()) {
-        try {
-          recordingMode = 'audio'; // Android is audio only automatically
-          const permStatus = await VoiceRecorder.requestAudioRecordingPermission();
-          if (!permStatus.value) {
-            showToast('마이크 권한이 차단되었습니다. 앱 설정에서 권한을 허용해주세요.', 'error');
-            return;
-          }
-          await VoiceRecorder.startRecording();
-          isRecording = true;
-          updateWhiteboardUI();
-          showToast('🎙 네이티브 앱 녹음을 시작합니다.');
-          return;
-        } catch(err) {
-          showToast('녹음을 시작할 수 없습니다: ' + err.message, 'error');
-          return;
-        }
-      }
+      // 0. Reset State
+      mediaChunks = [];
+      recordedBlob = null;
+      recordingMode = null;
 
       try {
-        // 0. 웹 브라우저 기본 환경 확인
         console.log('[녹음] 환경 확인...');
-        console.log('[녹음] navigator.mediaDevices:', !!navigator.mediaDevices);
-        console.log('[녹음] getUserMedia:', !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia));
-        console.log('[녹음] MediaRecorder:', typeof MediaRecorder);
-        console.log('[녹음] isSecureContext:', window.isSecureContext);
+        const hasMediaDevices = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+        const hasMediaRecorder = typeof MediaRecorder !== 'undefined';
         
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          showToast('이 환경에서는 녹음이 지원되지 않습니다. (mediaDevices 없음)', 'error');
-          return;
-        }
-        
-        if (typeof MediaRecorder === 'undefined') {
-          showToast('이 환경에서는 녹음이 지원되지 않습니다. (MediaRecorder 없음)', 'error');
-          return;
+        // --- 1. Attempt Screen + Audio Recording (Web API) ---
+        if (hasMediaDevices && hasMediaRecorder) {
+          try {
+            console.log('[녹음] 오디오 스트림 요청...');
+            const audioStream = await navigator.mediaDevices.getUserMedia({
+              audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true
+              }
+            });
+
+            // Setup Mirror Canvas
+            recordingCanvas = document.createElement('canvas');
+            recordingCanvas.width = wbCanvas.width;
+            recordingCanvas.height = wbCanvas.height;
+            recordingCtx = recordingCanvas.getContext('2d');
+            
+            if (typeof recordingCanvas.captureStream === 'function') {
+              console.log('[녹음] 캔버스 캡처 지원됨 → 화면+음성 결합');
+              const canvasStream = recordingCanvas.captureStream(30);
+              const combinedStream = new MediaStream([
+                ...canvasStream.getVideoTracks(),
+                ...audioStream.getAudioTracks()
+              ]);
+
+              // Detect best MIME type
+              const mimeTypes = ['video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9,opus', 'video/webm', 'video/mp4'];
+              const selectedMime = mimeTypes.find(m => MediaRecorder.isTypeSupported(m)) || '';
+              
+              mediaRecorder = new MediaRecorder(combinedStream, selectedMime ? { mimeType: selectedMime } : {});
+              recordingMode = 'video';
+            } else {
+              console.log('[녹음] 캔버스 캡처 미지원 → 음성만 녹음');
+              mediaRecorder = new MediaRecorder(audioStream);
+              recordingMode = 'audio';
+            }
+          } catch (webErr) {
+            console.error('[녹음] 브라우저 녹음 초기화 실패:', webErr);
+            // Fall through to Capacitor if on native
+          }
         }
 
-        // 1. 마이크 권한 상태 확인 (가능한 경우)
-        if (navigator.permissions && navigator.permissions.query) {
+        // --- 2. Fallback to Capacitor (Native Plugin) if Web API failed or preferred ---
+        if (!mediaRecorder && window.Capacitor && window.Capacitor.isNativePlatform()) {
           try {
-            const permStatus = await navigator.permissions.query({ name: 'microphone' });
-            console.log('[녹음] 마이크 권한 상태:', permStatus.state);
-            if (permStatus.state === 'denied') {
-              showToast('마이크 권한이 차단되었습니다. 앱 설정에서 마이크 권한을 허용해주세요.', 'error');
+            console.log('[녹음] 네이티브 플러그인 시도...');
+            const permStatus = await VoiceRecorder.requestAudioRecordingPermission();
+            if (!permStatus.value) {
+              showToast('마이크 권한이 차단되었습니다.', 'error');
               return;
             }
-          } catch (permErr) {
-            console.log('[녹음] permissions.query 미지원:', permErr.message);
+            await VoiceRecorder.startRecording();
+            recordingMode = 'audio'; // Capacitor is audio-only in this implementation
+            isRecording = true;
+            updateWhiteboardUI();
+            showToast('🎙 네이티브 앱 음성 녹음을 시작합니다.');
+            return;
+          } catch(capErr) {
+            showToast('네이티브 녹음을 시작할 수 없습니다.', 'error');
+            return;
           }
         }
 
-        // 2. 마이크 스트림 요청
-        console.log('[녹음] getUserMedia 호출...');
-        let audioStream;
-        try {
-          audioStream = await navigator.mediaDevices.getUserMedia({
-            audio: {
-              echoCancellation: true,
-              noiseSuppression: true,
-              autoGainControl: true
-            }
-          });
-          console.log('[녹음] 오디오 스트림 획득 성공, 트랙 수:', audioStream.getAudioTracks().length);
-        } catch (micErr) {
-          console.error('[녹음] getUserMedia 실패:', micErr.name, micErr.message);
-          if (micErr.name === 'NotAllowedError') {
-            showToast('마이크 권한이 거부되었습니다. 앱 설정 > 권한에서 마이크를 허용해주세요.', 'error');
-          } else if (micErr.name === 'NotFoundError') {
-            showToast('마이크를 찾을 수 없습니다. 기기에 마이크가 연결되어 있는지 확인해주세요.', 'error');
-          } else if (micErr.name === 'NotReadableError') {
-            showToast('마이크가 다른 앱에서 사용 중입니다.', 'error');
+        // --- 3. Start Web MediaRecorder ---
+        if (mediaRecorder) {
+          mediaRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) mediaChunks.push(e.data);
+          };
+          mediaRecorder.onstop = () => {
+            const blobType = mediaRecorder.mimeType || (recordingMode === 'video' ? 'video/webm' : 'audio/webm');
+            recordedBlob = new Blob(mediaChunks, { type: blobType });
+            console.log(`[녹음] 완료: mode=${recordingMode}, size=${recordedBlob.size}`);
+          };
+
+          mediaRecorder.start(1000);
+          isRecording = true;
+          
+          if (recordingMode === 'video') {
+            // Start mirror loop
+            renderRecordingFrame();
+            showToast('📹 화면과 음성 녹화를 시작합니다.');
           } else {
-            showToast('마이크 접근 실패: ' + micErr.message, 'error');
+            showToast('🎙 음성 녹음을 시작합니다.');
           }
-          return;
-        }
-
-        // 3. 캔버스 스트림 시도 (데스크톱 브라우저에서 지원)
-        let combinedStream = null;
-        recordingMode = 'audio'; // 기본값: 음성만
-
-        if (typeof wbCanvas.captureStream === 'function') {
-          try {
-            const canvasStream = wbCanvas.captureStream(30);
-            combinedStream = new MediaStream([
-              ...canvasStream.getVideoTracks(),
-              ...audioStream.getAudioTracks()
-            ]);
-            recordingMode = 'video';
-            console.log('[녹음] 캔버스+오디오 스트림 결합 성공');
-          } catch (captureErr) {
-            console.warn('[녹음] captureStream 실패, 음성만 녹음:', captureErr);
-            combinedStream = audioStream;
-            recordingMode = 'audio';
-          }
-        } else {
-          console.log('[녹음] captureStream 미지원 → 음성만 녹음');
-          combinedStream = audioStream;
-          recordingMode = 'audio';
-        }
-
-        // 4. MediaRecorder 생성 - 지원되는 MIME 타입 자동 감지
-        const mimeTypes = recordingMode === 'video'
-          ? ['video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9,opus', 'video/webm', 'video/mp4']
-          : ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4', 'audio/wav', ''];
-        
-        let selectedMime = '';
-        for (const mime of mimeTypes) {
-          if (mime === '' || MediaRecorder.isTypeSupported(mime)) {
-            selectedMime = mime;
-            console.log('[녹음] 지원 MIME 타입:', mime || '(기본값)');
-            break;
-          }
-        }
-
-        const recorderOptions = selectedMime ? { mimeType: selectedMime } : {};
-        console.log('[녹음] MediaRecorder 생성:', JSON.stringify(recorderOptions));
-        mediaRecorder = new MediaRecorder(combinedStream, recorderOptions);
-        console.log('[녹음] MediaRecorder 상태:', mediaRecorder.state, '/ mimeType:', mediaRecorder.mimeType);
-        
-        mediaChunks = [];
-        mediaRecorder.ondataavailable = (e) => {
-          if (e.data.size > 0) {
-            mediaChunks.push(e.data);
-            console.log('[녹음] 데이터 수신:', e.data.size, 'bytes / 총 청크:', mediaChunks.length);
-          }
-        };
-        mediaRecorder.onerror = (e) => {
-          console.error('[녹음] MediaRecorder 에러:', e.error?.name, e.error?.message);
-          showToast('녹음 중 오류: ' + (e.error?.message || '알 수 없는 오류'), 'error');
-          isRecording = false;
           updateWhiteboardUI();
-        };
-        mediaRecorder.onstop = () => {
-          const blobType = mediaRecorder.mimeType || selectedMime || 
-            (recordingMode === 'video' ? 'video/webm' : 'audio/webm');
-          recordedBlob = new Blob(mediaChunks, { type: blobType });
-          console.log(`[녹음] 완료: mode=${recordingMode}, type=${blobType}, size=${recordedBlob.size}`);
-        };
-        
-        mediaRecorder.start(1000); // 1초마다 데이터 수집하여 렉 방지
-        isRecording = true;
-        updateWhiteboardUI();
-        
-        if (recordingMode === 'video') {
-          showToast('📹 화면과 음성 녹화를 시작합니다.');
         } else {
-          showToast('🎙 음성 녹음을 시작합니다.');
+          showToast('이 기기에서는 녹음 기능을 사용할 수 없습니다.', 'error');
         }
+
       } catch (err) {
-        console.error('[녹음] 시작 실패:', err);
-        showToast('녹음을 시작할 수 없습니다: ' + err.message, 'error');
+        console.error('[녹음] 최종 실패:', err);
+        showToast('녹음 오류: ' + err.message, 'error');
       }
     } else {
-      if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+      // --- STOP RECORDING ---
+      if (recordingReqId) {
+        cancelAnimationFrame(recordingReqId);
+        recordingReqId = null;
+      }
+
+      if (window.Capacitor && window.Capacitor.isNativePlatform() && !mediaRecorder) {
         try {
           const result = await VoiceRecorder.stopRecording();
           const mimeType = result.value.mimeType;
           const base64Str = result.value.recordDataBase64;
           
-          // Convert base64 to Blob
           const byteCharacters = atob(base64Str);
           const byteNumbers = new Array(byteCharacters.length);
           for (let i = 0; i < byteCharacters.length; i++) {
             byteNumbers[i] = byteCharacters.charCodeAt(i);
           }
-          const byteArray = new Uint8Array(byteNumbers);
-          recordedBlob = new Blob([byteArray], { type: mimeType });
+          recordedBlob = new Blob([new Uint8Array(byteNumbers)], { type: mimeType });
           
           isRecording = false;
           updateWhiteboardUI();
-          showToast('⏹ 앱 녹음이 중지되었습니다.');
+          showToast('⏹ 녹음이 중지되었습니다.');
           return;
         } catch(err) {
-          console.error('[녹음] 네이티브 중지 오류:', err);
-          showToast('녹음 중지 시 오류: ' + err.message, 'error');
-          return;
+          showToast('중지 중 오류 발생', 'error');
         }
       }
 
-      try {
-        mediaRecorder.stop();
-        mediaRecorder.stream.getTracks().forEach(t => t.stop());
-      } catch (stopErr) {
-        console.error('[녹음] 중지 오류:', stopErr);
+      if (mediaRecorder) {
+        try {
+          mediaRecorder.stop();
+          mediaRecorder.stream.getTracks().forEach(t => t.stop());
+        } catch (stopErr) {
+          console.error('[녹음] 중지 오류:', stopErr);
+        }
       }
+
       isRecording = false;
       updateWhiteboardUI();
       showToast('⏹ 녹음이 중지되었습니다.');
@@ -737,35 +716,49 @@ export function renderLessonMode(container, params) {
   }
 
   async function handleSavePresentation() {
-    showToast('💾 저장 중...', 'info');
+    if (isRecording) {
+      showToast('녹음 중에는 저장할 수 없습니다. 녹음을 먼저 중지해주세요.', 'error');
+      return;
+    }
+
+    showToast('💾 발표 자료 저장 중...', 'info');
     try {
-      // 1. Canvas to Blob
+      // 1. Static Whiteboard Image
       const canvasBlob = await new Promise(resolve => wbCanvas.toBlob(resolve, 'image/png'));
+      if (!canvasBlob) throw new Error('이미지 캔버스 캡처 실패');
+      
       const imageFile = new File([canvasBlob], `wb_${Date.now()}.png`, { type: 'image/png' });
       const savedImage = await saveFile(imageFile);
 
-      // 2. Audio/Video to Blob (if exists)
+      // 2. Recorded Media
       let savedMedia = null;
-      if (recordedBlob) {
+      if (recordedBlob && recordedBlob.size > 0) {
         const isVideo = recordingMode === 'video';
-        const ext = isVideo ? 'webm' : (recordedBlob.type.includes('mp4') ? 'mp4' : 'webm');
-        const fileName = isVideo ? `video_${Date.now()}.${ext}` : `audio_${Date.now()}.${ext}`;
-        const mediaFile = new File([recordedBlob], fileName, { type: recordedBlob.type });
+        const type = recordedBlob.type;
+        let ext = isVideo ? 'webm' : 'webm';
+        if (type.includes('mp4')) ext = 'mp4';
+        else if (type.includes('wav')) ext = 'wav';
+        else if (type.includes('m4a')) ext = 'm4a';
+
+        const fileName = `${isVideo ? 'video' : 'audio'}_${Date.now()}.${ext}`;
+        const mediaFile = new File([recordedBlob], fileName, { type });
         savedMedia = await saveFile(mediaFile);
+        console.log('[저장] 미디어 저장 완료:', fileName, type);
       }
 
-      // 3. Save to presentation record
+      // 3. Register Presentation
       await addPresentation(selectedStudent.id, classId, {
         whiteboardImage: savedImage,
-        audioData: savedMedia // Reusing audioData field for audio/video URL
+        audioData: savedMedia,
+        recordingMode: recordingMode // Explicitly track mode
       });
 
-      showToast('발표 자료가 성공적으로 저장되었습니다! 🎉');
+      showToast('✨ 발표 자료가 성공적으로 저장되었습니다!');
       activeView = 'lesson';
       render();
     } catch (err) {
-      console.error(err);
-      showToast('저장 중 오류가 발생했습니다.', 'error');
+      console.error('[저장] 오류:', err);
+      showToast('저장 실패: ' + err.message, 'error');
     }
   }
 
@@ -803,31 +796,34 @@ export function renderLessonMode(container, params) {
             </div>
           ` : `
             <div class="grid" style="grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: var(--s-8);">
-              ${studentPresentations.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map(p => `
+              ${studentPresentations.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map(p => {
+                const isVideo = p.recordingMode === 'video';
+                return `
                 <div class="card presentation-card animate-up" style="padding: var(--s-4); position: relative;">
                   <div class="badge badge-main" style="position: absolute; top: 15px; left: 15px; z-index: 2;">
                     ${formatDate(p.createdAt)}
                   </div>
-                  <div class="presentation-media" style="background: #000; border-radius: var(--r-md); overflow: hidden; margin-bottom: var(--s-4);">
+                  <div class="presentation-media" style="background: #000; border-radius: var(--r-md); overflow: hidden; margin-bottom: var(--s-4); border: 2px solid var(--border-light);">
                     <img src="${p.whiteboardImage?.url}" style="width: 100%; aspect-ratio: 16/9; object-fit: contain;" />
+                    ${p.audioData ? `<div style="position: absolute; bottom: 100px; right: 20px; font-size: 2rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));">${isVideo ? '📹' : '🎙️'}</div>` : ''}
                   </div>
                   <div class="flex flex-col gap-sm">
                     ${p.audioData ? `
-                      <button class="btn btn-primary w-full play-video-btn" data-url="${p.audioData.url}">
-                        🎬 발표 영상 재생
+                      <button class="btn ${isVideo ? 'btn-primary' : 'btn-blue'} w-full play-video-btn" data-url="${p.audioData.url}" data-mode="${p.recordingMode}">
+                        ${isVideo ? '🎬 발표 영상 재생' : '🔊 발표 음성 듣기'}
                       </button>
                     ` : `
-                      <button class="btn btn-ghost w-full" disabled>영상 없음</button>
+                      <button class="btn btn-ghost w-full" disabled>기록 없음</button>
                     `}
-                    <button class="btn btn-secondary w-full" onclick="window.open('${p.whiteboardImage?.url}')">
-                      🖼️ 원본 이미지 보기
-                    </button>
-                    <button class="btn ${p.shared ? 'btn-danger' : 'btn-purple'} w-full btn-toggle-share" data-id="${p.id}" data-shared="${p.shared}">
-                      ${p.shared ? '👀 반 전체 공유 중 (끄기)' : '🙌 반 전체에 공유하기'}
-                    </button>
+                    <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 10px;">
+                      <button class="btn btn-secondary btn-sm" onclick="window.open('${p.whiteboardImage?.url}')">🖼️ 원본 이미지</button>
+                      <button class="btn ${p.shared ? 'btn-danger' : 'btn-purple'} btn-sm btn-toggle-share" data-id="${p.id}" data-shared="${p.shared}">
+                        ${p.shared ? '공유 끄기' : '전체 공유'}
+                      </button>
+                    </div>
                   </div>
                 </div>
-              `).join('')}
+              `;}).join('')}
             </div>
           `}
         </main>
