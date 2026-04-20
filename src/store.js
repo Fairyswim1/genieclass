@@ -521,13 +521,31 @@ export async function submitQuizSolution(quizId, studentId, studentName, solutio
 }
 
 export function listenToActiveQuiz(classId, callback) {
+    const QUIZ_EXPIRY_MS = 2 * 60 * 60 * 1000; // 2시간 후 자동 만료
     return onSnapshot(doc(db, COLLECTIONS.CLASSES, classId), async (docSnap) => {
         if (docSnap.exists()) {
             const data = docSnap.data();
             if (data.activeQuizId) {
                 const quizSnap = await getDoc(doc(db, COLLECTIONS.QUIZZES, data.activeQuizId));
                 if (quizSnap.exists()) {
-                    callback(quizSnap.data());
+                    const quiz = quizSnap.data();
+                    // 비활성 퀴즈 무시
+                    if (!quiz.active) {
+                        callback(null);
+                        return;
+                    }
+                    // 2시간 지난 퀴즈 자동 종료
+                    const elapsed = Date.now() - new Date(quiz.createdAt).getTime();
+                    if (elapsed > QUIZ_EXPIRY_MS) {
+                        console.log('[Quiz] 2시간 초과 퀴즈 자동 종료:', quiz.id);
+                        try {
+                            await updateDoc(doc(db, COLLECTIONS.QUIZZES, quiz.id), { active: false });
+                            await updateDoc(doc(db, COLLECTIONS.CLASSES, classId), { activeQuizId: '' });
+                        } catch (e) { console.error('[Quiz] 자동 종료 실패:', e); }
+                        callback(null);
+                        return;
+                    }
+                    callback(quiz);
                     return;
                 }
             }

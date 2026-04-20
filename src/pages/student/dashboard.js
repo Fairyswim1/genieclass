@@ -287,6 +287,8 @@ export function renderStudentDashboard(container) {
     if (unsubscribeQuiz) unsubscribeQuiz();
     unsubscribeQuiz = listenToActiveQuiz(student.classId, (quiz) => {
       if (quiz && quiz.active) {
+        // 학생이 이미 닫은 퀴즈는 다시 표시하지 않음
+        if (dismissedQuizIds.has(quiz.id)) return;
         if (!activeQuiz || activeQuiz.id !== quiz.id) {
           activeQuiz = quiz;
           showToast('⚡ 번개 퀴즈가 시작되었습니다!', 'info');
@@ -319,6 +321,9 @@ export function renderStudentDashboard(container) {
     });
   }
 
+  // Track dismissed quiz IDs so they don't reappear
+  let dismissedQuizIds = new Set();
+
   function renderQuizOverlay() {
     removeQuizOverlay();
     const overlay = document.createElement('div');
@@ -329,7 +334,10 @@ export function renderStudentDashboard(container) {
       <div class="modal-content animate-up" style="max-width: 1200px; width: 95%; height: 90vh; display: flex; flex-direction: column;">
         <div class="modal-header">
           <h2 class="modal-title">⚡ 실시간 번개 퀴즈</h2>
-          <div class="badge badge-purple">진행 중</div>
+          <div class="flex items-center gap-sm">
+            <div class="badge badge-purple">진행 중</div>
+            <button class="modal-close" id="btn-close-quiz-overlay" title="닫기">✕</button>
+          </div>
         </div>
         <div class="flex-1" style="display: grid; grid-template-columns: 1fr 340px; gap: 20px; overflow: hidden; padding: 10px 0;">
           <div style="overflow-y: auto; display: flex; flex-direction: column; gap: 20px;">
@@ -355,6 +363,15 @@ export function renderStudentDashboard(container) {
       </div>
     `;
     document.body.appendChild(overlay);
+
+    // 닫기 버튼: 현재 퀴즈를 무시 목록에 추가하고 오버레이 제거
+    overlay.querySelector('#btn-close-quiz-overlay').addEventListener('click', () => {
+      if (activeQuiz) {
+        dismissedQuizIds.add(activeQuiz.id);
+      }
+      activeQuiz = null;
+      removeQuizOverlay();
+    });
 
     overlay.querySelector('#quiz-solve-dropzone').addEventListener('click', () => overlay.querySelector('#quiz-solve-input').click());
     overlay.querySelector('#btn-submit-quiz-solve').addEventListener('click', async () => {
