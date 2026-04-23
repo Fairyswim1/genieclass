@@ -299,61 +299,210 @@ export function renderTeacherDashboard(container) {
   }
 
   async function openStudentManagement(classId) {
+    const cls = classes.find(c => c.id === classId);
+    if (!cls) return;
+
+    document.getElementById('manage-modal-title').textContent = `${cls.name} - 학생 관리`;
     const content = document.getElementById('student-manage-content');
-    async function refresh() {
+
+    async function renderStudentList() {
       const students = await getStudentsByClass(classId);
       content.innerHTML = `
-        <div class="tabs"><div class="tab active">학생 목록</div></div>
-        <table class="student-table" style="width:100%; border-collapse:collapse; margin-top:20px;">
-          <thead>
-            <tr style="border-bottom:2px solid var(--bg-main)">
-              <th align="left">이름</th>
-              <th align="left">아이디</th>
-              <th align="center">성장</th>
-              <th align="right">관리</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${students.map(s => `
-              <tr style="border-bottom:1px solid var(--bg-main)">
-                <td style="padding:12px 0;"><b>${s.name}</b><br/><small style="color:var(--primary)">${s.uniqueCode}</small></td>
-                <td>${s.loginId ? `<span class="badge badge-blue">ID: ${s.loginId}</span>` : '<span class="badge">미가입</span>'}</td>
-                <td align="center">${renderCharacter(s.characterLevel, 24, s.characterType, s.totalPoints)}</td>
-                <td align="right">
-                  <button class="btn btn-sm btn-ghost reset-btn" data-id="${s.id}">🔄</button>
-                  <button class="btn btn-sm btn-ghost pwd-btn" data-id="${s.id}" data-name="${s.name}">🔑</button>
-                  <button class="btn btn-sm btn-ghost del-btn" data-id="${s.id}" style="color:red">✕</button>
-                </td>
+        <div class="tabs">
+          <div class="tab active" data-tab="list">학생 목록</div>
+          <div class="tab" data-tab="add">학생 추가</div>
+          <div class="tab" data-tab="excel">엑셀 임포트</div>
+        </div>
+
+        <div id="tab-list">
+          <div class="flex justify-between items-center" style="margin-bottom:var(--s-4)">
+            <div style="color:var(--text-muted); font-size:0.9rem">전체 학생: <span style="font-weight:700; color:var(--primary)">${students.length}명</span></div>
+            <div class="flex gap-sm">
+              <button class="btn btn-secondary btn-sm" id="btn-export-excel">💾 엑셀 저장 (코드포함)</button>
+              <button class="btn btn-primary btn-sm" id="btn-go-to-add-tab">+ 학생 추가</button>
+            </div>
+          </div>
+          
+          <table class="student-table" style="width:100%; border-collapse:collapse;">
+            <thead>
+              <tr style="border-bottom:2px solid var(--bg-main)">
+                <th align="left" style="padding:10px 0">번호/이름</th>
+                <th align="left">아이디</th>
+                <th align="center">성장</th>
+                <th align="right">관리</th>
               </tr>
-            `).join('')}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              ${students.length === 0 ? `<tr><td colspan="4" align="center" style="padding:40px; color:var(--text-dim)">아직 등록된 학생이 없습니다.</td></tr>` : students.map(s => `
+                <tr style="border-bottom:1px solid var(--bg-main)">
+                  <td style="padding:12px 0;">
+                    <div style="font-size:0.75rem; color:var(--text-dim)">[${s.number || '-'}]</div>
+                    <b>${s.name}</b><br/>
+                    <small style="color:var(--primary); font-family:monospace">${s.uniqueCode}</small>
+                  </td>
+                  <td>${s.loginId ? `<span class="badge badge-blue">ID: ${s.loginId}</span>` : '<span class="badge">미가입</span>'}</td>
+                  <td align="center">${renderCharacter(s.characterLevel, 28, s.characterType, s.totalPoints)}</td>
+                  <td align="right">
+                    <div class="flex gap-xs justify-end">
+                      <button class="btn btn-sm btn-ghost reset-btn" data-id="${s.id}" title="계정 초기화">🔄</button>
+                      <button class="btn btn-sm btn-ghost pwd-btn" data-id="${s.id}" data-name="${s.name}" title="비번 변경">🔑</button>
+                      <button class="btn btn-sm btn-ghost del-btn" data-id="${s.id}" style="color:red" title="삭제">✕</button>
+                    </div>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+
+        <div id="tab-add" class="hidden">
+          <div style="display:flex; gap:10px; margin-bottom:20px;">
+            <div class="form-group" style="flex:0 0 80px">
+              <label class="input-label">번호</label>
+              <input type="text" class="input-field" id="add-student-number" placeholder="번호" />
+            </div>
+            <div class="form-group" style="flex:1">
+              <label class="input-label">이름 *</label>
+              <input type="text" class="input-field" id="add-student-name" placeholder="학생 이름을 입력하세요" />
+            </div>
+          </div>
+          <button class="btn btn-primary w-full" id="btn-add-single-student">학생 한 명 추가</button>
+          
+          <div style="margin: 30px 0; border-top: 1px solid var(--border-main); position: relative;">
+            <span style="position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: white; padding: 0 10px; color: var(--text-dim); font-size: 0.8rem;">또는 여러 명 한꺼번에 추가</span>
+          </div>
+          
+          <div class="form-group">
+            <label class="input-label">이름 목록 (줄바꿈으로 구분)</label>
+            <textarea class="input-field" id="add-students-batch" rows="5" placeholder="홍길동&#10;김철수&#10;이영희"></textarea>
+          </div>
+          <button class="btn btn-secondary w-full" id="btn-add-batch-students">학생 일괄 추가</button>
+        </div>
+
+        <div id="tab-excel" class="hidden">
+          <div style="margin-bottom:20px; padding:15px; background:var(--bg-main); border-radius:8px; font-size:0.85rem">
+            <div class="flex justify-between items-start">
+              <div>
+                <div style="font-weight:700; margin-bottom:4px">💡 엑셀 업로드 안내</div>
+                <div style="color:var(--text-secondary)">
+                  • 첫 줄에 '이름' 컬럼이 포함된 엑셀 파일을 업로드하세요.<br/>
+                  • '번호' 컬럼도 있으면 자동으로 인식합니다.
+                </div>
+              </div>
+              <button class="btn btn-outline btn-sm" id="btn-download-sample" style="border: 1px solid var(--primary); color: var(--primary);">📄 양식 받기</button>
+            </div>
+          </div>
+          <div class="drop-zone" id="excel-drop-zone" style="height:150px">
+            <div style="font-size:2rem">📄</div>
+            <div>여기로 엑셀 파일을 끌어오거나 클릭하세요</div>
+            <input type="file" id="excel-file-input" accept=".xlsx,.xls" class="hidden" />
+          </div>
+          <div id="excel-preview" class="hidden" style="margin-top:20px">
+            <div class="flex justify-between items-center" style="margin-bottom:10px">
+              <h4 style="margin:0">미리보기 (<span id="excel-count"></span>명)</h4>
+              <button class="btn btn-primary btn-sm" id="btn-import-excel">확인 및 추가</button>
+            </div>
+            <div id="excel-names-list" style="max-height:150px; overflow-y:auto; padding:10px; border:1px solid var(--border-main); border-radius:8px; display:flex; flex-wrap:wrap; gap:5px;"></div>
+          </div>
+        </div>
       `;
 
+      // Tab Events
+      content.querySelectorAll('.tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          content.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+          const target = tab.dataset.tab;
+          ['list', 'add', 'excel'].forEach(t => {
+            document.getElementById(`tab-${t}`).classList.toggle('hidden', t !== target);
+          });
+        });
+      });
+
+      // Actions
+      document.getElementById('btn-go-to-add-tab')?.addEventListener('click', () => {
+        content.querySelector('.tab[data-tab="add"]').click();
+      });
+
+      document.getElementById('btn-export-excel')?.addEventListener('click', () => {
+        exportStudentsToExcel(students, cls.name);
+      });
+
+      document.getElementById('btn-download-sample')?.addEventListener('click', () => {
+        downloadSampleExcel();
+      });
+
+      document.getElementById('btn-add-single-student')?.addEventListener('click', async () => {
+        const name = document.getElementById('add-student-name').value.trim();
+        const number = document.getElementById('add-student-number').value.trim();
+        if (!name) return showToast('이름을 입력하세요.', 'error');
+        await addStudent(name, classId, number);
+        showToast('추가되었습니다.');
+        renderStudentList();
+      });
+
+      document.getElementById('btn-add-batch-students')?.addEventListener('click', async () => {
+        const text = document.getElementById('add-students-batch').value;
+        const names = text.split('\n').map(n => n.trim()).filter(n => n);
+        if (names.length === 0) return showToast('이름을 입력하세요.', 'error');
+        await addStudentsBatch(names, classId);
+        showToast(`${names.length}명 추가되었습니다.`);
+        renderStudentList();
+      });
+
+      // Excel Logic
+      const dropZone = document.getElementById('excel-drop-zone');
+      const fileInput = document.getElementById('excel-file-input');
+      let pendingBatch = [];
+
+      dropZone?.addEventListener('click', () => fileInput.click());
+      fileInput?.addEventListener('change', async (e) => {
+        if (e.target.files[0]) {
+          try {
+            pendingBatch = await parseExcelFile(e.target.files[0]);
+            document.getElementById('excel-count').textContent = pendingBatch.length;
+            document.getElementById('excel-names-list').innerHTML = pendingBatch.map(s => `<span class="badge badge-blue">${s.name}</span>`).join('');
+            document.getElementById('excel-preview').classList.remove('hidden');
+          } catch (err) { showToast('파일 오류', 'error'); }
+        }
+      });
+
+      document.getElementById('btn-import-excel')?.addEventListener('click', async () => {
+        if (pendingBatch.length > 0) {
+          await addStudentsBatch(pendingBatch, classId);
+          showToast('임포트 완료');
+          renderStudentList();
+        }
+      });
+
+      // Account & Delete
       content.querySelectorAll('.reset-btn').forEach(btn => btn.addEventListener('click', async () => {
         if (confirm('계정을 초기화할까요?')) {
-            const { resetStudentAuth } = await import('../../store.js');
-            await resetStudentAuth(btn.dataset.id);
-            refresh();
+          const { resetStudentAuth } = await import('../../store.js');
+          await resetStudentAuth(btn.dataset.id);
+          renderStudentList();
         }
       }));
+
       content.querySelectorAll('.pwd-btn').forEach(btn => btn.addEventListener('click', async () => {
         const pw = prompt(`${btn.dataset.name} 학생의 새 비밀번호`);
         if (pw) {
-            const { updateStudentPassword } = await import('../../store.js');
-            await updateStudentPassword(btn.dataset.id, pw);
-            showToast('변경됨');
+          const { updateStudentPassword } = await import('../../store.js');
+          await updateStudentPassword(btn.dataset.id, pw);
+          showToast('비번 변경됨');
         }
       }));
+
       content.querySelectorAll('.del-btn').forEach(btn => btn.addEventListener('click', async () => {
-        if (confirm('학생을 삭제할까요?')) {
-            const { deleteStudent } = await import('../../store.js');
-            await deleteStudent(btn.dataset.id);
-            refresh();
+        if (confirm('정말 삭제하시겠습니까?')) {
+          const { deleteStudent } = await import('../../store.js');
+          await deleteStudent(btn.dataset.id);
+          renderStudentList();
         }
       }));
     }
-    await refresh();
+
+    await renderStudentList();
     openModal('student-manage-modal');
   }
 
