@@ -686,7 +686,6 @@ export function renderAssignMode(container, params) {
     `;
     document.head.appendChild(style);
   }
-}
 
   async function handleBulkDownload(assignmentId, assignmentTitle) {
     try {
