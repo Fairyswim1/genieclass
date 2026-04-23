@@ -150,8 +150,20 @@
     gap: var(--s-12);
 }
 
+.student-grid-73 {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: var(--s-12);
+}
+
+.student-grid-37 {
+    display: grid;
+    grid-template-columns: 1fr 2.5fr;
+    gap: var(--s-12);
+}
+
 @media (max-width: 1200px) {
-    .student-grid {
+    .student-grid, .student-grid-73, .student-grid-37 {
         grid-template-columns: 1fr;
     }
 }

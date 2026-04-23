@@ -127,7 +127,7 @@ export function renderStudentDashboard(container) {
               </div>
             </div>
           </section>
-          <div class="student-grid">
+          <div class="student-grid-73">
             <!-- Assignments & Records -->
             <div class="flex flex-col gap-lg">
               <div class="section-card card">
@@ -192,7 +192,7 @@ export function renderStudentDashboard(container) {
             </div>
           </div>
 
-          <div class="student-grid" style="margin-top: var(--s-12);">
+          <div class="student-grid-37" style="margin-top: var(--s-12);">
             <!-- My Presentations -->
             <div class="section-card card">
               <div class="section-card-header">
