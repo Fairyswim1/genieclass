@@ -6,7 +6,7 @@ import {
   createClass, getStudentsByClass, deleteClass, addStudent,
   addStudentsBatch, showToast, formatDate
 } from '../../store.js';
-import { parseExcelFile } from '../../utils/excelImport.js';
+import { parseExcelFile, downloadSampleExcel, exportStudentsToExcel } from '../../utils/excelImport.js';
 import { renderCharacter } from '../../components/characterAvatar.js';
 
 export function renderTeacherDashboard(container) {
@@ -278,6 +278,13 @@ export function renderTeacherDashboard(container) {
         </div>
 
         <div id="tab-list">
+          <div class="flex justify-between items-center" style="margin-bottom:var(--s-4)">
+            <div style="color:var(--text-muted); font-size:0.9rem">전체 학생: <span style="font-weight:700; color:var(--primary)">${students.length}명</span></div>
+            <div class="flex gap-sm">
+              <button class="btn btn-secondary btn-sm" id="btn-export-excel">💾 엑셀 저장 (코드포함)</button>
+              <button class="btn btn-primary btn-sm" id="btn-go-to-add-tab">+ 학생 추가</button>
+            </div>
+          </div>
           ${students.length === 0 ? `
             <div class="empty-state">
               <div class="empty-state-icon">👤</div>
@@ -338,11 +345,16 @@ export function renderTeacherDashboard(container) {
 
         <div id="tab-excel" class="hidden">
           <div style="margin-bottom:var(--space-md); padding:var(--space-md); background:var(--bg-body); border-radius:var(--radius-md); font-size:0.85rem">
-            <div style="font-weight:600; margin-bottom:4px">💡 엑셀 파일 형식</div>
-            <div style="color:var(--text-secondary)">
-              • 첫 줄은 제목(헤더)이어야 합니다.<br/>
-              • <span style="font-weight:600; color:var(--primary-light)">'이름'</span> 컬럼은 필수입니다.<br/>
-              • <span style="font-weight:600">'번호'</span> 컬럼은 선택사항입니다.
+            <div class="flex justify-between items-start">
+              <div>
+                <div style="font-weight:600; margin-bottom:4px">💡 엑셀 파일 형식</div>
+                <div style="color:var(--text-secondary)">
+                  • 첫 줄은 제목(헤더)이어야 합니다.<br/>
+                  • <span style="font-weight:600; color:var(--primary-light)">'이름'</span> 컬럼은 필수입니다.<br/>
+                  • <span style="font-weight:600">'번호'</span> 컬럼은 선택사항입니다.
+                </div>
+              </div>
+              <button class="btn btn-outline btn-sm" id="btn-download-sample" style="border: 1px solid var(--primary); color: var(--primary); padding: 4px 10px;">📄 예시 다운로드</button>
             </div>
           </div>
           <div class="drop-zone" id="excel-drop-zone">
@@ -362,15 +374,30 @@ export function renderTeacherDashboard(container) {
         </div>
       `;
 
-      // Tab switching
-      content.querySelectorAll('.tab').forEach(tab => {
-        tab.addEventListener('click', () => {
-          content.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-          tab.classList.add('active');
-          ['list', 'add', 'excel'].forEach(t => {
-            document.getElementById(`tab-${t}`).classList.toggle('hidden', t !== tab.dataset.tab);
-          });
+      // Tab switching function
+      function switchTab(tabName) {
+        content.querySelectorAll('.tab').forEach(t => {
+          const isActive = t.dataset.tab === tabName;
+          t.classList.toggle('active', isActive);
+          document.getElementById(`tab-${t.dataset.tab}`).classList.toggle('hidden', !isActive);
         });
+      }
+
+      content.querySelectorAll('.tab').forEach(tab => {
+        tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+      });
+
+      // Export/Add helpers
+      document.getElementById('btn-export-excel')?.addEventListener('click', () => {
+        exportStudentsToExcel(students, cls.name);
+      });
+
+      document.getElementById('btn-go-to-add-tab')?.addEventListener('click', () => {
+        switchTab('add');
+      });
+
+      document.getElementById('btn-download-sample')?.addEventListener('click', () => {
+        downloadSampleExcel();
       });
 
       // Add single student

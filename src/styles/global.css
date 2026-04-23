@@ -553,7 +553,11 @@ body {
   padding: var(--s-12);
   width: 90%;
   max-width: 600px;
+  max-height: 90vh;
   box-shadow: var(--shadow-xl);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .modal-header {
@@ -561,6 +565,23 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-shrink: 0;
+}
+
+#student-manage-content, 
+#create-class-form,
+.modal-body {
+  overflow-y: auto;
+  padding-right: var(--s-2);
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+#student-manage-content::-webkit-scrollbar {
+  width: 6px;
+}
+#student-manage-content::-webkit-scrollbar-thumb {
+  background: var(--border-main);
+  border-radius: 10px;
 }
 
 .modal-title {

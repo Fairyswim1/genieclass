@@ -56,3 +56,35 @@ export function parseExcelFile(file) {
         reader.readAsArrayBuffer(file);
     });
 }
+
+export function downloadSampleExcel() {
+    const data = [
+        ['번호', '이름'],
+        [1, '김철수'],
+        [2, '이영희'],
+        [3, '박민수']
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "학생_명단_예시");
+    XLSX.writeFile(wb, "지니클래스_학생관리_예시.xlsx");
+}
+
+export function exportStudentsToExcel(students, className) {
+    const data = [
+        ['번호', '이름', '고유로그인코드', '레벨', '현재포인트']
+    ];
+    students.forEach(s => {
+        data.push([
+            s.number || '-',
+            s.name,
+            s.uniqueCode,
+            `Lv.${s.characterLevel}`,
+            s.totalPoints
+        ]);
+    });
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "학생명단");
+    XLSX.writeFile(wb, `${className}_학생명단_코드.xlsx`);
+}
