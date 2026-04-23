@@ -318,7 +318,7 @@ export function renderLessonMode(container, params) {
             <input type="range" id="pen-size-slider" min="1" max="10" value="${penSize}" style="width: 80px; accent-color: var(--primary);">
           </div>
           <button class="btn ${isRecording ? 'btn-danger' : 'btn-primary'} btn-sm" id="wb-record">
-            ${isRecording ? '⏹ 중지' : '🎙 녹음'}
+            ${isRecording ? '⏹ 중지' : '📽️ 발표 녹화'}
           </button>
           <button class="btn btn-secondary btn-sm" id="wb-save">💾 저장</button>
         </div>
@@ -408,21 +408,28 @@ export function renderLessonMode(container, params) {
 
     const startDrawing = (e) => {
       e.preventDefault();
-      if (e.button !== undefined && e.button !== 0) return;
+      e.stopPropagation();
+      // 마우스 우클릭만 차단 (터치는 button이 0이므로 통과)
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
       drawing = true;
       
       const pos = getPos(e);
       const pressure = e.pointerType === 'pen' && e.pressure ? e.pressure : 0.5;
       currentPoints = [[pos.x, pos.y, pressure]];
       
-      wbCanvas.setPointerCapture(e.pointerId);
+      // Android WebView에서 setPointerCapture가 불안정하므로 try-catch
+      try { wbCanvas.setPointerCapture(e.pointerId); } catch(err) {}
     };
 
     const moveDrawing = (e) => {
       e.preventDefault();
+      e.stopPropagation();
       if (!drawing) return;
       
-      const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+      // getCoalescedEvents는 Android WebView에서 지원 안 될 수 있으므로 안전하게 처리
+      let events;
+      try { events = e.getCoalescedEvents ? e.getCoalescedEvents() : null; } catch(err) { events = null; }
+      if (!events || events.length === 0) events = [e];
       for (const ev of events) {
         const pos = getPos(ev);
         const pressure = ev.pointerType === 'pen' && ev.pressure ? ev.pressure : 0.5;
@@ -477,6 +484,7 @@ export function renderLessonMode(container, params) {
 
     const stopDrawing = (e) => {
       e.preventDefault();
+      e.stopPropagation();
       if (!drawing) return;
       
       const pos = getPos(e);
@@ -500,13 +508,89 @@ export function renderLessonMode(container, params) {
       
       drawing = false;
       currentPoints = [];
-      wbCanvas.releasePointerCapture(e.pointerId);
+      try { wbCanvas.releasePointerCapture(e.pointerId); } catch(err) {}
     };
 
+    // Pointer Events (기본)
     wbCanvas.addEventListener('pointerdown', startDrawing);
     wbCanvas.addEventListener('pointermove', moveDrawing);
     wbCanvas.addEventListener('pointerup', stopDrawing);
     wbCanvas.addEventListener('pointercancel', stopDrawing);
+
+    // Touch Events 폴백 (Android WebView에서 포인터 이벤트가 실패할 경우 대비)
+    const getTouchPos = (touch) => {
+      const rect = wbCanvas.getBoundingClientRect();
+      return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+    };
+    wbCanvas.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      if (drawing) return; // 이미 pointer로 처리 중이면 무시
+      const touch = e.touches[0];
+      const pos = getTouchPos(touch);
+      drawing = true;
+      currentPoints = [[pos.x, pos.y, 0.5]];
+    }, { passive: false });
+    wbCanvas.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      if (!drawing) return;
+      const touch = e.touches[0];
+      const pos = getTouchPos(touch);
+      currentPoints.push([pos.x, pos.y, 0.5]);
+      // 펜/지우개 로직 재사용
+      if (currentPoints.length < 2) return;
+      const isEraser = currentTool === 'eraser';
+      if (isEraser) {
+        const size = penSize * 15;
+        wbCtx.save();
+        wbCtx.globalCompositeOperation = 'destination-out';
+        wbCtx.lineWidth = size;
+        wbCtx.beginPath();
+        const p1 = currentPoints[currentPoints.length - 2];
+        const p2 = currentPoints[currentPoints.length - 1];
+        wbCtx.moveTo(p1[0], p1[1]);
+        wbCtx.lineTo(p2[0], p2[1]);
+        wbCtx.stroke();
+        wbCtx.restore();
+      } else {
+        const strokeSize = penSize * 2.5;
+        const strokePolygon = getStroke(currentPoints, {
+          size: strokeSize, thinning: 0.5, smoothing: 0.5, streamline: 0.5,
+          simulatePressure: true
+        });
+        const pathData = getSvgPathFromStroke(strokePolygon);
+        if (pathData) {
+          const path = new Path2D(pathData);
+          draftCtx.save();
+          draftCtx.setTransform(1, 0, 0, 1, 0, 0);
+          draftCtx.clearRect(0, 0, draftCanvas.width, draftCanvas.height);
+          draftCtx.restore();
+          draftCtx.save();
+          draftCtx.fillStyle = penColor;
+          draftCtx.fill(path);
+          draftCtx.restore();
+        }
+      }
+    }, { passive: false });
+    wbCanvas.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      if (!drawing) return;
+      if (currentTool === 'pen') {
+        wbCtx.save();
+        wbCtx.setTransform(1, 0, 0, 1, 0, 0);
+        wbCtx.drawImage(draftCanvas, 0, 0);
+        wbCtx.restore();
+        draftCtx.save();
+        draftCtx.setTransform(1, 0, 0, 1, 0, 0);
+        draftCtx.clearRect(0, 0, draftCanvas.width, draftCanvas.height);
+        draftCtx.restore();
+      }
+      drawing = false;
+      currentPoints = [];
+    }, { passive: false });
+    wbCanvas.addEventListener('touchcancel', (e) => {
+      drawing = false;
+      currentPoints = [];
+    }, { passive: false });
   }
 
   function bindWhiteboardEvents() {
@@ -581,13 +665,31 @@ export function renderLessonMode(container, params) {
         if (hasMediaDevices && hasMediaRecorder) {
           try {
             console.log('[녹음] 오디오 스트림 요청...');
-            const audioStream = await navigator.mediaDevices.getUserMedia({
+            const rawAudioStream = await navigator.mediaDevices.getUserMedia({
               audio: {
                 echoCancellation: true,
                 noiseSuppression: true,
-                autoGainControl: true
+                autoGainControl: true,
+                channelCount: 1,
+                sampleRate: 44100
               }
             });
+
+            // Web Audio API로 마이크 볼륨 증폭 (3배)
+            let audioStream = rawAudioStream;
+            try {
+              const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+              const source = audioContext.createMediaStreamSource(rawAudioStream);
+              const gainNode = audioContext.createGain();
+              gainNode.gain.value = 3.0; // 볼륨 3배 증폭
+              const dest = audioContext.createMediaStreamDestination();
+              source.connect(gainNode);
+              gainNode.connect(dest);
+              audioStream = dest.stream;
+              console.log('[녹음] 오디오 볼륨 증폭 적용 (3x)');
+            } catch (gainErr) {
+              console.warn('[녹음] Web Audio API 증폭 실패, 원본 오디오 사용:', gainErr);
+            }
 
             // Setup Mirror Canvas
             recordingCanvas = document.createElement('canvas');
@@ -652,19 +754,18 @@ export function renderLessonMode(container, params) {
             console.log(`[녹음] 완료: mode=${recordingMode}, size=${recordedBlob.size}`);
           };
 
-          mediaRecorder.start(1000);
+          mediaRecorder.start(200); // 200ms 청크로 딜레이 최소화
           isRecording = true;
           
           if (recordingMode === 'video') {
-            // Start mirror loop
             renderRecordingFrame();
-            showToast('📹 화면과 음성 녹화를 시작합니다.');
+            showToast('📹 발표 녹화를 시작합니다. (화면+음성)');
           } else {
-            showToast('🎙 음성 녹음을 시작합니다.');
+            showToast('🎙 오디오 녹음을 시작합니다.');
           }
           updateWhiteboardUI();
         } else {
-          showToast('이 기기에서는 녹음 기능을 사용할 수 없습니다.', 'error');
+          showToast('이 기기에서는 녹화/녹음 기능을 시작할 수 없습니다.', 'error');
         }
 
       } catch (err) {
@@ -766,7 +867,7 @@ export function renderLessonMode(container, params) {
     // Update Record Button
     const recordBtn = document.getElementById('wb-record');
     if (recordBtn) {
-      recordBtn.innerHTML = isRecording ? '⏹ 중지' : '🎙 녹음';
+      recordBtn.innerHTML = isRecording ? '⏹ 중지' : '📽️ 발표 녹화';
       recordBtn.className = `btn ${isRecording ? 'btn-danger' : 'btn-primary'} btn-sm`;
     }
     

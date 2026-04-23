@@ -117,7 +117,10 @@ export function renderStudentDashboard(container) {
             <div class="flex-1">
               <div class="flex justify-between items-end" style="margin-bottom: var(--s-2);">
                 <span style="font-family: var(--font-title); font-size: 1.2rem;">${config.emoji} ${config.name}</span>
-                <span style="font-family: var(--font-hand); font-size: 1.2rem;">${progress.isMaxLevel ? '최고 레벨 도달! 🎉' : `다음 레벨까지 ${progress.remainingPoints}P 남음`}</span>
+                <div class="flex items-center gap-sm">
+                  <span style="font-family: var(--font-hand); font-size: 1.2rem;">${progress.isMaxLevel ? '최고 레벨 도달! 🎉' : `다음 레벨까지 ${progress.remainingPoints}P 남음`}</span>
+                  <button class="btn btn-ghost btn-sm" id="btn-change-character" style="font-size: 0.8rem; padding: 4px 10px; border: 1px solid var(--border-subtle); border-radius: var(--r-md);">🔄 열매 변경</button>
+                </div>
               </div>
               <div style="background: var(--bg-main); height: 14px; border-radius: 7px; overflow: hidden; border: 2px solid var(--border-main);">
                 <div style="width: ${progress.progressPercent}%; height: 100%; background: var(--primary); transition: width 0.5s;"></div>
@@ -205,8 +208,10 @@ export function renderStudentDashboard(container) {
                      </div>
                      <img src="${p.whiteboardImage?.url}" style="width:100%; aspect-ratio: 16/9; object-fit: contain; background: #000; border-radius: 4px; margin-bottom: 5px; cursor:pointer;" class="img-preview" onclick="window.open('${p.whiteboardImage?.url}')"/>
                      ${p.audioData ? `
-                       <button class="btn btn-secondary w-full btn-sm btn-play-video" data-url="${p.audioData.url}">🎬 발표 영상 보기</button>
-                     ` : `<button class="btn btn-ghost w-full btn-sm" disabled>영상 없음</button>`}
+                       <button class="btn btn-secondary w-full btn-sm btn-play-video" data-url="${p.audioData.url}">
+                         ${p.recordingMode === 'video' ? '🎬 발표 영상 보기' : '🔊 발표 음성 듣기'}
+                       </button>
+                     ` : `<button class="btn btn-ghost w-full btn-sm" disabled>기록 없음</button>`}
                    </div>
                  `).join('')}
               </div>
@@ -228,7 +233,9 @@ export function renderStudentDashboard(container) {
                      <div class="flex items-center gap-sm">
                         <span style="font-size: 0.85rem; color: var(--text-dim); margin-right: 10px;">${formatDate(p.createdAt)}</span>
                         ${p.audioData ? `
-                          <button class="btn btn-secondary btn-sm btn-play-video" data-url="${p.audioData.url}">🎬 영상보기</button>
+                          <button class="btn btn-secondary btn-sm btn-play-video" data-url="${p.audioData.url}">
+                            ${p.recordingMode === 'video' ? '🎬 영상보기' : '🔊 음성듣기'}
+                          </button>
                         ` : `
                           <button class="btn btn-ghost btn-sm" onclick="window.open('${p.whiteboardImage?.url}')">🖼️ 보기</button>
                         `}
@@ -252,32 +259,44 @@ export function renderStudentDashboard(container) {
         </div>
       </div>
 
-      <!-- Character Selection Modal -->
-      ${!freshStudent.characterType ? `
-        <div id="selection-modal" class="modal-backdrop active" style="z-index: 1000;">
-          <div class="modal-content animate-up" style="max-width: 500px; text-align: center; background: var(--bg-card);">
-            <h2 class="modal-title" style="margin-bottom: var(--s-4); font-family: var(--font-title);">🌱 나만의 반려 식물 고르기</h2>
-            <p style="color: var(--text-muted); margin-bottom: var(--s-8); font-family: var(--font-sans);">함께 성장할 단짝 식물을 선택해봐요!</p>
-            <div class="grid" style="grid-template-columns: 1fr 1fr; gap: var(--s-4); margin-bottom: var(--s-8);">
-              ${Object.entries(PLANT_TYPES).map(([id, info]) => `
-                <div class="card selection-card" data-type="${id}" style="cursor: pointer; padding: var(--s-6); transition: all 0.3s var(--ease-out); border: 2px solid var(--border-main);">
-                  <div style="font-size: 3rem; margin-bottom: 10px;">${info.icon}</div>
-                  <div style="font-family: var(--font-title); font-size: 1.2rem;">${info.name}</div>
-                </div>
-              `).join('')}
-            </div>
-            <button class="btn btn-primary btn-lg w-full" id="btn-confirm-selection" disabled>이 식물로 할래요!</button>
+      <!-- Character Selection Modal (shown on first login OR when changing) -->
+      <div id="selection-modal" class="modal-backdrop ${!freshStudent.characterType ? 'active' : ''}" style="z-index: 1000;">
+        <div class="modal-content animate-up" style="max-width: 700px; text-align: center; background: var(--bg-card); max-height: 90vh; overflow-y: auto;">
+          <h2 class="modal-title" style="margin-bottom: var(--s-4); font-family: var(--font-title);">🌱 나만의 반려 식물 고르기</h2>
+          <p style="color: var(--text-muted); margin-bottom: var(--s-6); font-family: var(--font-sans);">${freshStudent.characterType ? '새로운 단짝 식물을 골라보세요!' : '함께 성장할 단짝 식물을 선택해봐요!'}</p>
+          <div class="grid" style="grid-template-columns: repeat(5, 1fr); gap: var(--s-3); margin-bottom: var(--s-6);">
+            ${Object.entries(PLANT_TYPES).map(([id, info]) => `
+              <div class="card selection-card ${freshStudent.characterType === id ? 'current' : ''}" data-type="${id}" style="cursor: pointer; padding: var(--s-3) var(--s-2); transition: all 0.3s var(--ease-out); border: 2px solid var(--border-main); min-width: 0;">
+                <div style="font-size: 2rem; margin-bottom: 4px;">${info.icon}</div>
+                <div style="font-family: var(--font-title); font-size: 0.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${info.name}</div>
+              </div>
+            `).join('')}
+          </div>
+          <div class="flex gap-sm">
+            ${freshStudent.characterType ? '<button class="btn btn-ghost btn-lg flex-1" id="btn-cancel-selection">취소</button>' : ''}
+            <button class="btn btn-primary btn-lg ${freshStudent.characterType ? 'flex-1' : 'w-full'}" id="btn-confirm-selection" disabled>이 식물로 할래요!</button>
           </div>
         </div>
-        <style>
-          .selection-card.selected {
-            border-color: var(--primary) !important;
-            background: #FFFDFC !important;
-            transform: scale(1.05);
-            box-shadow: var(--shadow-lg);
-          }
-        </style>
-      ` : ''}
+      </div>
+      <style>
+        .selection-card.selected {
+          border-color: var(--primary) !important;
+          background: #FFFDFC !important;
+          transform: scale(1.05);
+          box-shadow: var(--shadow-lg);
+        }
+        .selection-card.current {
+          border-color: var(--text-dim) !important;
+          opacity: 0.6;
+        }
+        .selection-card.current::after {
+          content: '현재';
+          display: block;
+          font-size: 0.65rem;
+          color: var(--text-dim);
+          margin-top: 2px;
+        }
+      </style>
     `;
 
     bindEvents(assignments, freshStudent);
@@ -445,6 +464,7 @@ export function renderStudentDashboard(container) {
     if (modal) {
       let selectedType = null;
       const confirmBtn = document.getElementById('btn-confirm-selection');
+      const cancelBtn = document.getElementById('btn-cancel-selection');
       
       modal.querySelectorAll('.selection-card').forEach(card => {
         card.addEventListener('click', () => {
@@ -453,6 +473,10 @@ export function renderStudentDashboard(container) {
           selectedType = card.dataset.type;
           confirmBtn.disabled = false;
         });
+      });
+
+      cancelBtn?.addEventListener('click', () => {
+        modal.classList.remove('active');
       });
 
       confirmBtn.addEventListener('click', async () => {
@@ -466,6 +490,12 @@ export function renderStudentDashboard(container) {
         }
       });
     }
+
+    // Change Character Button
+    document.getElementById('btn-change-character')?.addEventListener('click', () => {
+      const modal = document.getElementById('selection-modal');
+      if (modal) modal.classList.add('active');
+    });
 
     document.getElementById('btn-student-logout')?.addEventListener('click', () => {
       logoutStudent(); if (unsubscribeQuiz) unsubscribeQuiz(); window.location.hash = '/student/login';
