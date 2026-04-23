@@ -133,7 +133,7 @@ export function renderStudentDashboard(container) {
               <div class="section-card card">
                 <div class="section-card-header">
                   <span style="font-size: 1.2rem;">📝</span>
-                  <h2 class="section-card-title">오늘의 과제</h2>
+                  <h2 class="section-card-title">과제 목록</h2>
                 </div>
                 <div class="flex flex-col gap-sm">
                   ${assignments.length === 0 ? '<p class="text-center" style="color: var(--text-dim); padding: 20px;">출제된 과제가 없습니다.</p>' : assignments.map(a => {
