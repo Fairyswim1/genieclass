@@ -132,10 +132,10 @@ export function renderStudentLogin(container) {
         if (loginId.length < 4) return;
         
         idCheckTimeout = setTimeout(async () => {
-            const exists = await checkLoginIdExists(loginId);
-            if (exists) {
+            const check = await checkLoginIdExists(loginId);
+            if (check.exists) {
                 idError.classList.remove('hidden');
-                idError.textContent = '이미 누군가 사용 중인 아이디입니다.';
+                idError.textContent = `이미 '${check.name}' 학생이 사용 중인 아이디입니다.`;
                 idError.style.color = 'var(--red)';
             } else {
                 idError.classList.remove('hidden');
@@ -198,10 +198,12 @@ export function renderStudentLogin(container) {
           if (password !== confirmPw) { showToast('비밀번호가 일치하지 않습니다.', 'error'); return; }
 
           isLoading = true; render();
-          const exists = await checkLoginIdExists(loginId);
-          if (exists) {
+          const check = await checkLoginIdExists(loginId);
+          if (check.exists) {
             isLoading = false; render();
-            document.getElementById('setup-id-error')?.classList.remove('hidden');
+            const errorEl = document.getElementById('setup-id-error');
+            errorEl.textContent = `이미 '${check.name}' 학생이 사용 중인 아이디입니다.`;
+            errorEl.classList.remove('hidden');
             loginIdInput.focus();
             showToast('이미 존재하는 아이디입니다.', 'error');
             return;

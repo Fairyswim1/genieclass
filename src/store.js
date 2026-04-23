@@ -229,7 +229,11 @@ export async function checkLoginIdExists(loginId) {
     if (!loginId || loginId.trim() === '') return false;
     const q = query(collection(db, COLLECTIONS.STUDENTS), where('loginId', '==', loginId.trim()));
     const snapshot = await getDocs(q);
-    return !snapshot.empty;
+    if (!snapshot.empty) {
+        const data = snapshot.docs[0].data();
+        return { exists: true, name: data.name, classId: data.classId };
+    }
+    return { exists: false };
 }
 
 export async function setupStudentAuth(studentId, loginId, password) {
