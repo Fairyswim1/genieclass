@@ -63,9 +63,9 @@ export function renderTeacherDashboard(container) {
         <!-- Main Content -->
         <main class="main-content">
           <div style="max-width: 1600px; margin: 0 auto;">
-            <div class="dashboard-header animate-fade-in-down">
+          <div class="dashboard-header animate-fade-in-down">
             <h1 class="dashboard-greeting">안녕하세요, <span>${teacher.displayName || '선생님'}</span> 선생님! 👋</h1>
-            <p class="dashboard-subtitle">오늘도 좋은 수업 되세요</p>
+            <p class="dashboard-subtitle">오늘도 좋은 수업 되세요 <span style="font-size: 0.7rem; opacity: 0.4;">v1.1.0</span></p>
           </div>
 
           <div class="section-header">
