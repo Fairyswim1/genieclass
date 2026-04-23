@@ -73,12 +73,14 @@ export function renderTeacherDashboard(container) {
             <button class="btn btn-primary btn-sm" id="btn-add-class">+ 새 클래스</button>
           </div>
 
-          <div class="class-grid stagger-children">
+          <div class="class-grid stagger-children" id="class-grid-container">
             ${await Promise.all(classes.map(async cls => {
       const students = await getStudentsByClass(cls.id);
       return `
-                <div class="card card-clickable class-card" data-class-id="${cls.id}">
-                  <div class="class-card-banner" style="background:${cls.color}"></div>
+                <div class="card card-clickable class-card" data-class-id="${cls.id}" draggable="true">
+                  <div class="class-card-banner" style="background:${cls.color}">
+                    <button class="btn-edit-color" data-class-id="${cls.id}" title="색상 변경">🎨</button>
+                  </div>
                   <div class="class-card-body">
                     <div class="class-card-name">${cls.name}</div>
                     <div class="class-card-info">
@@ -98,6 +100,22 @@ export function renderTeacherDashboard(container) {
               <span>새 클래스 만들기</span>
             </div>
           </div>
+          <style>
+            .class-card-banner { position: relative; }
+            .btn-edit-color {
+              position: absolute; top: 8px; right: 8px;
+              width: 30px; height: 30px; border-radius: 50%;
+              background: rgba(255,255,255,0.2); backdrop-filter: blur(4px);
+              border: none; color: white; cursor: pointer;
+              display: flex; align-items: center; justify-content: center;
+              transition: all 0.2s; opacity: 0;
+            }
+            .class-card:hover .btn-edit-color { opacity: 1; }
+            .btn-edit-color:hover { background: rgba(255,255,255,0.4); transform: scale(1.1); }
+            
+            .class-card.dragging { opacity: 0.5; transform: scale(0.95); }
+            .class-card.drag-over { border: 2px dashed var(--primary); }
+          </style>
           </div>
         </main>
       </div>
@@ -138,7 +156,67 @@ export function renderTeacherDashboard(container) {
       </div>
     `;
 
-    bindEvents();
+  const PRESET_COLORS = [
+    'linear-gradient(135deg, #4F46E5, #818CF8)', // Indigo
+    'linear-gradient(135deg, #0D9488, #2DD4BF)', // Teal
+    'linear-gradient(135deg, #7C3AED, #A78BFA)', // Violet
+    'linear-gradient(135deg, #DB2777, #F472B6)', // Pink
+    'linear-gradient(135deg, #2563EB, #60A5FA)', // Blue
+    'linear-gradient(135deg, #059669, #34D399)', // Green
+    'linear-gradient(135deg, #D97706, #FBBF24)', // Amber
+    'linear-gradient(135deg, #EA580C, #FB923C)', // Orange
+    'linear-gradient(135deg, #334155, #94a3b8)', // Slate
+    'linear-gradient(135deg, #78350f, #D97706)', // Brown
+  ];
+
+  function openColorPicker(classId, currentColor) {
+    const existing = document.getElementById('color-picker-modal');
+    if (existing) existing.remove();
+
+    const picker = document.createElement('div');
+    picker.id = 'color-picker-modal';
+    picker.className = 'modal-backdrop active';
+    picker.innerHTML = `
+      <div class="modal-content" style="max-width: 400px; text-align: center;">
+        <h3 class="modal-title" style="margin-bottom: var(--s-6);">🎨 클래스 색상 변경</h3>
+        <div class="grid" style="grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: var(--s-8);">
+          ${PRESET_COLORS.map(color => `
+            <div class="color-swatch ${color === currentColor ? 'selected' : ''}" 
+                 data-color="${color}" 
+                 style="background: ${color}; width: 100%; aspect-ratio: 1; border-radius: 8px; cursor: pointer; border: 3px solid transparent;">
+            </div>
+          `).join('')}
+        </div>
+        <div class="flex gap-sm">
+          <button class="btn btn-ghost flex-1" id="btn-close-picker">취소</button>
+          <button class="btn btn-primary flex-1" id="btn-save-color" disabled>변경하기</button>
+        </div>
+      </div>
+      <style>
+        .color-swatch.selected { border-color: var(--primary) !important; transform: scale(1.1); }
+        .color-swatch:hover { transform: scale(1.1); }
+      </style>
+    `;
+    document.body.appendChild(picker);
+
+    let selectedColor = currentColor;
+    picker.querySelectorAll('.color-swatch').forEach(sw => {
+      sw.addEventListener('click', () => {
+        picker.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+        sw.classList.add('selected');
+        selectedColor = sw.dataset.color;
+        document.getElementById('btn-save-color').disabled = false;
+      });
+    });
+
+    document.getElementById('btn-close-picker').addEventListener('click', () => picker.remove());
+    document.getElementById('btn-save-color').addEventListener('click', async () => {
+      const { updateClassColor } = await import('../../store.js');
+      await updateClassColor(classId, selectedColor);
+      showToast('클래스 색상이 변경되었습니다.');
+      picker.remove();
+      render();
+    });
   }
 
   function bindEvents() {
@@ -220,6 +298,70 @@ export function renderTeacherDashboard(container) {
         openModeSelection(card.dataset.classId);
       });
     });
+
+    // Color edit
+    document.querySelectorAll('.btn-edit-color').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const cls = classes.find(c => c.id === btn.dataset.classId);
+        openColorPicker(cls.id, cls.color);
+      });
+    });
+
+    // Drag and drop for reordering
+    const containerGrid = document.getElementById('class-grid-container');
+    const draggables = containerGrid.querySelectorAll('.class-card[draggable="true"]');
+    
+    draggables.forEach(draggable => {
+      draggable.addEventListener('dragstart', () => {
+        draggable.classList.add('dragging');
+      });
+
+      draggable.addEventListener('dragend', async () => {
+        draggable.classList.remove('dragging');
+        
+        // Save new order
+        const newOrderCards = [...containerGrid.querySelectorAll('.class-card')];
+        const newOrderData = newOrderCards.map((card, index) => ({
+          id: card.dataset.classId,
+          order: index
+        }));
+        
+        const { updateClassOrder } = await import('../../store.js');
+        await updateClassOrder(newOrderData);
+        showToast('클래스 순서가 저장되었습니다.');
+      });
+
+      draggable.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        const afterElement = getDragAfterElement(containerGrid, e.clientX, e.clientY);
+        const dragging = document.querySelector('.dragging');
+        if (afterElement == null) {
+          containerGrid.insertBefore(dragging, document.getElementById('add-class-card'));
+        } else {
+          containerGrid.insertBefore(dragging, afterElement);
+        }
+      });
+    });
+
+    function getDragAfterElement(container, x, y) {
+      const draggableElements = [...container.querySelectorAll('.class-card:not(.dragging)')];
+
+      return draggableElements.reduce((closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = x - box.left - box.width / 2; // Simple horizontal check for grid
+        const offsetY = y - box.top - box.height / 2;
+        
+        // Combined distance for better grid feel
+        const distance = Math.sqrt(offset*offset + offsetY*offsetY);
+        
+        if (distance < closest.offset) {
+          return { offset: distance, element: child };
+        } else {
+          return closest;
+        }
+      }, { offset: Number.POSITIVE_INFINITY }).element;
+    }
   }
 
   function openModal(id) {

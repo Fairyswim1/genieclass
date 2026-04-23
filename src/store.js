@@ -126,15 +126,34 @@ export async function createClass(name, teacherId) {
         teacherId,
         createdAt: new Date().toISOString(),
         color: getRandomColor(),
+        order: Date.now(), // Default order based on timestamp
     };
     await setDoc(doc(db, COLLECTIONS.CLASSES, classId), cls);
     return cls;
 }
 
 export async function getClassesByTeacher(teacherId) {
-    const q = query(collection(db, COLLECTIONS.CLASSES), where('teacherId', '==', teacherId));
+    const q = query(
+        collection(db, COLLECTIONS.CLASSES), 
+        where('teacherId', '==', teacherId),
+        orderBy('order', 'asc')
+    );
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => doc.data());
+}
+
+export async function updateClassColor(classId, color) {
+    const ref = doc(db, COLLECTIONS.CLASSES, classId);
+    await updateDoc(ref, { color });
+}
+
+export async function updateClassOrder(classOrders) {
+    // classOrders: Array of { id, order }
+    const batch = classOrders.map(item => {
+        const ref = doc(db, COLLECTIONS.CLASSES, item.id);
+        return updateDoc(ref, { order: item.order });
+    });
+    await Promise.all(batch);
 }
 
 export async function getClassById(classId) {

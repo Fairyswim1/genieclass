@@ -16,6 +16,7 @@ export function renderAssignMode(container, params) {
   let cls = null;
   let activeTab = 'announcements'; // 'announcements', 'assignments', 'resources'
   let editingAssignmentId = null;
+  let otherClasses = []; // All classes for cross-posting
 
   // File Queues for forms
   let annFilesQueue = []; // Array of File objects for NEW uploads
@@ -26,6 +27,11 @@ export function renderAssignMode(container, params) {
   async function init() {
     cls = await getClassById(classId);
     if (!cls) { window.location.hash = '/teacher/dashboard'; return; }
+    
+    // Get all classes for cross-posting
+    const { getClassesByTeacher } = await import('../../store.js');
+    otherClasses = await getClassesByTeacher(teacher.uid);
+    
     await render();
   }
 
@@ -164,6 +170,17 @@ export function renderAssignMode(container, params) {
                 </div>
                 <div id="ann-file-list" class="file-queue-list"></div>
               </div>
+              <div class="form-group">
+                <label class="input-label">게시할 학급 선택</label>
+                <div class="flex flex-wrap gap-sm" id="ann-class-selectors">
+                  ${otherClasses.map(c => `
+                    <label class="chip-checkbox">
+                      <input type="checkbox" name="ann-target-class" value="${c.id}" ${c.id === classId ? 'checked disabled' : ''} />
+                      <span>${c.name}</span>
+                    </label>
+                  `).join('')}
+                </div>
+              </div>
               <div class="flex gap-md justify-end">
                 <button class="btn btn-ghost" id="btn-cancel-announcement">취소</button>
                 <button class="btn btn-primary" id="btn-submit-announcement">공지 게시</button>
@@ -243,6 +260,17 @@ export function renderAssignMode(container, params) {
                   <input type="file" id="assign-files" multiple class="hidden" />
                 </div>
                 <div id="assign-file-list" class="file-queue-list"></div>
+              </div>
+              <div class="form-group" id="assign-cross-post-container">
+                <label class="input-label">게시할 학급 선택</label>
+                <div class="flex flex-wrap gap-sm">
+                  ${otherClasses.map(c => `
+                    <label class="chip-checkbox">
+                      <input type="checkbox" name="assign-target-class" value="${c.id}" ${c.id === classId ? 'checked disabled' : ''} />
+                      <span>${c.name}</span>
+                    </label>
+                  `).join('')}
+                </div>
               </div>
               <div class="flex gap-md justify-end">
                 <button class="btn btn-ghost" id="btn-cancel-assignment">취소</button>
@@ -455,6 +483,7 @@ export function renderAssignMode(container, params) {
       document.getElementById('assign-due').value = '';
       updateFileListUI('assign');
       document.getElementById('btn-submit-assignment').textContent = '과제 생성';
+      document.getElementById('assign-cross-post-container').classList.remove('hidden');
     });
     document.getElementById('btn-cancel-assignment')?.addEventListener('click', () => {
       document.getElementById('assignment-form').classList.add('hidden');
@@ -479,15 +508,23 @@ export function renderAssignMode(container, params) {
       const content = document.getElementById('ann-content').value.trim();
       if (!title) { showToast('제목을 입력하세요.', 'error'); return; }
 
+      // Get target classes
+      const selectedClasses = [classId, ...Array.from(document.querySelectorAll('input[name="ann-target-class"]:checked:not(:disabled)')).map(el => el.value)];
+
       const files = [];
       try {
         for (const file of annFilesQueue) {
           const saved = await saveFile(file);
           files.push({ id: saved.id, name: saved.name });
         }
-        await createAnnouncement(classId, { title, content, files });
-        showToast('공지사항이 게시되었습니다.');
+        
+        // Post to all selected classes
+        const posts = selectedClasses.map(cid => createAnnouncement(cid, { title, content, files }));
+        await Promise.all(posts);
+        
+        showToast(selectedClasses.length > 1 ? `${selectedClasses.length}개 학급에 공지되었습니다.` : '공지사항이 게시되었습니다.');
         annFilesQueue = [];
+        document.getElementById('announcement-form').classList.add('hidden');
         render();
       } catch (err) { showToast('오류가 발생했습니다.', 'error'); }
     });
@@ -500,6 +537,8 @@ export function renderAssignMode(container, params) {
 
       if (!title) { showToast('제목을 입력하세요.', 'error'); return; }
 
+      const selectedClasses = editingAssignmentId ? [classId] : [classId, ...Array.from(document.querySelectorAll('input[name="assign-target-class"]:checked:not(:disabled)')).map(el => el.value)];
+
       try {
         const uploadedFiles = [];
         for (const file of assignFilesQueue) {
@@ -507,22 +546,22 @@ export function renderAssignMode(container, params) {
           uploadedFiles.push({ id: saved.id, name: saved.name });
         }
         
-        // Final files set = Existing (filtered) + Newly uploaded
         const finalFiles = [...existingFilesQueue, ...uploadedFiles];
-        
         const assignData = { title, description, dueDate, files: finalFiles };
         
         if (editingAssignmentId) {
           await updateAssignment(editingAssignmentId, assignData);
           showToast('과제가 수정되었습니다.');
         } else {
-          await createAssignment(classId, assignData);
-          showToast('과제가 생성되었습니다.');
+          const posts = selectedClasses.map(cid => createAssignment(cid, assignData));
+          await Promise.all(posts);
+          showToast(selectedClasses.length > 1 ? `${selectedClasses.length}개 학급에 과제가 출제되었습니다.` : '과제가 생성되었습니다.');
         }
         
         editingAssignmentId = null;
         assignFilesQueue = [];
         existingFilesQueue = [];
+        document.getElementById('assignment-form').classList.add('hidden');
         render();
       } catch (err) { 
         console.error(err);
@@ -580,6 +619,9 @@ export function renderAssignMode(container, params) {
           existingFilesQueue = a.files ? [...a.files] : [];
           updateFileListUI('assign');
           
+          // Hide cross-post on edit
+          document.getElementById('assign-cross-post-container').classList.add('hidden');
+
           // Scroll to form
           document.getElementById('assignment-form').scrollIntoView({ behavior: 'smooth' });
         }
@@ -608,6 +650,43 @@ export function renderAssignMode(container, params) {
       });
     });
   }
+
+  // Style for chip checkboxes (added once)
+  if (!document.getElementById('assign-mode-styles')) {
+    const style = document.createElement('style');
+    style.id = 'assign-mode-styles';
+    style.textContent = `
+      .chip-checkbox {
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+      }
+      .chip-checkbox input { position: absolute; opacity: 0; width: 0; height: 0; }
+      .chip-checkbox span {
+        padding: 6px 12px;
+        border-radius: var(--r-full);
+        border: 1px solid var(--border-main);
+        background: var(--bg-surface);
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        transition: all 0.2s;
+        user-select: none;
+      }
+      .chip-checkbox input:checked + span {
+        background: var(--primary);
+        border-color: var(--primary);
+        color: white;
+        box-shadow: var(--shadow-sm);
+      }
+      .chip-checkbox input:disabled + span {
+        opacity: 0.6;
+        cursor: not-allowed;
+        background: var(--bg-main);
+      }
+    `;
+    document.head.appendChild(style);
+  }
+}
 
   async function handleBulkDownload(assignmentId, assignmentTitle) {
     try {
