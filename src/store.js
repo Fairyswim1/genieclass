@@ -329,7 +329,23 @@ export async function updateStudentCharacterType(studentId, type) {
 }
 
 export async function deleteStudent(studentId) {
+    if (!studentId) return;
+    
+    // 1. Delete Student Document (This frees up the loginId)
     await deleteDoc(doc(db, COLLECTIONS.STUDENTS, studentId));
+    
+    // 2. Cleanup related data (presentations, submissions)
+    try {
+        const collectionsToClean = [COLLECTIONS.PRESENTATIONS, COLLECTIONS.SUBMISSIONS, COLLECTIONS.QUIZ_SUBMISSIONS];
+        for (const coll of collectionsToClean) {
+            const q = query(collection(db, coll), where('studentId', '==', studentId));
+            const snap = await getDocs(q);
+            const deletions = snap.docs.map(d => deleteDoc(doc(db, coll, d.id)));
+            await Promise.all(deletions);
+        }
+    } catch (err) {
+        console.error('Data cleanup error during student deletion:', err);
+    }
 }
 
 // ========== Presentations ==========

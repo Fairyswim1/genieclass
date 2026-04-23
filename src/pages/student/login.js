@@ -119,9 +119,30 @@ export function renderStudentLogin(container) {
       });
     }
 
-    // ID Error Clear
-    document.getElementById('setup-login-id')?.addEventListener('input', () => {
-        document.getElementById('setup-id-error')?.classList.add('hidden');
+    // ID Real-time check
+    let idCheckTimeout = null;
+    const idInput = document.getElementById('setup-login-id');
+    const idError = document.getElementById('setup-id-error');
+    
+    idInput?.addEventListener('input', () => {
+        idError?.classList.add('hidden');
+        const loginId = idInput.value.trim();
+        
+        if (idCheckTimeout) clearTimeout(idCheckTimeout);
+        if (loginId.length < 4) return;
+        
+        idCheckTimeout = setTimeout(async () => {
+            const exists = await checkLoginIdExists(loginId);
+            if (exists) {
+                idError.classList.remove('hidden');
+                idError.textContent = '이미 누군가 사용 중인 아이디입니다.';
+                idError.style.color = 'var(--red)';
+            } else {
+                idError.classList.remove('hidden');
+                idError.textContent = '멋진 아이디예요! 사용 가능합니다.';
+                idError.style.color = 'var(--success)';
+            }
+        }, 500);
     });
 
     document.getElementById('student-login-form')?.addEventListener('submit', async (e) => {
