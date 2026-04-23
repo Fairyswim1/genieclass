@@ -226,7 +226,8 @@ export async function getStudentByCode(code) {
 }
 
 export async function checkLoginIdExists(loginId) {
-    const q = query(collection(db, COLLECTIONS.STUDENTS), where('loginId', '==', loginId));
+    if (!loginId || loginId.trim() === '') return false;
+    const q = query(collection(db, COLLECTIONS.STUDENTS), where('loginId', '==', loginId.trim()));
     const snapshot = await getDocs(q);
     return !snapshot.empty;
 }
@@ -234,8 +235,26 @@ export async function checkLoginIdExists(loginId) {
 export async function setupStudentAuth(studentId, loginId, password) {
     const ref = doc(db, COLLECTIONS.STUDENTS, studentId);
     await updateDoc(ref, {
-        loginId: loginId,
-        password: password, // Simple password for now as per teacher request (educational environment)
+        loginId: loginId.trim(),
+        password: password,
+        updatedAt: new Date().toISOString()
+    });
+}
+
+export async function resetStudentAuth(studentId) {
+    const ref = doc(db, COLLECTIONS.STUDENTS, studentId);
+    await updateDoc(ref, {
+        loginId: '',
+        password: '',
+        updatedAt: new Date().toISOString()
+    });
+}
+
+export async function updateStudentPassword(studentId, newPassword) {
+    const ref = doc(db, COLLECTIONS.STUDENTS, studentId);
+    await updateDoc(ref, {
+        password: newPassword,
+        updatedAt: new Date().toISOString()
     });
 }
 

@@ -439,25 +439,43 @@ export function renderTeacherDashboard(container) {
                   <th style="width:60px">번호</th>
                   <th>이름</th>
                   <th>고유코드</th>
-                  <th>레벨</th>
-                  <th>칭찬</th>
-                  <th></th>
+                  <th style="width:120px">계정 상태</th>
+                  <th>성장</th>
+                  <th style="width:120px"></th>
                 </tr>
               </thead>
               <tbody>
-                ${students.map(s => `
+                ${students.map(s => {
+                  const hasAccount = s.loginId && s.password;
+                  return `
                   <tr>
                     <td><span style="color:var(--text-secondary)">${s.number || '-'}</span></td>
                     <td><span style="font-weight:600">${s.name}</span></td>
                     <td><span class="student-code">${s.uniqueCode}</span></td>
                     <td>
+                      ${hasAccount ? `
+                        <div class="flex flex-col">
+                          <span class="badge badge-blue">ID: ${s.loginId}</span>
+                        </div>
+                      ` : `
+                        <span class="badge badge-purple">미가입</span>
+                      `}
+                    </td>
+                    <td>
                       <div class="flex items-center gap-sm">
                         ${renderCharacter(s.characterLevel, 32, s.characterType || 'apple', s.totalPoints)}
-                        <span class="badge badge-primary">Lv.${s.characterLevel}</span>
+                        <span class="badge badge-gold">⭐ ${s.totalPoints}</span>
                       </div>
                     </td>
-                    <td><span class="badge badge-gold">⭐ ${s.totalPoints}</span></td>
-                    <td><button class="btn btn-ghost btn-sm delete-student-btn" data-student-id="${s.id}" style="color:var(--red);font-size:0.8rem">삭제</button></td>
+                    <td>
+                      <div class="flex gap-sm">
+                        ${hasAccount ? `
+                          <button class="btn btn-outline btn-sm reset-auth-btn" data-student-id="${s.id}" title="계정 초기화">🔄</button>
+                          <button class="btn btn-outline btn-sm change-pw-btn" data-student-id="${s.id}" data-student-name="${s.name}" title="비번 변경">🔑</button>
+                        ` : ''}
+                        <button class="btn btn-ghost btn-sm delete-student-btn" data-student-id="${s.id}" style="color:var(--red)">삭제</button>
+                      </div>
+                    </td>
                   </tr>
                 `).join('')}
               </tbody>

@@ -1,5 +1,5 @@
 // ========================================
-// Student Login Page (v2.1)
+// Student Login Page (v2.2)
 // ========================================
 import {
   getStudentByCode, loginStudentByIdPw, checkLoginIdExists, setupStudentAuth,
@@ -72,6 +72,7 @@ export function renderStudentLogin(container) {
                 <div class="form-group" style="margin-bottom: var(--s-4);">
                   <label class="input-label">사용할 아이디</label>
                   <input type="text" class="input-field" id="setup-login-id" placeholder="영문, 숫자 포함 4자 이상" required minlength="4" />
+                  <div id="setup-id-error" class="hidden" style="color: var(--red); font-size: 0.8rem; margin-top: 4px;">이미 사용 중인 아이디입니다.</div>
                 </div>
                 <div class="form-group" style="margin-bottom: var(--s-4);">
                   <label class="input-label">비밀번호</label>
@@ -109,7 +110,7 @@ export function renderStudentLogin(container) {
     document.getElementById('back-to-landing')?.addEventListener('click', () => { window.location.hash = '/'; });
     document.getElementById('setup-cancel')?.addEventListener('click', () => { mode = 'code'; pendingStudent = null; render(); });
 
-    // Real-time unique code formatting: uppercase only, alphanumeric only
+    // Real-time unique code formatting
     const codeInput = document.getElementById('std-unique-code');
     if (codeInput) {
       codeInput.addEventListener('input', (e) => {
@@ -117,6 +118,11 @@ export function renderStudentLogin(container) {
         e.target.value = val;
       });
     }
+
+    // ID Error Clear
+    document.getElementById('setup-login-id')?.addEventListener('input', () => {
+        document.getElementById('setup-id-error')?.classList.add('hidden');
+    });
 
     document.getElementById('student-login-form')?.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -163,7 +169,8 @@ export function renderStudentLogin(container) {
           }
         }
         else if (mode === 'setup') {
-          const loginId = document.getElementById('setup-login-id').value.trim();
+          const loginIdInput = document.getElementById('setup-login-id');
+          const loginId = loginIdInput.value.trim();
           const password = document.getElementById('setup-password').value;
           const confirmPw = document.getElementById('setup-password-confirm').value;
 
@@ -173,6 +180,8 @@ export function renderStudentLogin(container) {
           const exists = await checkLoginIdExists(loginId);
           if (exists) {
             isLoading = false; render();
+            document.getElementById('setup-id-error')?.classList.remove('hidden');
+            loginIdInput.focus();
             showToast('이미 존재하는 아이디입니다.', 'error');
             return;
           }
