@@ -305,9 +305,20 @@ export function renderAssignMode(container, params) {
                 </div>
                 <div id="res-file-list" class="file-queue-list"></div>
               </div>
+              <div class="form-group">
+                <label class="input-label">게시할 학급 선택</label>
+                <div class="flex flex-wrap gap-sm" id="res-class-selectors">
+                  ${otherClasses.map(c => `
+                    <label class="chip-checkbox">
+                      <input type="checkbox" name="res-target-class" value="${c.id}" ${c.id === classId ? 'checked disabled' : ''} />
+                      <span>${c.name}</span>
+                    </label>
+                  `).join('')}
+                </div>
+              </div>
               <div class="flex gap-md justify-end">
                 <button class="btn btn-ghost" id="btn-cancel-resource">취소</button>
-                <button class="btn btn-primary" id="btn-submit-resource">자료실 등록</button>
+                <button class="btn btn-primary" id="btn-submit-resource">자료 등록</button>
               </div>
             </div>
 
@@ -575,17 +586,21 @@ export function renderAssignMode(container, params) {
       const description = document.getElementById('res-desc').value.trim();
       if (!title) { showToast('자료 이름을 입력하세요.', 'error'); return; }
 
-      const fileInput = document.getElementById('res-files');
-      if (fileInput.files.length === 0) { showToast('최소 하나의 파일을 첨부하세요.', 'error'); return; }
+      const selectedClasses = [classId, ...Array.from(document.querySelectorAll('input[name="res-target-class"]:checked:not(:disabled)')).map(el => el.value)];
 
       try {
+        const files = [];
         for (const file of resFilesQueue) {
           const saved = await saveFile(file);
           files.push({ id: saved.id, name: saved.name });
         }
-        await addResource(classId, { title, description, files });
-        showToast('자료가 등록되었습니다.');
+        
+        const posts = selectedClasses.map(cid => addResource(cid, { title, description, files }));
+        await Promise.all(posts);
+        
+        showToast(selectedClasses.length > 1 ? `${selectedClasses.length}개 학급에 자료가 공유되었습니다.` : '자료가 등록되었습니다.');
         resFilesQueue = [];
+        document.getElementById('resource-form').classList.add('hidden');
         render();
       } catch (err) { showToast('오류 발생', 'error'); }
     });

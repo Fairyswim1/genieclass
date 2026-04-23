@@ -275,9 +275,25 @@ export function renderTeacherDashboard(container) {
 
   function openModeSelection(classId) {
     const modalBtns = document.getElementById('mode-selection-btns');
+    modalBtns.style.display = 'flex';
+    modalBtns.style.flexDirection = 'column';
+    modalBtns.style.gap = '20px';
+    
     modalBtns.innerHTML = `
-      <div class="mode-card card card-clickable" onclick="window.location.hash='/teacher/class/${classId}/lesson'">수업 모드</div>
-      <div class="mode-card card card-clickable" onclick="window.location.hash='/teacher/class/${classId}/assign'">과제 모드</div>
+      <div class="mode-card card card-clickable animate-up" onclick="window.location.hash='/teacher/class/${classId}/lesson'" style="width:100%; height:auto; min-height:120px; text-align:left; display:flex; align-items:center; gap:20px; padding:25px;">
+        <span style="font-size:3rem;">📚</span>
+        <div>
+          <div style="font-size:1.4rem; font-weight:800; margin-bottom:8px;">수업 모드</div>
+          <div style="font-size:0.95rem; color:var(--text-muted); line-height:1.5;">실시간 수업을 진행하며 학생들에게 캐릭터 칭찬을 해주고 발표를 기록합니다.</div>
+        </div>
+      </div>
+      <div class="mode-card card card-clickable animate-up" onclick="window.location.hash='/teacher/class/${classId}/assign'" style="width:100%; height:auto; min-height:120px; text-align:left; display:flex; align-items:center; gap:20px; padding:25px; animation-delay:0.1s;">
+        <span style="font-size:3rem;">📝</span>
+        <div>
+          <div style="font-size:1.4rem; font-weight:800; margin-bottom:8px;">과제 및 자료 관리</div>
+          <div style="font-size:0.95rem; color:var(--text-muted); line-height:1.5;">공지사항 게시, 과제 출제 및 학생들의 제출물을 확인하고 관리합니다.</div>
+        </div>
+      </div>
     `;
     openModal('mode-select-modal');
   }
