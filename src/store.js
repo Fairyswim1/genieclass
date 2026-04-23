@@ -135,11 +135,20 @@ export async function createClass(name, teacherId) {
 export async function getClassesByTeacher(teacherId) {
     const q = query(
         collection(db, COLLECTIONS.CLASSES), 
-        where('teacherId', '==', teacherId),
-        orderBy('order', 'asc')
+        where('teacherId', '==', teacherId)
     );
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => doc.data());
+    const classes = snapshot.docs.map(doc => doc.data());
+    
+    // Sort in JS to handle classes missing the 'order' field
+    return classes.sort((a, b) => {
+        const orderA = a.order !== undefined ? a.order : Number.MAX_SAFE_INTEGER;
+        const orderB = b.order !== undefined ? b.order : Number.MAX_SAFE_INTEGER;
+        
+        if (orderA !== orderB) return orderA - orderB;
+        // Fallback to createdAt if order is same or missing
+        return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
+    });
 }
 
 export async function updateClassColor(classId, color) {
