@@ -128,9 +128,57 @@ export function renderLessonMode(container, params) {
                    <span style="font-size: 1.5rem;">📁</span>
                    <span>발표 기록</span>
                  </button>
+                 <button class="btn btn-outline" id="btn-observe" style="flex-direction: column; height: 100px; gap: 10px; border: 2px solid var(--primary-light); background: var(--bg-surface);">
+                   <span style="font-size: 1.5rem;">📝</span>
+                   <span>관찰 기록</span>
+                 </button>
                </div>
             </div>
           ` : ''}
+        </div>
+
+        <!-- Observation Modal -->
+        <div class="modal-backdrop" id="observation-modal" style="z-index: 3000;">
+          <div class="modal-content animate-up" style="max-width: 500px; width: 90%;">
+            <div class="modal-header">
+              <h3 class="modal-title">📝 관찰 기록 작성</h3>
+              <button class="modal-close" id="close-observation-modal">✕</button>
+            </div>
+            <div class="modal-body" style="padding: 20px 0;">
+              <div id="observation-choice-view">
+                <p style="margin-bottom: 20px; color: var(--text-muted); text-align: center;">어떤 방식으로 기록하시겠습니까?</p>
+                <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 15px;">
+                  <button class="btn btn-secondary" id="btn-obs-voice" style="flex-direction: column; height: 120px; gap: 10px;">
+                    <span style="font-size: 2rem;">🎙️</span>
+                    <span>음성 녹음</span>
+                  </button>
+                  <button class="btn btn-primary" id="btn-obs-text" style="flex-direction: column; height: 120px; gap: 10px;">
+                    <span style="font-size: 2rem;">⌨️</span>
+                    <span>텍스트 입력</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Voice Recording View -->
+              <div id="observation-voice-view" class="hidden" style="text-align: center; padding: 20px;">
+                <div class="recording-indicator" id="obs-rec-indicator" style="width: 80px; height: 80px; background: var(--error); border-radius: 50%; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; color: white; font-size: 2rem; animation: pulse 1.5s infinite;">
+                  🎤
+                </div>
+                <h4 id="obs-rec-timer">00:00</h4>
+                <p style="margin: 15px 0;">학생의 활동 내용을 음성으로 기록 중입니다...</p>
+                <button class="btn btn-danger w-full" id="btn-stop-obs-rec">녹음 중지 및 저장</button>
+              </div>
+
+              <!-- Text Input View -->
+              <div id="observation-text-view" class="hidden">
+                <div class="form-group">
+                  <label class="input-label">관찰 내용 (세특 기초 자료)</label>
+                  <textarea class="input-field" id="obs-text-input" rows="6" placeholder="예: 문제 해결 전략이 창의적이며 동료 학생들에게 논리적으로 잘 설명함"></textarea>
+                </div>
+                <button class="btn btn-primary w-full" id="btn-save-obs-text">기록 저장하기</button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     `;
@@ -638,8 +686,10 @@ export function renderLessonMode(container, params) {
     if (!draftCanvas) return;
 
     // Composite: wbCanvas (bottom) + draftCanvas (top)
+    recordingCtx.save();
     recordingCtx.setTransform(1, 0, 0, 1, 0, 0);
     recordingCtx.clearRect(0, 0, recordingCanvas.width, recordingCanvas.height);
+    recordingCtx.restore(); // restore scale ratio
     
     // Draw Background/Permanent lines
     recordingCtx.drawImage(wbCanvas, 0, 0);
@@ -658,6 +708,21 @@ export function renderLessonMode(container, params) {
 
       try {
         console.log('[녹음] 환경 확인...');
+        const isNativeMode = window.Capacitor && window.Capacitor.isNativePlatform();
+
+        // 1. 네이티브 앱(Android)에서 WebView가 권한 예외로 크래시(Crash)되는 것을 방지하기 위해 권한 먼저 획득
+        if (isNativeMode) {
+          try {
+            const permStatus = await VoiceRecorder.requestAudioRecordingPermission();
+            if (!permStatus.value) {
+              showToast('마이크 권한이 차단되었습니다.', 'error');
+              return;
+            }
+          } catch(e) {
+            console.warn('[녹음] 네이티브 권한 요청 에러:', e);
+          }
+        }
+
         const hasMediaDevices = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
         const hasMediaRecorder = typeof MediaRecorder !== 'undefined';
         
@@ -677,25 +742,37 @@ export function renderLessonMode(container, params) {
 
             // Web Audio API로 마이크 볼륨 증폭 (3배)
             let audioStream = rawAudioStream;
-            try {
-              const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-              const source = audioContext.createMediaStreamSource(rawAudioStream);
-              const gainNode = audioContext.createGain();
-              gainNode.gain.value = 3.0; // 볼륨 3배 증폭
-              const dest = audioContext.createMediaStreamDestination();
-              source.connect(gainNode);
-              gainNode.connect(dest);
-              audioStream = dest.stream;
-              console.log('[녹음] 오디오 볼륨 증폭 적용 (3x)');
-            } catch (gainErr) {
-              console.warn('[녹음] Web Audio API 증폭 실패, 원본 오디오 사용:', gainErr);
+            // 안드로이드 하드웨어 인코더(MediaRecorder)와 WebAudio의 충돌(Crash)을 피하기 위해 네이티브에서는 증폭 생략
+            if (!isNativeMode) {
+              try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const source = audioContext.createMediaStreamSource(rawAudioStream);
+                const gainNode = audioContext.createGain();
+                gainNode.gain.value = 3.0; // 볼륨 3배 증폭
+                const dest = audioContext.createMediaStreamDestination();
+                source.connect(gainNode);
+                gainNode.connect(dest);
+                audioStream = dest.stream;
+                console.log('[녹음] 오디오 볼륨 증폭 적용 (3x)');
+              } catch (gainErr) {
+                console.warn('[녹음] Web Audio API 증폭 실패, 원본 오디오 사용:', gainErr);
+              }
             }
 
             // Setup Mirror Canvas
             recordingCanvas = document.createElement('canvas');
-            recordingCanvas.width = wbCanvas.width;
-            recordingCanvas.height = wbCanvas.height;
+            
+            // 안드로이드 WebM 인코더가 거대한 칠판 해상도에서 크래시되지 않도록 최대 해상도 제한 (안전한 1280x720)
+            const MAX_REC_WIDTH = 1280;
+            const MAX_REC_HEIGHT = 720;
+            let ratio = 1;
+            if (wbCanvas.width > MAX_REC_WIDTH || wbCanvas.height > MAX_REC_HEIGHT) {
+              ratio = Math.min(MAX_REC_WIDTH / wbCanvas.width, MAX_REC_HEIGHT / wbCanvas.height);
+            }
+            recordingCanvas.width = Math.floor(wbCanvas.width * ratio);
+            recordingCanvas.height = Math.floor(wbCanvas.height * ratio);
             recordingCtx = recordingCanvas.getContext('2d');
+            recordingCtx.scale(ratio, ratio);
             
             if (typeof recordingCanvas.captureStream === 'function') {
               console.log('[녹음] 캔버스 캡처 지원됨 → 화면+음성 결합');
