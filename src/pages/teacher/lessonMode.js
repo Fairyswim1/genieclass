@@ -227,6 +227,56 @@ export function renderLessonMode(container, params) {
       activeView = 'presentations';
       render();
     });
+
+    // --- Observation Events ---
+    document.getElementById('btn-observe')?.addEventListener('click', () => {
+      const modal = document.getElementById('observation-modal');
+      modal.classList.add('active');
+      // Reset view to choice
+      document.getElementById('observation-choice-view').classList.remove('hidden');
+      document.getElementById('observation-voice-view').classList.add('hidden');
+      document.getElementById('observation-text-view').classList.add('hidden');
+      document.getElementById('obs-text-input').value = '';
+    });
+
+    document.getElementById('close-observation-modal')?.addEventListener('click', () => {
+      document.getElementById('observation-modal').classList.remove('active');
+    });
+
+    document.getElementById('btn-obs-text')?.addEventListener('click', () => {
+      document.getElementById('observation-choice-view').classList.add('hidden');
+      document.getElementById('observation-text-view').classList.remove('hidden');
+    });
+
+    document.getElementById('btn-obs-voice')?.addEventListener('click', () => {
+      showToast('음성 기록 기능을 준비 중입니다. (태블릿/전자칠판 권장)', 'info');
+      // 추후 VoiceRecorder 로직 연결
+    });
+
+    document.getElementById('btn-save-obs-text')?.addEventListener('click', async () => {
+      const text = document.getElementById('obs-text-input').value.trim();
+      if (!text) { showToast('기록할 내용을 입력해주세요.', 'error'); return; }
+      
+      const saveBtn = document.getElementById('btn-save-obs-text');
+      saveBtn.disabled = true;
+      saveBtn.textContent = '저장 중...';
+
+      try {
+        const { saveObservation } = await import('../../store.js');
+        await saveObservation(selectedStudent.id, classId, {
+          content: text,
+          mode: 'text',
+          studentName: selectedStudent.name
+        });
+        showToast('성공적으로 기록되었습니다! ✨');
+        document.getElementById('observation-modal').classList.remove('active');
+      } catch (err) {
+        showToast('저장 실패', 'error');
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = '기록 저장하기';
+      }
+    });
   }
 
   // --- Quiz Mode ---

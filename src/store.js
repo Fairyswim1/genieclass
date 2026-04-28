@@ -723,3 +723,21 @@ export function showToast(message, type = 'success') {
         setTimeout(() => toast.remove(), 300);
     }, 3000);
 }
+
+export async function saveObservation(studentId, classId, data) {
+    try {
+        const { db, COLLECTIONS } = await import('./firebase.js');
+        const { addDoc, collection, serverTimestamp } = await import('firebase/firestore');
+        const docRef = await addDoc(collection(db, COLLECTIONS.PRESENTATIONS), {
+            studentId,
+            classId,
+            type: 'observation',
+            createdAt: serverTimestamp(),
+            ...data
+        });
+        return { id: docRef.id, ...data };
+    } catch (err) {
+        console.error('Save observation error:', err);
+        throw err;
+    }
+}
