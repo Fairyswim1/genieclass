@@ -726,7 +726,6 @@ export function showToast(message, type = 'success') {
 
 export async function saveObservation(studentId, classId, data) {
     try {
-        const { db, COLLECTIONS } = await import('./firebase.js');
         const { addDoc, collection, serverTimestamp } = await import('firebase/firestore');
         const docRef = await addDoc(collection(db, COLLECTIONS.PRESENTATIONS), {
             studentId,
@@ -739,5 +738,22 @@ export async function saveObservation(studentId, classId, data) {
     } catch (err) {
         console.error('Save observation error:', err);
         throw err;
+    }
+}
+
+export async function getObservationsByClass(classId) {
+    try {
+        const { query, collection, where, getDocs, orderBy } = await import('firebase/firestore');
+        const q = query(
+            collection(db, COLLECTIONS.PRESENTATIONS),
+            where('classId', '==', classId),
+            where('type', '==', 'observation'),
+            orderBy('createdAt', 'desc')
+        );
+        const snap = await getDocs(q);
+        return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (err) {
+        console.error('Get observations error:', err);
+        return [];
     }
 }

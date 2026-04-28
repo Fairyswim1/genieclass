@@ -4,8 +4,9 @@ import {
   createAnnouncement, getAnnouncementsByClass, deleteAnnouncement,
   addResource, getResourcesByClass, deleteResource,
   getSubmissionsByAssignment, saveFile, showToast, formatDate,
-  getStudentById, downloadFile as storeDownloadFile
+  getStudentById, downloadFile as storeDownloadFile, getObservationsByClass
 } from '../../store.js';
+import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
 
 export function renderAssignMode(container, params) {
@@ -40,6 +41,7 @@ export function renderAssignMode(container, params) {
     const announcements = await getAnnouncementsByClass(classId);
     const resources = await getResourcesByClass(classId);
     const students = await getStudentsByClass(classId);
+    const observations = await getObservationsByClass(classId);
 
     // Pre-calculate assignments HTML with submissions
     let assignmentsHtml = '';
@@ -138,10 +140,11 @@ export function renderAssignMode(container, params) {
             <p class="page-subtitle" style="color: var(--text-muted); margin-top: var(--s-2);">수업 소식, 과제 및 학습 자료를 관리합니다.</p>
           </header>
 
-          <div class="tabs" style="margin-bottom: var(--s-12); max-width: 600px;">
+          <div class="tabs" style="margin-bottom: var(--s-12); max-width: 800px;">
             <div class="tab ${activeTab === 'announcements' ? 'active' : ''}" data-tab="announcements">📢 공지사항</div>
             <div class="tab ${activeTab === 'assignments' ? 'active' : ''}" data-tab="assignments">📝 과제 관리</div>
             <div class="tab ${activeTab === 'resources' ? 'active' : ''}" data-tab="resources">📁 수업 자료</div>
+            <div class="tab ${activeTab === 'observations' ? 'active' : ''}" data-tab="observations">📋 생기부 관리</div>
           </div>
 
           <!-- 공지사항 섹션 -->
@@ -351,6 +354,45 @@ export function renderAssignMode(container, params) {
               `).join('')}
             </div>
           </div>
+
+          <!-- 생기부 관리 섹션 -->
+          <div id="section-observations" class="${activeTab !== 'observations' ? 'hidden' : 'animate-up'}">
+            <div class="section-header">
+              <h2 class="section-title">관찰 기록 (세특 관리)</h2>
+              <button class="btn btn-primary btn-sm" id="btn-export-observations">📥 엑셀로 내보내기</button>
+            </div>
+            
+            <div class="card" style="padding: var(--s-6);">
+              ${observations.length === 0 ? `
+                <div class="empty-board">
+                  <div class="empty-board-icon">📋</div>
+                  <p style="font-size: 1.1rem; font-weight: 600; color: var(--text-main); margin-bottom: 8px;">등록된 관찰 기록이 없습니다.</p>
+                  <p style="font-size: 0.9rem;">수업 모드에서 학생들의 활동을 관찰하고 기록해보세요.</p>
+                </div>
+              ` : `
+                <table class="board-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 140px;">날짜</th>
+                      <th style="width: 100px;">학생명</th>
+                      <th>관찰 내용 및 특기사항</th>
+                      <th style="width: 80px;">구분</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${observations.map(obs => `
+                      <tr>
+                        <td style="font-size: 0.85rem; color: var(--text-muted);">${formatDate(obs.createdAt)}</td>
+                        <td><strong style="color: var(--primary);">${obs.studentName || '알 수 없음'}</strong></td>
+                        <td style="white-space: pre-line; text-align: left; padding: 15px 10px; line-height: 1.6;">${obs.content || '기록 없음'}</td>
+                        <td><span class="badge ${obs.mode === 'voice' ? 'badge-blue' : 'badge-green'}">${obs.mode === 'voice' ? '음성' : '텍스트'}</span></td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              `}
+            </div>
+          </div>
         </main>
       </div>
     `;
@@ -468,6 +510,43 @@ export function renderAssignMode(container, params) {
         activeTab = tab.dataset.tab;
         render();
       });
+    });
+
+    // Export Observations to Excel
+    document.getElementById('btn-export-observations')?.addEventListener('click', () => {
+      if (observations.length === 0) {
+        showToast('내보낼 기록이 없습니다.', 'error');
+        return;
+      }
+
+      try {
+        const data = observations.map(obs => ({
+          '날짜': formatDate(obs.createdAt),
+          '학생명': obs.studentName || '알 수 없음',
+          '관찰 내용 및 특기사항': obs.content || '',
+          '구분': obs.mode === 'voice' ? '음성' : '텍스트'
+        }));
+
+        const worksheet = XLSX.utils.json_to_sheet(data);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "관찰기록");
+        
+        // Column widths
+        const wscols = [
+          {wch: 20}, // 날짜
+          {wch: 15}, // 학생명
+          {wch: 80}, // 내용
+          {wch: 10}  // 구분
+        ];
+        worksheet['!cols'] = wscols;
+
+        const fileName = `[${cls.name}]_생기부_관찰기록_${new Date().toISOString().split('T')[0]}.xlsx`;
+        XLSX.writeFile(workbook, fileName);
+        showToast('엑셀 파일이 생성되었습니다! 📥');
+      } catch (err) {
+        console.error('Excel export error:', err);
+        showToast('엑셀 생성 중 오류가 발생했습니다.', 'error');
+      }
     });
 
     // Forms Toggle
