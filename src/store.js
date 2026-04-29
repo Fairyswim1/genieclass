@@ -553,12 +553,13 @@ export async function startQuiz(classId, problemImageFile) {
         createdAt: new Date().toISOString(),
     };
 
+    await setDoc(doc(db, COLLECTIONS.QUIZZES, id), quiz);
+
     // Update class with active quiz ID
     await updateDoc(doc(db, COLLECTIONS.CLASSES, classId), {
         activeQuizId: id
     });
 
-    await setDoc(doc(db, COLLECTIONS.QUIZZES, id), quiz);
     return quiz;
 }
 
@@ -747,11 +748,16 @@ export async function getObservationsByClass(classId) {
         const q = query(
             collection(db, COLLECTIONS.PRESENTATIONS),
             where('classId', '==', classId),
-            where('type', '==', 'observation'),
-            orderBy('createdAt', 'desc')
+            where('type', '==', 'observation')
         );
         const snap = await getDocs(q);
-        return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        return snap.docs
+            .map(doc => ({ id: doc.id, ...doc.data() }))
+            .sort((a, b) => {
+                const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
+                const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
+                return dateB - dateA;
+            });
     } catch (err) {
         console.error('Get observations error:', err);
         return [];
