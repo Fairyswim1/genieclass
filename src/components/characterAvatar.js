@@ -57,8 +57,24 @@ const PLANT_LEVEL_ASSETS = {
 /** 최고 단계 (Lv.8 = 나무) */
 export const MAX_CHARACTER_LEVEL = 8;
 
-/** 누적 포인트 구간 시작점 [Lv1 … Lv8] — 단계마다 1P씩 진행(0~7P로 1~8단계) */
-export const LEVEL_THRESHOLDS = [0, 1, 2, 3, 4, 5, 6, 7];
+/**
+ * 다음 레벨까지 필요한 포인트(간격): 2→2→1→1→2→2 를 순환
+ * 누적 기준 시작점 thresholds[0]=0(Lv1) … thresholds[7]=Lv8 도달점
+ */
+const LEVEL_POINT_GAPS = [2, 2, 1, 1, 2, 2];
+
+function buildCumulativeThresholds(maxLevel, gaps) {
+  const thresholds = [0];
+  let acc = 0;
+  for (let step = 0; step < maxLevel - 1; step++) {
+    acc += gaps[step % gaps.length];
+    thresholds.push(acc);
+  }
+  return thresholds;
+}
+
+/** 누적 포인트 구간 시작점 [Lv1 … Lv8] — Lv8 도달까지 총 12P 필요 (패턴 간격 합계) */
+export const LEVEL_THRESHOLDS = buildCumulativeThresholds(MAX_CHARACTER_LEVEL, LEVEL_POINT_GAPS);
 
 /** 총 포인트로 레벨 1~8 산정 (Firestore characterLevel 과 맞춤) */
 export function deriveCharacterLevelFromPoints(totalPoints) {

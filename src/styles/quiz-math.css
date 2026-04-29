@@ -193,7 +193,148 @@
   border-bottom: 1px solid #bae6fd;
 }
 
-/* 풀이 갤러리 카드 */
+/* 번개 퀴즈 학생 오버레이 레이아웃 — 문제는 상단 전체 폭, 제출·갤러리는 하단 2열 */
+#quiz-overlay .quiz-overlay-shell {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  gap: var(--s-5);
+  padding: 12px 16px 16px;
+  overflow: hidden;
+  min-height: 0;
+}
+
+#quiz-overlay .quiz-problem-shell--student-overlay {
+  flex: 0 0 auto;
+  min-height: min(280px, 44vh);
+  max-height: min(520px, 52vh);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#quiz-overlay .quiz-problem-shell--student-overlay .quiz-problem-shell__body {
+  flex: 1 1 auto;
+  min-height: clamp(140px, 26vh, 320px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+#quiz-overlay .quiz-problem-shell--student-overlay .quiz-problem-shell__img-wrap {
+  max-height: min(46vh, 440px);
+}
+
+#quiz-overlay .quiz-problem-shell--student-overlay .quiz-problem-shell__img {
+  max-height: min(46vh, 440px);
+}
+
+@supports (height: 1dvh) {
+  #quiz-overlay .quiz-problem-shell--student-overlay .quiz-problem-shell__img-wrap,
+  #quiz-overlay .quiz-problem-shell--student-overlay .quiz-problem-shell__img {
+    max-height: min(46dvh, 440px);
+  }
+}
+
+#quiz-overlay .quiz-overlay-columns {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(260px, 340px);
+  gap: var(--s-6);
+  align-items: stretch;
+}
+
+@media (max-width: 900px) {
+  #quiz-overlay .quiz-overlay-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+#quiz-overlay .quiz-overlay-submit-card {
+  padding: 22px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+#quiz-overlay .quiz-overlay-gallery-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  align-content: start;
+}
+
+#quiz-overlay .quiz-overlay-sidebar-heading {
+  margin: 0 0 var(--s-3);
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  flex-shrink: 0;
+}
+
+#quiz-overlay .quiz-overlay-sidebar {
+  min-height: min(300px, 40vh);
+}
+
+.quiz-problem-image-placeholder,
+.quiz-problem-image-error {
+  margin: 0;
+  padding: 14px;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  text-align: center;
+  line-height: 1.5;
+}
+
+.quiz-problem-image-error {
+  color: #b91c1c;
+}
+
+/* 친구 풀이 갤러리 — 제출 이미지 썸네일 크기 상한 */
+.quiz-gallery__card {
+  padding: 12px !important;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.quiz-gallery__thumb-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  max-height: min(36vh, 220px);
+  width: 100%;
+  background: rgba(15, 23, 42, 0.04);
+  border-radius: var(--r-sm, 8px);
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+.quiz-gallery__thumb {
+  display: block;
+  max-width: 100%;
+  max-height: min(34vh, 200px);
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 6px;
+}
+
+.quiz-gallery__student-name {
+  font-size: 0.82rem;
+  margin-top: auto;
+  font-weight: 700;
+  color: var(--primary-light, #818cf8);
+}
+
+.quiz-gallery__solution.quiz-math-render-root {
+  margin: 0;
+}
+
+/* 풀이 갤러리 카드 내 수식 블록 */
 .quiz-solution-math {
   font-size: 0.92rem;
   line-height: 1.6;

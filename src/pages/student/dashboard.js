@@ -411,16 +411,35 @@ export function renderStudentDashboard(container) {
     bindEvents(assignments, freshStudent, cls);
   }
 
+  function fingerprintProblemImage(pi) {
+    if (!pi || typeof pi !== 'object') return '';
+    const u = typeof pi.url === 'string' ? pi.url : '';
+    const id = pi.id != null ? String(pi.id) : '';
+    return `${id}\u001f${u}`;
+  }
+
   function startQuizListener() {
     if (unsubscribeQuiz) unsubscribeQuiz();
     unsubscribeQuiz = listenToActiveQuiz(student.classId, (quiz) => {
       if (quiz && quiz.active) {
-        // 학생이 이미 닫은 퀴즈는 다시 표시하지 않음
         if (dismissedQuizIds.has(quiz.id)) return;
-        if (!activeQuiz || activeQuiz.id !== quiz.id) {
-          activeQuiz = quiz;
+
+        const prev = activeQuiz;
+        const isNewQuiz = !prev || prev.id !== quiz.id;
+        activeQuiz = quiz;
+
+        if (isNewQuiz) {
           showToast('⚡ 번개 퀴즈가 시작되었습니다!', 'info');
           startSubmissionsListener(quiz.id);
+          renderQuizOverlay();
+          return;
+        }
+
+        const probChanged =
+          (prev.problemText || '') !== (quiz.problemText || '') ||
+          fingerprintProblemImage(prev.problemImage) !== fingerprintProblemImage(quiz.problemImage);
+
+        if (probChanged) {
           renderQuizOverlay();
         }
       } else {
@@ -433,22 +452,59 @@ export function renderStudentDashboard(container) {
     });
   }
 
+  /** Firestore 저장본에서 다운로드 URL 확보(url 없으면 FILES 문서 로드). */
+  async function resolveStoredFileUrl(fileRef) {
+    if (!fileRef) return '';
+    const direct = typeof fileRef.url === 'string' ? fileRef.url.trim() : '';
+    if (direct) return direct;
+    const fid = fileRef.id ?? fileRef.fileId;
+    if (!fid) return '';
+    try {
+      const meta = await getFileById(String(fid));
+      return typeof meta?.url === 'string' ? meta.url.trim() : '';
+    } catch {
+      return '';
+    }
+  }
+
+  function escapeImgAttrSafeUrl(raw) {
+    return String(raw).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+  }
+
+  async function hydrateQuizGallery(subs) {
+    const gallery = document.getElementById('quiz-gallery');
+    if (!gallery || !Array.isArray(subs)) return;
+    const rows = await Promise.all(
+      subs.map(async (s) => ({
+        s,
+        imageUrl: s.image ? await resolveStoredFileUrl(s.image) : '',
+      })),
+    );
+
+    gallery.innerHTML = rows
+      .map(({ s, imageUrl }) => `
+          <div class="card quiz-gallery__card">
+            ${imageUrl
+        ? `<div class="quiz-gallery__thumb-wrap"><img class="quiz-gallery__thumb" src="${escapeImgAttrSafeUrl(imageUrl)}" alt="" loading="lazy" decoding="async"/></div>`
+        : ''}
+            ${s.solutionText
+        ? `<div class="quiz-gallery__solution quiz-solution-math quiz-math-render-root">${escapeHtml(s.solutionText)}</div>`
+        : ''}
+            <div class="quiz-gallery__student-name">${escapeHtml(s.studentName || '')}</div>
+          </div>
+        `)
+      .join('');
+
+    gallery.querySelectorAll('.quiz-gallery__solution.quiz-math-render-root').forEach((el) => {
+      renderQuizMath(el);
+    });
+  }
+
   function startSubmissionsListener(quizId) {
     if (unsubscribeSubmissions) unsubscribeSubmissions();
     unsubscribeSubmissions = listenToQuizSubmissions(quizId, (subs) => {
       quizSubmissions = subs;
-      const gallery = document.getElementById('quiz-gallery');
-      if (gallery) {
-        gallery.innerHTML = subs.map(s => `
-          <div class="card" style="padding: 12px; display: flex; flex-direction: column; gap: 10px;">
-            ${s.image ? `<img src="${s.image.url}" style="width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px;" alt="" />` : ''}
-            ${s.solutionText ? `<div class="quiz-solution-math quiz-math-render-root">${escapeHtml(s.solutionText)}</div>` : ''}
-            <div style="font-size: 0.8rem; margin-top: auto; font-weight: 700; color: var(--primary-light);">${escapeHtml(s.studentName || '')}</div>
-          </div>
-        `).join('');
-        
-        renderQuizMath(gallery);
-      }
+      void hydrateQuizGallery(subs);
     });
 }
 
@@ -462,7 +518,7 @@ export function renderStudentDashboard(container) {
     overlay.className = 'modal-backdrop active page-enter';
     overlay.style.zIndex = '500';
     overlay.innerHTML = `
-      <div class="modal-content animate-up" style="max-width: 1200px; width: 95%; height: 90vh; display: flex; flex-direction: column;">
+      <div class="modal-content animate-up quiz-overlay-modal-inner" style="max-width: 1200px; width: 95%; height: min(92vh, 900px); display: flex; flex-direction: column; min-height: 0;">
         <div class="modal-header">
           <h2 class="modal-title">⚡ 실시간 번개 퀴즈</h2>
           <div class="flex items-center gap-sm">
@@ -470,37 +526,25 @@ export function renderStudentDashboard(container) {
             <button class="modal-close" id="btn-close-quiz-overlay" title="닫기">✕</button>
           </div>
         </div>
-        <div class="flex-1" style="display: grid; grid-template-columns: 1fr minmax(280px, 340px); gap: 20px; overflow: hidden; padding: 12px 16px 16px;">
-          <div style="overflow-y: auto; display: flex; flex-direction: column; gap: var(--s-6); min-width: 0;">
-            <section class="quiz-problem-shell">
-              <h3 class="quiz-problem-shell__head">문제</h3>
-              <div class="quiz-problem-shell__body">
-                ${activeQuiz.problemText ? `
-                <div class="quiz-math-render-root latex-panel-root">
-                  <div class="latex-preview-panel latex-preview-panel--standalone">
-                    <div class="latex-preview-body">${escapeHtml(activeQuiz.problemText)}</div>
-                  </div>
-                </div>` : ''}
-                ${(() => {
-      const pi = activeQuiz.problemImage;
-      if (!pi) return '';
-      const rawUrl = typeof pi.url === 'string' ? pi.url.trim() : '';
-      if (rawUrl) {
-        return `<div class="quiz-problem-shell__img-wrap"><img class="quiz-problem-shell__img" src="${escapeHtml(rawUrl)}" alt="문제 이미지" loading="eager" decoding="async"/></div>`;
-      }
-      if (pi.id) {
-        return `<div class="quiz-problem-shell__img-wrap"><img class="quiz-problem-shell__img" data-quiz-problem-file="${escapeHtml(String(pi.id))}" alt="문제 이미지" loading="eager" decoding="async"/></div>`;
-      }
-      return '';
-    })()}
-              </div>
-            </section>
-            
-            <div class="card" style="padding: 22px;">
+        <div class="quiz-overlay-shell flex-1" style="min-height: 0;">
+          <section class="quiz-problem-shell quiz-problem-shell--student-overlay flex-shrink-0">
+            <h3 class="quiz-problem-shell__head">문제</h3>
+            <div class="quiz-problem-shell__body">
+              ${activeQuiz.problemText ? `
+              <div class="quiz-math-render-root latex-panel-root">
+                <div class="latex-preview-panel latex-preview-panel--standalone">
+                  <div class="latex-preview-body">${escapeHtml(activeQuiz.problemText)}</div>
+                </div>
+              </div>` : ''}
+              <div id="quiz-problem-image-root" class="quiz-problem-image-root" ${activeQuiz.problemImage ? '' : 'hidden'}></div>
+            </div>
+          </section>
+          <div class="quiz-overlay-columns">
+            <div class="quiz-overlay-submit-card card">
               <h3 style="margin-bottom: 16px; display: flex; align-items: center; gap: 10px;">
                 <span style="font-size: 1.5rem;">✍️</span> 내 풀이 제출
               </h3>
-              
+
               <div class="form-group" style="margin-bottom: 16px;">
                 <label class="input-label">답안·풀이 (텍스트)</label>
                 <textarea class="input-field" id="quiz-solve-text" rows="4" spellcheck="false" placeholder="풀이를 작성하세요. 수식은 $x^2$ 나 $$ \\frac{\\sqrt{3}}{2} $$ 같은 LaTeX를 쓸 수 있습니다."></textarea>
@@ -518,10 +562,10 @@ export function renderStudentDashboard(container) {
 
               <button class="btn btn-primary btn-lg w-full" style="min-height: 56px; font-size: 1.1rem;" id="btn-submit-quiz-solve">✨ 풀이 제출 및 공유</button>
             </div>
-          </div>
-          <div style="display: flex; flex-direction: column; height: 100%; overflow: hidden; min-height: 0;">
-            <h4 style="margin-bottom: 12px; color: var(--text-muted); font-size: 0.95rem;">친구들의 풀이</h4>
-            <div id="quiz-gallery" style="flex: 1; overflow-y: auto; display: grid; grid-template-columns: 1fr; gap: 12px; align-content: start;"></div>
+            <div class="quiz-overlay-sidebar flex flex-col overflow-hidden">
+              <h4 class="quiz-overlay-sidebar-heading">친구들의 풀이</h4>
+              <div id="quiz-gallery" class="quiz-overlay-gallery-grid"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -529,18 +573,42 @@ export function renderStudentDashboard(container) {
     document.body.appendChild(overlay);
 
     void (async () => {
-      const pending = overlay.querySelector('img[data-quiz-problem-file]');
-      if (!pending) return;
-      const id = pending.getAttribute('data-quiz-problem-file');
-      if (!id) return;
+      const root = overlay.querySelector('#quiz-problem-image-root');
+      if (!root) return;
+      const pi = activeQuiz?.problemImage;
+      if (!pi) {
+        root.hidden = true;
+        root.innerHTML = '';
+        return;
+      }
+      root.hidden = false;
+      root.innerHTML = '<p class="quiz-problem-image-placeholder">문제 이미지를 불러오는 중…</p>';
       try {
-        const meta = await getFileById(id);
-        if (meta?.url) {
-          pending.src = meta.url;
-          pending.removeAttribute('data-quiz-problem-file');
+        const url = await resolveStoredFileUrl(pi);
+        root.innerHTML = '';
+        if (!url) {
+          root.innerHTML = '<p class="quiz-problem-image-error">문제 이미지를 불러오지 못했습니다.</p>';
+          return;
         }
-      } catch (_) { /* ignore */ }
+        const wrap = document.createElement('div');
+        wrap.className = 'quiz-problem-shell__img-wrap';
+        const img = document.createElement('img');
+        img.className = 'quiz-problem-shell__img';
+        img.alt = '문제 이미지';
+        img.loading = 'eager';
+        img.decoding = 'async';
+        img.onerror = () => {
+          root.innerHTML = '<p class="quiz-problem-image-error">문제 이미지를 표시할 수 없습니다.</p>';
+        };
+        img.src = url;
+        wrap.appendChild(img);
+        root.appendChild(wrap);
+      } catch (_) {
+        root.innerHTML = '<p class="quiz-problem-image-error">문제 이미지를 불러오지 못했습니다.</p>';
+      }
     })();
+
+    void hydrateQuizGallery(quizSubmissions);
 
     // 닫기 버튼: 현재 퀴즈를 무시 목록에 추가하고 오버레이 제거
     overlay.querySelector('#btn-close-quiz-overlay').addEventListener('click', () => {
@@ -586,11 +654,10 @@ export function renderStudentDashboard(container) {
     });
 
     setTimeout(() => {
-      overlay.querySelectorAll('.quiz-math-render-root').forEach((el) => renderQuizMath(el));
+      overlay.querySelectorAll('.quiz-problem-shell .quiz-math-render-root').forEach((el) => renderQuizMath(el));
     }, 0);
 
-    if (quizSubmissions.length > 0) startSubmissionsListener(activeQuiz.id);
-}
+  }
 
   function removeQuizOverlay() {
     const existing = document.getElementById('quiz-overlay');
