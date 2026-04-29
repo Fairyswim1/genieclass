@@ -720,9 +720,17 @@ function getRandomColor() {
     return colors[Math.floor(Math.random() * colors.length)];
 }
 
+function toDateValue(dateValue) {
+    if (!dateValue) return null;
+    if (dateValue instanceof Date) return dateValue;
+    if (typeof dateValue.toDate === 'function') return dateValue.toDate();
+    if (typeof dateValue.seconds === 'number') return new Date(dateValue.seconds * 1000);
+    return new Date(dateValue);
+}
+
 export function formatDate(dateStr) {
-    if (!dateStr) return '';
-    const d = new Date(dateStr);
+    const d = toDateValue(dateStr);
+    if (!d || Number.isNaN(d.getTime())) return '';
     const month = d.getMonth() + 1;
     const day = d.getDate();
     const hours = d.getHours();
@@ -731,8 +739,8 @@ export function formatDate(dateStr) {
 }
 
 export function formatDateShort(dateStr) {
-    if (!dateStr) return '';
-    const d = new Date(dateStr);
+    const d = toDateValue(dateStr);
+    if (!d || Number.isNaN(d.getTime())) return '';
     return `${d.getMonth() + 1}월 ${d.getDate()}일`;
 }
 

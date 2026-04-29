@@ -46,6 +46,15 @@ export function renderLessonMode(container, params) {
   let recordingCtx = null;
   let recordingReqId = null;
 
+  // Observation voice recording state
+  let obsMediaRecorder = null;
+  let obsMediaChunks = [];
+  let obsAudioStream = null;
+  let obsIsRecording = false;
+  let obsNativeRecording = false;
+  let obsRecordingSeconds = 0;
+  let obsRecordingTimer = null;
+
   async function init() {
     cls = await getClassById(classId);
     if (!cls) { window.location.hash = '/teacher/dashboard'; return; }
@@ -240,6 +249,10 @@ export function renderLessonMode(container, params) {
     });
 
     document.getElementById('close-observation-modal')?.addEventListener('click', () => {
+      if (obsIsRecording) {
+        showToast('녹음 중에는 창을 닫을 수 없습니다. 녹음을 먼저 저장해주세요.', 'error');
+        return;
+      }
       document.getElementById('observation-modal').classList.remove('active');
     });
 
@@ -248,9 +261,12 @@ export function renderLessonMode(container, params) {
       document.getElementById('observation-text-view').classList.remove('hidden');
     });
 
-    document.getElementById('btn-obs-voice')?.addEventListener('click', () => {
-      showToast('음성 기록 기능을 준비 중입니다. (태블릿/전자칠판 권장)', 'info');
-      // 추후 VoiceRecorder 로직 연결
+    document.getElementById('btn-obs-voice')?.addEventListener('click', async () => {
+      await startObservationRecording();
+    });
+
+    document.getElementById('btn-stop-obs-rec')?.addEventListener('click', async () => {
+      await stopObservationRecording();
     });
 
     document.getElementById('btn-save-obs-text')?.addEventListener('click', async () => {
@@ -277,6 +293,178 @@ export function renderLessonMode(container, params) {
         saveBtn.textContent = '기록 저장하기';
       }
     });
+  }
+
+  function updateObservationTimer() {
+    const timerEl = document.getElementById('obs-rec-timer');
+    if (!timerEl) return;
+    const mins = Math.floor(obsRecordingSeconds / 60).toString().padStart(2, '0');
+    const secs = (obsRecordingSeconds % 60).toString().padStart(2, '0');
+    timerEl.textContent = `${mins}:${secs}`;
+  }
+
+  function startObservationTimer() {
+    obsRecordingSeconds = 0;
+    updateObservationTimer();
+    if (obsRecordingTimer) clearInterval(obsRecordingTimer);
+    obsRecordingTimer = setInterval(() => {
+      obsRecordingSeconds += 1;
+      updateObservationTimer();
+    }, 1000);
+  }
+
+  function stopObservationTimer() {
+    if (obsRecordingTimer) clearInterval(obsRecordingTimer);
+    obsRecordingTimer = null;
+  }
+
+  async function startObservationRecording() {
+    if (obsIsRecording) return;
+
+    document.getElementById('observation-choice-view')?.classList.add('hidden');
+    document.getElementById('observation-voice-view')?.classList.remove('hidden');
+
+    obsMediaRecorder = null;
+    obsMediaChunks = [];
+    obsAudioStream = null;
+    obsNativeRecording = false;
+
+    try {
+      const isNativeMode = Capacitor.isNativePlatform();
+      if (isNativeMode) {
+        try {
+          const permStatus = await VoiceRecorder.requestAudioRecordingPermission();
+          if (!permStatus.value) {
+            showToast('마이크 권한이 차단되었습니다.', 'error');
+            document.getElementById('observation-choice-view')?.classList.remove('hidden');
+            document.getElementById('observation-voice-view')?.classList.add('hidden');
+            return;
+          }
+        } catch (err) {
+          console.warn('[관찰 녹음] 네이티브 권한 요청 실패:', err);
+        }
+      }
+
+      const hasWebRecorder = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && typeof MediaRecorder !== 'undefined');
+      if (hasWebRecorder) {
+        try {
+          obsAudioStream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+              channelCount: 1,
+              sampleRate: 44100
+            }
+          });
+
+          const mimeTypes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
+          const selectedMime = mimeTypes.find(m => MediaRecorder.isTypeSupported(m)) || '';
+          obsMediaRecorder = new MediaRecorder(obsAudioStream, selectedMime ? { mimeType: selectedMime } : {});
+          obsMediaRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) obsMediaChunks.push(e.data);
+          };
+          obsMediaRecorder.start(200);
+        } catch (webErr) {
+          console.error('[관찰 녹음] 브라우저 녹음 시작 실패:', webErr);
+          obsAudioStream?.getTracks().forEach(track => track.stop());
+          obsAudioStream = null;
+          obsMediaRecorder = null;
+        }
+      }
+
+      if (!obsMediaRecorder && isNativeMode) {
+        await VoiceRecorder.startRecording();
+        obsNativeRecording = true;
+      }
+
+      if (!obsMediaRecorder && !obsNativeRecording) {
+        showToast('이 기기에서는 음성 녹음을 시작할 수 없습니다.', 'error');
+        document.getElementById('observation-choice-view')?.classList.remove('hidden');
+        document.getElementById('observation-voice-view')?.classList.add('hidden');
+        return;
+      }
+
+      obsIsRecording = true;
+      startObservationTimer();
+      showToast('관찰 음성 녹음을 시작했습니다.', 'info');
+    } catch (err) {
+      console.error('[관찰 녹음] 시작 오류:', err);
+      showToast('녹음 시작 중 오류가 발생했습니다.', 'error');
+      document.getElementById('observation-choice-view')?.classList.remove('hidden');
+      document.getElementById('observation-voice-view')?.classList.add('hidden');
+    }
+  }
+
+  async function stopObservationRecording() {
+    if (!obsIsRecording) return;
+
+    const stopBtn = document.getElementById('btn-stop-obs-rec');
+    if (stopBtn) {
+      stopBtn.disabled = true;
+      stopBtn.textContent = '저장 중...';
+    }
+
+    try {
+      let recordedBlob = null;
+      let mimeType = 'audio/webm';
+
+      if (obsNativeRecording) {
+        const result = await VoiceRecorder.stopRecording();
+        mimeType = result.value.mimeType || 'audio/webm';
+        const base64Str = result.value.recordDataBase64;
+        const byteCharacters = atob(base64Str);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        recordedBlob = new Blob([new Uint8Array(byteNumbers)], { type: mimeType });
+      } else if (obsMediaRecorder) {
+        const stopped = new Promise(resolve => {
+          obsMediaRecorder.onstop = () => {
+            mimeType = obsMediaRecorder.mimeType || 'audio/webm';
+            resolve(new Blob(obsMediaChunks, { type: mimeType }));
+          };
+        });
+        obsMediaRecorder.stop();
+        obsAudioStream?.getTracks().forEach(track => track.stop());
+        recordedBlob = await stopped;
+      }
+
+      if (!recordedBlob || recordedBlob.size === 0) {
+        throw new Error('녹음 데이터가 비어 있습니다.');
+      }
+
+      const ext = mimeType.includes('mp4') ? 'mp4' : (mimeType.includes('m4a') ? 'm4a' : (mimeType.includes('wav') ? 'wav' : 'webm'));
+      const audioFile = new File([recordedBlob], `observation_${Date.now()}.${ext}`, { type: mimeType });
+      const savedAudio = await saveFile(audioFile);
+      const { saveObservation } = await import('../../store.js');
+
+      await saveObservation(selectedStudent.id, classId, {
+        content: '음성 관찰 기록',
+        mode: 'voice',
+        studentName: selectedStudent.name,
+        audioData: savedAudio,
+        durationSeconds: obsRecordingSeconds
+      });
+
+      showToast('음성 관찰 기록이 저장되었습니다!');
+      document.getElementById('observation-modal')?.classList.remove('active');
+    } catch (err) {
+      console.error('[관찰 녹음] 저장 오류:', err);
+      showToast('음성 기록 저장에 실패했습니다.', 'error');
+    } finally {
+      obsIsRecording = false;
+      obsNativeRecording = false;
+      obsMediaRecorder = null;
+      obsMediaChunks = [];
+      obsAudioStream = null;
+      stopObservationTimer();
+      if (stopBtn) {
+        stopBtn.disabled = false;
+        stopBtn.textContent = '녹음 중지 및 저장';
+      }
+    }
   }
 
   // --- Quiz Mode ---

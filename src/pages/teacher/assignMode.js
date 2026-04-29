@@ -18,6 +18,7 @@ export function renderAssignMode(container, params) {
   let activeTab = 'announcements'; // 'announcements', 'assignments', 'resources'
   let editingAssignmentId = null;
   let otherClasses = []; // All classes for cross-posting
+  let currentObservations = [];
 
   // File Queues for forms
   let annFilesQueue = []; // Array of File objects for NEW uploads
@@ -42,6 +43,7 @@ export function renderAssignMode(container, params) {
     const resources = await getResourcesByClass(classId);
     const students = await getStudentsByClass(classId);
     const observations = await getObservationsByClass(classId);
+    currentObservations = observations;
 
     // Pre-calculate assignments HTML with submissions
     let assignmentsHtml = '';
@@ -384,7 +386,12 @@ export function renderAssignMode(container, params) {
                       <tr>
                         <td style="font-size: 0.85rem; color: var(--text-muted);">${formatDate(obs.createdAt)}</td>
                         <td><strong style="color: var(--primary);">${obs.studentName || '알 수 없음'}</strong></td>
-                        <td style="white-space: pre-line; text-align: left; padding: 15px 10px; line-height: 1.6;">${obs.content || '기록 없음'}</td>
+                        <td style="white-space: pre-line; text-align: left; padding: 15px 10px; line-height: 1.6;">
+                          <div>${obs.content || '기록 없음'}</div>
+                          ${obs.audioData?.url ? `
+                            <audio controls src="${obs.audioData.url}" style="width: 100%; max-width: 360px; margin-top: 10px;"></audio>
+                          ` : ''}
+                        </td>
                         <td><span class="badge ${obs.mode === 'voice' ? 'badge-blue' : 'badge-green'}">${obs.mode === 'voice' ? '음성' : '텍스트'}</span></td>
                       </tr>
                     `).join('')}
@@ -514,16 +521,16 @@ export function renderAssignMode(container, params) {
 
     // Export Observations to Excel
     document.getElementById('btn-export-observations')?.addEventListener('click', () => {
-      if (observations.length === 0) {
+      if (currentObservations.length === 0) {
         showToast('내보낼 기록이 없습니다.', 'error');
         return;
       }
 
       try {
-        const data = observations.map(obs => ({
+        const data = currentObservations.map(obs => ({
           '날짜': formatDate(obs.createdAt),
           '학생명': obs.studentName || '알 수 없음',
-          '관찰 내용 및 특기사항': obs.content || '',
+          '관찰 내용 및 특기사항': obs.audioData?.name ? `${obs.content || '음성 관찰 기록'} (${obs.audioData.name})` : (obs.content || ''),
           '구분': obs.mode === 'voice' ? '음성' : '텍스트'
         }));
 
