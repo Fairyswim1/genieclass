@@ -543,12 +543,13 @@ export async function deleteResource(resourceId) {
 }
 
 // ========== Real-time Quiz ==========
-export async function startQuiz(classId, problemImageFile) {
+export async function startQuiz(classId, problemImageFile, problemText = '') {
     const id = generateId();
     const quiz = {
         id,
         classId,
-        problemImage: problemImageFile, // { id, name, url? }
+        problemImage: problemImageFile || null, // { id, name, url? }
+        problemText,
         active: true,
         createdAt: new Date().toISOString(),
     };
@@ -571,14 +572,15 @@ export async function stopQuiz(classId) {
     }
 }
 
-export async function submitQuizSolution(quizId, studentId, studentName, solutionImageFile) {
+export async function submitQuizSolution(quizId, studentId, studentName, solutionImageFile, solutionText = '') {
     const id = generateId();
     const sub = {
         id,
         quizId,
         studentId,
         studentName,
-        image: solutionImageFile,
+        image: solutionImageFile || null,
+        solutionText,
         shared: true,
         createdAt: new Date().toISOString(),
     };

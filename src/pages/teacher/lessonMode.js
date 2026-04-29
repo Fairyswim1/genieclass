@@ -296,29 +296,56 @@ export function renderLessonMode(container, params) {
             <!-- Left: Problem & Gallery -->
             <div class="flex flex-col gap-lg">
               ${!activeQuiz ? `
-                <div class="card" style="padding: var(--s-12); text-align: center;">
-                  <h3 style="margin-bottom: var(--s-4);">새 퀴즈 출제하기</h3>
-                  <div class="drop-zone" id="quiz-img-dropzone" style="height: 300px; display: flex; flex-direction: column; justify-content: center;">
-                    <span style="font-size: 3rem; margin-bottom: 15px;">🖼️</span>
-                    <p>문제 이미지를 업로드하세요</p>
-                    <input type="file" id="quiz-img-input" class="hidden" accept="image/*" />
+                <div class="card" style="padding: var(--s-12); text-align: left;">
+                  <h3 style="margin-bottom: var(--s-6); text-align: center;">⚡ 새 퀴즈 출제하기</h3>
+                  
+                  <div class="form-group" style="margin-bottom: var(--s-6);">
+                    <label class="input-label">문제 설명 (텍스트/수식)</label>
+                    <textarea class="input-field" id="quiz-text-input" rows="4" placeholder="문제를 입력하세요. (예: 다음 식을 계산하세요. $2x + 5 = 11$)"></textarea>
+                    
+                    <div class="math-toolbar" style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 5px;">
+                      <button class="btn btn-ghost btn-sm btn-math" data-latex="\\frac{ }{ }">分</button>
+                      <button class="btn btn-ghost btn-sm btn-math" data-latex="\\sqrt{ }">√</button>
+                      <button class="btn btn-ghost btn-sm btn-math" data-latex="^2">x²</button>
+                      <button class="btn btn-ghost btn-sm btn-math" data-latex="\\pm">±</button>
+                      <button class="btn btn-ghost btn-sm btn-math" data-latex="\\times">×</button>
+                      <button class="btn btn-ghost btn-sm btn-math" data-latex="\\div">÷</button>
+                      <button class="btn btn-ghost btn-sm btn-math" data-latex="\\pi">π</button>
+                      <button class="btn btn-ghost btn-sm btn-math" data-latex="\\alpha">α</button>
+                      <button class="btn btn-ghost btn-sm btn-math" data-latex="\\beta">β</button>
+                      <button class="btn btn-ghost btn-sm btn-math" data-latex="\\theta">θ</button>
+                      <button class="btn btn-ghost btn-sm btn-math" data-latex="\\sum">Σ</button>
+                      <button class="btn btn-ghost btn-sm btn-math" data-latex="\\infty">∞</button>
+                    </div>
                   </div>
-                  <button class="btn btn-primary btn-lg w-full" style="margin-top: var(--s-6);" id="btn-start-quiz">퀴즈 시작하기</button>
+
+                  <div class="form-group" style="margin-bottom: var(--s-6);">
+                    <label class="input-label">이미지 첨부 (선택)</label>
+                    <div class="drop-zone" id="quiz-img-dropzone" style="height: 150px; display: flex; flex-direction: column; justify-content: center;">
+                      <span style="font-size: 2rem; margin-bottom: 10px;">🖼️</span>
+                      <p id="quiz-img-status">문제 이미지를 업로드하세요</p>
+                      <input type="file" id="quiz-img-input" class="hidden" accept="image/*" />
+                    </div>
+                  </div>
+
+                  <button class="btn btn-primary btn-lg w-full" style="height: 60px; font-size: 1.2rem;" id="btn-start-quiz">🚀 퀴즈 시작하기</button>
                 </div>
               ` : `
-                <div class="card" style="padding: var(--s-4);">
+                <div class="card" style="padding: var(--s-6);">
                   <div class="input-label">출제된 문제</div>
-                  <img src="${activeQuiz.problemImage.url}" style="max-height: 400px; width: 100%; object-fit: contain; background: #000; border-radius: var(--r-md);" />
+                  ${activeQuiz.problemText ? `<div class="quiz-problem-text" style="font-size: 1.3rem; margin-bottom: 15px; padding: 15px; background: var(--bg-surface); border-radius: 8px; line-height: 1.6; white-space: pre-wrap;">${activeQuiz.problemText}</div>` : ''}
+                  ${activeQuiz.problemImage ? `<img src="${activeQuiz.problemImage.url}" style="max-height: 400px; width: 100%; object-fit: contain; background: #000; border-radius: var(--r-md);" />` : ''}
                 </div>
                 
                 <div class="section-header" style="margin-top: var(--s-8);">
                   <h2 class="section-title">학생 풀이 갤러리 (${quizSubmissions.length})</h2>
                 </div>
-                <div class="grid" style="grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--s-4);">
+                <div class="grid" style="grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--s-6);">
                   ${quizSubmissions.map(s => `
-                    <div class="card" style="padding: var(--s-3);">
-                      <img src="${s.image.url}" style="width: 100%; aspect-ratio: 4/3; object-fit: cover; border-radius: var(--r-sm); cursor: pointer;" onclick="window.open('${s.image.url}')" />
-                      <div style="margin-top: 10px; font-weight: 700; text-align: center;">${s.studentName}</div>
+                    <div class="card" style="padding: var(--s-3); display: flex; flex-direction: column; gap: 10px;">
+                      ${s.image ? `<img src="${s.image.url}" style="width: 100%; aspect-ratio: 4/3; object-fit: cover; border-radius: var(--r-sm); cursor: pointer;" onclick="window.open('${s.image.url}')" />` : ''}
+                      ${s.solutionText ? `<div class="solution-text" style="padding: 10px; background: var(--bg-main); border-radius: 6px; font-size: 0.95rem; line-height: 1.5; white-space: pre-wrap;">${s.solutionText}</div>` : ''}
+                      <div style="margin-top: auto; font-weight: 700; text-align: center; color: var(--primary-light);">${s.studentName}</div>
                     </div>
                   `).join('')}
                 </div>
@@ -359,17 +386,49 @@ export function renderLessonMode(container, params) {
 
     const dropzone = document.getElementById('quiz-img-dropzone');
     const input = document.getElementById('quiz-img-input');
+    const statusText = document.getElementById('quiz-img-status');
+    const textInput = document.getElementById('quiz-text-input');
+
     dropzone?.addEventListener('click', () => input.click());
+    input?.addEventListener('change', () => {
+      if (input.files[0]) statusText.textContent = `선택됨: ${input.files[0].name}`;
+    });
+
+    document.querySelectorAll('.btn-math').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const latex = btn.dataset.latex;
+        const start = textInput.selectionStart;
+        const end = textInput.selectionEnd;
+        const text = textInput.value;
+        textInput.value = text.substring(0, start) + latex + text.substring(end);
+        textInput.focus();
+        textInput.setSelectionRange(start + latex.length, start + latex.length);
+      });
+    });
 
     document.getElementById('btn-start-quiz')?.addEventListener('click', async () => {
-      if (!input.files[0]) { showToast('이미지를 선택해주세요.', 'error'); return; }
+      const problemText = textInput.value.trim();
+      const hasImage = input.files[0];
+      if (!problemText && !hasImage) { showToast('문제 내용이나 이미지를 입력해주세요.', 'error'); return; }
+      
+      const startBtn = document.getElementById('btn-start-quiz');
+      startBtn.disabled = true;
+      startBtn.textContent = '퀴즈 시작 중...';
+
       try {
-        const saved = await saveFile(input.files[0]);
-        const quiz = await startQuiz(classId, saved);
+        let saved = null;
+        if (hasImage) saved = await saveFile(input.files[0]);
+        const quiz = await startQuiz(classId, saved, problemText);
         activeQuiz = quiz;
         startSubmissionsListener(quiz.id);
         render();
       } catch (err) { showToast('시작 중 오류 발생', 'error'); }
+      finally {
+        if (startBtn) {
+          startBtn.disabled = false;
+          startBtn.textContent = '🚀 퀴즈 시작하기';
+        }
+      }
     });
 
     document.getElementById('btn-stop-quiz')?.addEventListener('click', async () => {
@@ -387,8 +446,21 @@ export function renderLessonMode(container, params) {
     unsubscribeSubmissions = listenToQuizSubmissions(quizId, (subs) => {
       quizSubmissions = subs;
       render();
+      
+      // LaTeX rendering
+      setTimeout(() => {
+        if (window.renderMathInElement) {
+          renderMathInElement(container, {
+            delimiters: [
+              {left: '$$', right: '$$', display: true},
+              {left: '$', right: '$', display: false}
+            ],
+            throwOnError: false
+          });
+        }
+      }, 100);
     });
-  }
+}
 
   // --- Whiteboard Mode --- (Keep existing logic but styled)
   function renderWhiteboardMode() {

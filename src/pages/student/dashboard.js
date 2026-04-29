@@ -331,14 +331,25 @@ export function renderStudentDashboard(container) {
       const gallery = document.getElementById('quiz-gallery');
       if (gallery) {
         gallery.innerHTML = subs.map(s => `
-          <div class="card" style="padding: 10px; text-align: center;">
-            <img src="${s.image.url}" style="width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px;" />
-            <div style="font-size: 0.8rem; margin-top: 5px; font-weight: 700;">${s.studentName}</div>
+          <div class="card" style="padding: 10px; text-align: center; display: flex; flex-direction: column; gap: 8px;">
+            ${s.image ? `<img src="${s.image.url}" style="width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px;" />` : ''}
+            ${s.solutionText ? `<div style="font-size: 0.85rem; background: var(--bg-main); padding: 8px; border-radius: 6px; text-align: left; white-space: pre-wrap;">${s.solutionText}</div>` : ''}
+            <div style="font-size: 0.8rem; margin-top: auto; font-weight: 700; color: var(--primary-light);">${s.studentName}</div>
           </div>
         `).join('');
+        
+        if (window.renderMathInElement) {
+          renderMathInElement(gallery, {
+            delimiters: [
+              {left: '$$', right: '$$', display: true},
+              {left: '$', right: '$', display: false}
+            ],
+            throwOnError: false
+          });
+        }
       }
     });
-  }
+}
 
   // Track dismissed quiz IDs so they don't reappear
   let dismissedQuizIds = new Set();
@@ -360,23 +371,39 @@ export function renderStudentDashboard(container) {
         </div>
         <div class="flex-1" style="display: grid; grid-template-columns: 1fr 340px; gap: 20px; overflow: hidden; padding: 10px 0;">
           <div style="overflow-y: auto; display: flex; flex-direction: column; gap: 20px;">
-            <div class="card" style="background: #000; padding: 0; overflow: hidden;">
-              <div class="input-label" style="padding: 10px 15px; background: rgba(255,255,255,0.05); margin: 0;">📋 문제</div>
-              <img src="${activeQuiz.problemImage.url}" style="width: 100%; max-height: 400px; object-fit: contain;" />
-            </div>
-            <div class="card" style="padding: 20px;">
-              <h3 style="margin-bottom: 15px;">내 풀이 제출</h3>
-              <div class="drop-zone" id="quiz-solve-dropzone" style="padding: 30px;">
-                <span style="font-size: 1.5rem;">📷</span>
-                <p>풀이 사진을 업로드하세요</p>
-                <input type="file" id="quiz-solve-input" class="hidden" accept="image/*" />
+            <div class="card" style="background: var(--bg-surface); padding: 0; overflow: hidden; border: 2px solid var(--primary-light);">
+              <div class="input-label" style="padding: 10px 15px; background: rgba(255,255,255,0.05); margin: 0; font-size: 1.1rem; color: var(--primary-light);">📋 문제</div>
+              <div style="padding: 20px;">
+                ${activeQuiz.problemText ? `<div id="quiz-problem-text" style="font-size: 1.4rem; line-height: 1.6; margin-bottom: 20px; white-space: pre-wrap;">${activeQuiz.problemText}</div>` : ''}
+                ${activeQuiz.problemImage ? `<img src="${activeQuiz.problemImage.url}" style="width: 100%; max-height: 500px; object-fit: contain; border-radius: 8px; background: #000;" />` : ''}
               </div>
-              <button class="btn btn-primary btn-lg w-full" style="margin-top: 15px;" id="btn-submit-quiz-solve">풀이 제출 및 공유</button>
+            </div>
+            
+            <div class="card" style="padding: 25px;">
+              <h3 style="margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 1.5rem;">✍️</span> 내 풀이 제출
+              </h3>
+              
+              <div class="form-group" style="margin-bottom: 20px;">
+                <label class="input-label">답안 입력 (선택)</label>
+                <textarea class="input-field" id="quiz-solve-text" rows="3" placeholder="답안을 입력하세요. 수식은 $...$ 사이에 입력하세요."></textarea>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 20px;">
+                <label class="input-label">사진 제출 (선택)</label>
+                <div class="drop-zone" id="quiz-solve-dropzone" style="padding: 20px; height: 120px;">
+                  <span style="font-size: 1.5rem;">📷</span>
+                  <p id="quiz-solve-status">풀이 사진을 업로드하세요</p>
+                  <input type="file" id="quiz-solve-input" class="hidden" accept="image/*" />
+                </div>
+              </div>
+
+              <button class="btn btn-primary btn-lg w-full" style="height: 60px; font-size: 1.2rem;" id="btn-submit-quiz-solve">✨ 풀이 제출 및 공유</button>
             </div>
           </div>
           <div style="display: flex; flex-direction: column; height: 100%; overflow: hidden;">
-            <h4 style="margin-bottom: 10px;">친구들의 풀이</h4>
-            <div id="quiz-gallery" style="flex: 1; overflow-y: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-content: start;"></div>
+            <h4 style="margin-bottom: 15px; color: var(--text-muted);">친구들의 풀이</h4>
+            <div id="quiz-gallery" style="flex: 1; overflow-y: auto; display: grid; grid-template-columns: 1fr; gap: 15px; align-content: start;"></div>
           </div>
         </div>
       </div>
@@ -392,18 +419,55 @@ export function renderStudentDashboard(container) {
       removeQuizOverlay();
     });
 
-    overlay.querySelector('#quiz-solve-dropzone').addEventListener('click', () => overlay.querySelector('#quiz-solve-input').click());
-    overlay.querySelector('#btn-submit-quiz-solve').addEventListener('click', async () => {
-      const input = overlay.querySelector('#quiz-solve-input');
-      if (input.files.length === 0) { showToast('풀이 이미지를 선택해주세요.', 'error'); return; }
-      try {
-        const saved = await saveFile(input.files[0]);
-        await submitQuizSolution(activeQuiz.id, student.id, student.name, saved);
-        showToast('풀이가 제출되었습니다! 잘했어요! 🎉');
-      } catch (err) { showToast('제출 중 오류 발생', 'error'); }
+    const solveInput = overlay.querySelector('#quiz-solve-input');
+    const solveStatus = overlay.querySelector('#quiz-solve-status');
+    const solveText = overlay.querySelector('#quiz-solve-text');
+
+    overlay.querySelector('#quiz-solve-dropzone').addEventListener('click', () => solveInput.click());
+    solveInput.addEventListener('change', () => {
+      if (solveInput.files[0]) solveStatus.textContent = `선택됨: ${solveInput.files[0].name}`;
     });
+
+    overlay.querySelector('#btn-submit-quiz-solve').addEventListener('click', async () => {
+      const solutionText = solveText.value.trim();
+      const hasImage = solveInput.files[0];
+      
+      if (!solutionText && !hasImage) { showToast('답안을 입력하거나 사진을 선택해주세요.', 'error'); return; }
+      
+      const submitBtn = overlay.querySelector('#btn-submit-quiz-solve');
+      submitBtn.disabled = true;
+      submitBtn.textContent = '제출 중...';
+
+      try {
+        let saved = null;
+        if (hasImage) saved = await saveFile(solveInput.files[0]);
+        await submitQuizSolution(activeQuiz.id, student.id, student.name, saved, solutionText);
+        showToast('풀이가 제출되었습니다! 잘했어요! 🎉');
+        solveText.value = '';
+        solveInput.value = '';
+        solveStatus.textContent = '풀이 사진을 업로드하세요';
+      } catch (err) { showToast('제출 중 오류 발생', 'error'); }
+      finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = '✨ 풀이 제출 및 공유';
+      }
+    });
+
+    // LaTeX rendering for problem and gallery
+    setTimeout(() => {
+      if (window.renderMathInElement) {
+        renderMathInElement(overlay, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false}
+          ],
+          throwOnError: false
+        });
+      }
+    }, 100);
+
     if (quizSubmissions.length > 0) startSubmissionsListener(activeQuiz.id);
-  }
+}
 
   function removeQuizOverlay() {
     const existing = document.getElementById('quiz-overlay');
