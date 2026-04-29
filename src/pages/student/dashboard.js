@@ -267,7 +267,7 @@ export function renderStudentDashboard(container) {
                 <div class="flex flex-col gap-sm student-dashboard-announce-scroll">
                    ${announcements.length === 0 ? '<p class="text-center" style="color: var(--text-dim); padding: 20px;">새로운 소식이 없습니다.</p>' : announcements.map(ann => `
                      <div class="feed-item" style="margin-bottom: 0;">
-                       <div style="font-weight: 700; margin-bottom: 8px; color: var(--text-white);">${ann.title}</div>
+                       <div style="font-weight: 700; margin-bottom: 8px; color: var(--text-main);">${ann.title}</div>
                        <p style="font-size: 0.9rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 15px;">${ann.content}</p>
                        ${ann.files && ann.files.length > 0 ? `
                          <div class="flex gap-sm" style="margin-bottom: 10px; flex-wrap: wrap;">
@@ -450,7 +450,7 @@ export function renderStudentDashboard(container) {
                     <div class="latex-preview-body">${escapeHtml(activeQuiz.problemText)}</div>
                   </div>
                 </div>` : ''}
-                ${activeQuiz.problemImage ? `<img class="quiz-problem-shell__img" src="${activeQuiz.problemImage.url}" alt="문제 이미지"/>` : ''}
+                ${activeQuiz.problemImage ? `<div class="quiz-problem-shell__img-wrap"><img class="quiz-problem-shell__img" src="${activeQuiz.problemImage.url}" alt="문제 이미지" loading="lazy" decoding="async"/></div>` : ''}
               </div>
             </section>
             

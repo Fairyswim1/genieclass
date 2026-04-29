@@ -127,7 +127,53 @@
   color: #fff;
 }
 
-/* 학생 문제 영역 카드 헤더 (기존 shell 유지) */
+/* 학생 번개 퀴즈 — 문제 카드 · 이미지가 뷰포트를 넘지 않도록 */
+.quiz-problem-shell {
+  border-radius: var(--r-md, 12px);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(255, 255, 255, 0.65);
+  overflow: hidden;
+  min-width: 0;
+}
+
+.quiz-problem-shell__head {
+  margin: 0;
+  padding: 10px 14px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  background: rgba(248, 250, 252, 0.95);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.quiz-problem-shell__body {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.quiz-problem-shell__img-wrap {
+  width: 100%;
+  max-height: min(48dvh, 420px);
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.04);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.quiz-problem-shell__img {
+  display: block;
+  max-width: 100%;
+  max-height: min(48dvh, 420px);
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+
 .quiz-problem-shell__head.quiz-head-light {
   background: linear-gradient(90deg, #e0f2fe 0%, #f0fdf4 100%);
   color: #0369a1;
