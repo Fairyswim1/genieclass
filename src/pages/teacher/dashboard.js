@@ -284,14 +284,14 @@ export function renderTeacherDashboard(container) {
         <span style="font-size:3rem;">📚</span>
         <div>
           <div style="font-size:1.4rem; font-weight:800; margin-bottom:8px;">수업 모드</div>
-          <div style="font-size:0.95rem; color:var(--text-muted); line-height:1.5;">실시간 수업을 진행하며 학생들에게 캐릭터 칭찬을 해주고 발표를 기록합니다.</div>
+          <div style="font-size:0.95rem; color:var(--text-muted); line-height:1.5;">학생별 칭찬, 발표 기록, 번개 퀴즈, 관찰 기록을 활용해 실시간 수업 활동을 진행합니다.</div>
         </div>
       </div>
       <div class="mode-card card card-clickable animate-up" onclick="window.location.hash='/teacher/class/${classId}/assign'" style="width:100%; height:auto; min-height:120px; text-align:left; display:flex; align-items:center; gap:20px; padding:25px; animation-delay:0.1s;">
         <span style="font-size:3rem;">📝</span>
         <div>
           <div style="font-size:1.4rem; font-weight:800; margin-bottom:8px;">과제 및 자료 관리</div>
-          <div style="font-size:0.95rem; color:var(--text-muted); line-height:1.5;">공지사항 게시, 과제 출제 및 학생들의 제출물을 확인하고 관리합니다.</div>
+          <div style="font-size:0.95rem; color:var(--text-muted); line-height:1.5;">공지사항, 과제, 수업 자료를 관리하고 학생 제출물과 생기부 관찰 기록을 확인합니다.</div>
         </div>
       </div>
     `;
