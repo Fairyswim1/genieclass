@@ -9,6 +9,7 @@ import {
   deletePresentationById
 } from '../../store.js';
 import { escapeHtml, renderQuizMath } from '../../utils/quizMath.js';
+import { renderQuizLatexKeyboardHtml } from '../../utils/quizLatexKeyboard.js';
 import { renderCharacter, getLevelConfig, renderPraiseAnimation } from '../../components/characterAvatar.js';
 import { getStroke } from 'perfect-freehand';
 import { Capacitor } from '@capacitor/core';
@@ -491,30 +492,11 @@ export function renderLessonMode(container, params) {
                   
                   <div class="form-group" style="margin-bottom: var(--s-6);">
                     <label class="input-label">문제 설명 (텍스트·수식)</label>
-                    <textarea class="input-field quiz-text-input-enhanced" id="quiz-text-input" rows="5" spellcheck="false" placeholder="예) $2x^2 - 5x + 3 = 0$ 의 두 근을 구하시오.&#10;&#10;긴 수식은 오른쪽처럼 별도 줄에 $$ ... $$ 로 감싸면 가운데 정렬됩니다."></textarea>
-                    
-                    <div class="quiz-math-toolbar" style="margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center;">
-                      <span style="font-size: 0.75rem; color: var(--text-dim); width: 100%; margin-bottom: 2px;">자주 쓰는 기호 삽입 (커서 위치에 추가)</span>
-                      <button type="button" class="btn btn-ghost btn-sm btn-math" data-latex="\\frac{a}{b}" title="분수 템플릿">분수</button>
-                      <button type="button" class="btn btn-ghost btn-sm btn-math" data-latex="\\sqrt{x}" title="루트">√</button>
-                      <button type="button" class="btn btn-ghost btn-sm btn-math" data-latex="x^2" title="제곱">$x^2$</button>
-                      <button type="button" class="btn btn-ghost btn-sm btn-math" data-latex="\\pm">±</button>
-                      <button type="button" class="btn btn-ghost btn-sm btn-math" data-latex="\\times">×</button>
-                      <button type="button" class="btn btn-ghost btn-sm btn-math" data-latex="\\div">÷</button>
-                      <button type="button" class="btn btn-ghost btn-sm btn-math" data-latex="\\leq">≤</button>
-                      <button type="button" class="btn btn-ghost btn-sm btn-math" data-latex="\\geq">≥</button>
-                      <button type="button" class="btn btn-ghost btn-sm btn-math" data-latex="\\neq">≠</button>
-                      <button type="button" class="btn btn-ghost btn-sm btn-math" data-latex="\\pi">π</button>
-                      <button type="button" class="btn btn-ghost btn-sm btn-math" data-latex="\\alpha">α</button>
-                      <button type="button" class="btn btn-ghost btn-sm btn-math" data-latex="\\beta">β</button>
-                      <button type="button" class="btn btn-ghost btn-sm btn-math" data-latex="\\theta">θ</button>
-                      <button type="button" class="btn btn-ghost btn-sm btn-math" data-latex="\\sum">Σ</button>
-                      <button type="button" class="btn btn-ghost btn-sm btn-math" data-latex="\\infty">∞</button>
-                      <button type="button" class="btn btn-ghost btn-sm btn-math" data-latex="\\int">∫</button>
-                    </div>
-                    <label class="input-label" style="margin-top: var(--s-6);">미리보기 (출제 후 학생에게도 같은 스타일로 보입니다)</label>
-                    <div id="quiz-live-math-preview" class="quiz-math-board quiz-math-board--live" aria-live="polite">
-                      <p class="quiz-math-placeholder">위에 문제를 입력하면 여기에서 수식이 렌더링됩니다. 예: 근의 공식은 $x=\frac{-b\pm\sqrt{b^2-4ac}}{2a}$ 입니다.</p>
+                    <textarea class="input-field quiz-text-input-enhanced" id="quiz-text-input" rows="5" spellcheck="false" placeholder="예) $2x^2 - 5x + 3 = 0$ 의 두 근을 구하시오.&#10;&#10;긴 수식 줄은 전체를 $$ … $$ 로 감싸면 가운데 정렬됩니다. 아래 패드에서 LaTeX를 넣으면 미리보기에 바로 반영됩니다."></textarea>
+                    ${renderQuizLatexKeyboardHtml()}
+                    <label class="input-label" style="margin-top: var(--s-6);">미리보기 (학생에게도 같은 스타일로 보입니다)</label>
+                    <div id="quiz-live-math-preview" class="latex-preview-panel latex-preview-live" aria-live="polite">
+                      <p class="latex-preview-placeholder">위에 문제를 입력하면 여기에 수식과 글이 함께 보입니다. $x=-b\\pm\\sqrt{b^2-4ac}$ 와 같은 수식도 지원합니다.</p>
                     </div>
                   </div>
 
@@ -533,9 +515,9 @@ export function renderLessonMode(container, params) {
                 <div class="card" style="padding: var(--s-8); margin-bottom: var(--s-4);">
                   <div class="input-label" style="margin-bottom: 12px; font-weight: 700;">출제 중인 문제</div>
                   ${activeQuiz.problemText ? `
-                  <div class="quiz-math-render-root">
-                    <div class="quiz-math-board">
-                      <div class="quiz-math-board__inner">${escapeHtml(activeQuiz.problemText)}</div>
+                  <div class="quiz-math-render-root latex-panel-root">
+                    <div class="latex-preview-panel latex-preview-panel--standalone">
+                      <div class="latex-preview-body">${escapeHtml(activeQuiz.problemText)}</div>
                     </div>
                   </div>` : ''}
                   ${activeQuiz.problemImage ? `
@@ -604,32 +586,43 @@ export function renderLessonMode(container, params) {
       if (input.files[0]) statusText.textContent = `선택됨: ${input.files[0].name}`;
     });
 
-    document.querySelectorAll('.btn-math').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const latex = btn.dataset.latex;
-        const start = textInput.selectionStart;
-        const end = textInput.selectionEnd;
-        const text = textInput.value;
-        textInput.value = text.substring(0, start) + latex + text.substring(end);
-        textInput.focus();
-        textInput.setSelectionRange(start + latex.length, start + latex.length);
-        refreshTeacherQuizPreview();
-      });
-    });
-
     let previewDebounce;
     const refreshTeacherQuizPreview = () => {
       const preview = document.getElementById('quiz-live-math-preview');
       const ti = document.getElementById('quiz-text-input');
       if (!preview || !ti) return;
+      preview.classList.add('latex-preview-panel');
       const raw = ti.value;
       if (!raw.trim()) {
-        preview.innerHTML = '<p class="quiz-math-placeholder">위에 문제를 입력하면 여기에서 수식이 렌더링됩니다. 예: 근의 공식은 $x=\\frac{-b\\pm\\sqrt{b^2-4ac}}{2a}$ 입니다.</p>';
+        preview.innerHTML = '<p class="latex-preview-placeholder">위에 문제를 입력하면 여기에 수식과 글이 함께 보입니다. $x=-b\\pm\\sqrt{b^2-4ac}$ 같은 수식도 지원합니다.</p>';
         return;
       }
-      preview.innerHTML = `<div class="quiz-math-board"><div class="quiz-math-board__inner">${escapeHtml(raw)}</div></div>`;
+      preview.innerHTML = `<div class="latex-preview-body quiz-math-render-root">${escapeHtml(raw)}</div>`;
       renderQuizMath(preview);
     };
+
+    const kb = document.getElementById('quiz-latex-keyboard');
+    if (kb && textInput) {
+      kb.addEventListener('click', (e) => {
+        const tabBtn = e.target.closest('[data-latex-tab]');
+        if (tabBtn) {
+          const i = parseInt(tabBtn.dataset.latexTab, 10);
+          kb.querySelectorAll('.latex-kb-tab').forEach((t) => t.classList.toggle('latex-kb-tab--active', t === tabBtn));
+          kb.querySelectorAll('.latex-kb-panel').forEach((p, j) => p.classList.toggle('latex-kb-panel--visible', j === i));
+          return;
+        }
+        const sym = e.target.closest('.latex-kb-insert');
+        if (!sym) return;
+        const latex = decodeURIComponent(sym.dataset.latexInsert || '');
+        const start = textInput.selectionStart ?? 0;
+        const end = textInput.selectionEnd ?? 0;
+        const txt = textInput.value;
+        textInput.value = txt.substring(0, start) + latex + txt.substring(end);
+        textInput.focus();
+        textInput.setSelectionRange(start + latex.length, start + latex.length);
+        refreshTeacherQuizPreview();
+      });
+    }
 
     textInput?.addEventListener('input', () => {
       clearTimeout(previewDebounce);

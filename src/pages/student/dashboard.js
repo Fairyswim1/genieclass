@@ -445,9 +445,9 @@ export function renderStudentDashboard(container) {
               <h3 class="quiz-problem-shell__head">문제</h3>
               <div class="quiz-problem-shell__body">
                 ${activeQuiz.problemText ? `
-                <div class="quiz-math-render-root">
-                  <div class="quiz-math-board">
-                    <div class="quiz-math-board__inner">${escapeHtml(activeQuiz.problemText)}</div>
+                <div class="quiz-math-render-root latex-panel-root">
+                  <div class="latex-preview-panel latex-preview-panel--standalone">
+                    <div class="latex-preview-body">${escapeHtml(activeQuiz.problemText)}</div>
                   </div>
                 </div>` : ''}
                 ${activeQuiz.problemImage ? `<img class="quiz-problem-shell__img" src="${activeQuiz.problemImage.url}" alt="문제 이미지"/>` : ''}
