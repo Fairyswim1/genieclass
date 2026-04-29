@@ -4,7 +4,8 @@ import {
   createAnnouncement, getAnnouncementsByClass, deleteAnnouncement,
   addResource, getResourcesByClass, deleteResource,
   getSubmissionsByAssignment, saveFile, showToast, formatDate,
-  getStudentById, downloadFile as storeDownloadFile, getObservationsByClass
+  getStudentById, downloadFile as storeDownloadFile, getObservationsByClass,
+  getStudentSelfRecordsByClass
 } from '../../store.js';
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
@@ -15,7 +16,7 @@ export function renderAssignMode(container, params) {
 
   const classId = params.id;
   let cls = null;
-  let activeTab = 'announcements'; // 'announcements', 'assignments', 'resources'
+  let activeTab = 'announcements'; // 'announcements', 'assignments', 'resources', 'observations', 'selfrecords'
   let editingAssignmentId = null;
   let otherClasses = []; // All classes for cross-posting
   let currentObservations = [];
@@ -44,7 +45,47 @@ export function renderAssignMode(container, params) {
     const students = await getStudentsByClass(classId);
     const observations = await getObservationsByClass(classId);
     currentObservations = observations;
+    const selfRecords = await getStudentSelfRecordsByClass(classId);
 
+    const recordsByStudent = selfRecords.reduce((acc, record) => {
+      if (!record.studentId) return acc;
+      if (!acc[record.studentId]) acc[record.studentId] = [];
+      acc[record.studentId].push(record);
+      return acc;
+    }, {});
+    students.forEach(st => {
+      if (!recordsByStudent[st.id]) recordsByStudent[st.id] = [];
+    });
+
+    const selfRecordRowsHtml = [];
+    [...students].sort((a, b) => String(a.name).localeCompare(String(b.name), 'ko')).forEach(st => {
+      const list = (recordsByStudent[st.id] || []).slice().sort((x, y) => new Date(y.createdAt) - new Date(x.createdAt));
+      if (!list.length) {
+        selfRecordRowsHtml.push(`
+          <tr>
+            <td colspan="5" style="text-align: left; padding: 12px 14px; color: var(--text-dim); font-size: 0.88rem;">
+              <strong style="color: var(--text-main);">${st.name}</strong> — 아직 작성한 기록이 없습니다.
+            </td>
+          </tr>
+        `);
+        return;
+      }
+      list.forEach((rec) => {
+        selfRecordRowsHtml.push(`
+          <tr>
+            <td style="font-size: 0.85rem; color: var(--text-muted); white-space: nowrap;">${formatDate(rec.createdAt)}</td>
+            <td><strong style="color: var(--primary);">${st.name}</strong></td>
+            <td style="font-weight: 600;">${rec.title || '제목 없음'}</td>
+            <td style="text-align: left; white-space: pre-line; line-height: 1.55; padding: 10px;">${rec.content || ''}</td>
+            <td style="text-align: left; vertical-align: top;">
+              ${rec.files && rec.files.length ? rec.files.map(f => `
+                <button type="button" class="btn btn-secondary btn-sm" style="font-size: 0.72rem; margin: 2px 4px 2px 0;" onclick="window.downloadFile('${f.id}')">📎 ${f.name}</button>
+              `).join('') : '<span style="font-size: 0.8rem; color: var(--text-dim);">—</span>'}
+            </td>
+          </tr>
+        `);
+      });
+    });
     // Pre-calculate assignments HTML with submissions
     let assignmentsHtml = '';
     if (assignments.length === 0) {
@@ -142,11 +183,12 @@ export function renderAssignMode(container, params) {
             <p class="page-subtitle" style="color: var(--text-muted); margin-top: var(--s-2);">수업 소식, 과제 및 학습 자료를 관리합니다.</p>
           </header>
 
-          <div class="tabs" style="margin-bottom: var(--s-12); max-width: 800px;">
+          <div class="tabs" style="margin-bottom: var(--s-12); max-width: 100%; flex-wrap: wrap;">
             <div class="tab ${activeTab === 'announcements' ? 'active' : ''}" data-tab="announcements">📢 공지사항</div>
             <div class="tab ${activeTab === 'assignments' ? 'active' : ''}" data-tab="assignments">📝 과제 관리</div>
             <div class="tab ${activeTab === 'resources' ? 'active' : ''}" data-tab="resources">📁 수업 자료</div>
             <div class="tab ${activeTab === 'observations' ? 'active' : ''}" data-tab="observations">📋 생기부 관리</div>
+            <div class="tab ${activeTab === 'selfrecords' ? 'active' : ''}" data-tab="selfrecords">📌 학생 자기 기록</div>
           </div>
 
           <!-- 공지사항 섹션 -->
@@ -397,6 +439,42 @@ export function renderAssignMode(container, params) {
                     `).join('')}
                   </tbody>
                 </table>
+              `}
+            </div>
+          </div>
+
+          <!-- 학생 자기 기록 (생기부 참고용) -->
+          <div id="section-selfrecords" class="${activeTab !== 'selfrecords' ? 'hidden' : 'animate-up'}">
+            <div class="section-header">
+              <h2 class="section-title">학생 자기 기록 (생기부 참고)</h2>
+            </div>
+            <p style="font-size: 0.92rem; color: var(--text-muted); margin-bottom: var(--s-6); line-height: 1.55;">
+              학생이 대시보드에서 남긴 참고용 기록입니다. 교사의 <strong>관찰 기록</strong>과 별도로 저장됩니다.
+            </p>
+            <div class="card" style="padding: var(--s-6);">
+              ${selfRecords.length === 0 ? `
+                <div class="empty-board">
+                  <div class="empty-board-icon">📌</div>
+                  <p style="font-size: 1.1rem; font-weight: 600; color: var(--text-main); margin-bottom: 8px;">등록된 학생 기록이 없습니다.</p>
+                  <p style="font-size: 0.9rem;">학생이 기록을 남기면 여기에 표시됩니다.</p>
+                </div>
+              ` : `
+                <div style="overflow-x: auto;">
+                  <table class="board-table">
+                    <thead>
+                      <tr>
+                        <th style="width: 120px;">날짜</th>
+                        <th style="width: 90px;">학생</th>
+                        <th style="width: 160px;">제목</th>
+                        <th>내용</th>
+                        <th style="width: 200px;">첨부</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${selfRecordRowsHtml.join('')}
+                    </tbody>
+                  </table>
+                </div>
               `}
             </div>
           </div>

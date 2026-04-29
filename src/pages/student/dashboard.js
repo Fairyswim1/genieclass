@@ -89,7 +89,7 @@ export function renderStudentDashboard(container) {
           </div>
         </header>
 
-        <main class="student-dashboard">
+        <main class="student-dashboard student-dashboard--compact">
           <section class="student-welcome flex justify-between items-end">
             <div>
               <h1 class="student-welcome-title">반가워요, <span>${freshStudent.name}</span>님!</h1>
@@ -114,7 +114,7 @@ export function renderStudentDashboard(container) {
           </section>
 
           <!-- Character & Progress -->
-          <section class="card flex items-center gap-md" style="margin-bottom: var(--s-6); padding: var(--s-4) var(--s-6);">
+          <section class="card student-dashboard-char-row flex items-center gap-md">
             <div class="student-character-float">
               ${renderCharacter(freshStudent.characterLevel, 70, freshStudent.characterType || 'apple', freshStudent.totalPoints)}
             </div>
@@ -131,9 +131,9 @@ export function renderStudentDashboard(container) {
               </div>
             </div>
           </section>
-          <div class="student-grid-73">
+          <div class="student-grid-73 student-dashboard-main-grid">
             <!-- Assignments & Records -->
-            <div class="flex flex-col gap-lg">
+            <div class="flex flex-col student-dashboard-col-gap">
               <div class="section-card card">
                 <div class="section-card-header">
                   <span style="font-size: 1.2rem;">📝</span>
@@ -173,14 +173,14 @@ export function renderStudentDashboard(container) {
               </div>
             </div>
 
-            <div class="flex flex-col gap-lg">
+            <div class="flex flex-col student-dashboard-col-gap">
               <!-- Announcements -->
               <div class="section-card card">
                 <div class="section-card-header">
                   <span style="font-size: 1.2rem;">📢</span>
                   <h2 class="section-card-title">공지사항</h2>
                 </div>
-                <div class="flex flex-col gap-sm" style="max-height: 320px; overflow-y: auto; padding-right: 4px;">
+                <div class="flex flex-col gap-sm student-dashboard-announce-scroll">
                    ${announcements.length === 0 ? '<p class="text-center" style="color: var(--text-dim); padding: 20px;">새로운 소식이 없습니다.</p>' : announcements.map(ann => `
                      <div class="feed-item" style="margin-bottom: 0;">
                        <div style="font-weight: 700; margin-bottom: 8px; color: var(--text-white);">${ann.title}</div>
@@ -209,7 +209,7 @@ export function renderStudentDashboard(container) {
                   <input type="text" class="input-field" id="self-record-title" placeholder="제목을 입력하세요" />
                 </div>
                 <div class="form-group" style="margin-bottom: var(--s-3);">
-                  <textarea class="input-field" id="self-record-content" rows="4" placeholder="기록할 내용을 입력하세요"></textarea>
+                  <textarea class="input-field" id="self-record-content" rows="3" placeholder="기록할 내용을 입력하세요"></textarea>
                 </div>
                 <div class="drop-zone" id="self-record-dropzone" style="height: 110px; padding: 16px; margin-bottom: var(--s-3);">
                   <div style="font-size: 1.4rem;">📎</div>
@@ -240,7 +240,7 @@ export function renderStudentDashboard(container) {
             </div>
           </div>
 
-          <div class="student-grid-37" style="margin-top: var(--s-12);">
+          <div class="student-grid-37 student-dashboard-bottom-grid">
             <!-- My Presentations -->
             <div class="section-card card">
               <div class="section-card-header">

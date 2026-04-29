@@ -77,6 +77,83 @@
     animation: slideUpFade 0.7s var(--ease-out);
 }
 
+/* 더 많은 정보를 한 화면에서 볼 수 있도록 밀도를 조금 올림 */
+.student-dashboard--compact {
+    padding: var(--s-3) var(--s-4) var(--s-8);
+    max-width: 1240px;
+}
+
+.student-dashboard--compact .student-welcome {
+    margin-bottom: var(--s-3);
+}
+
+.student-dashboard--compact .student-welcome-title {
+    font-size: 1.65rem;
+    margin-bottom: 4px;
+}
+
+.student-dashboard--compact .student-welcome-subtitle {
+    font-size: 0.98rem;
+}
+
+.student-dashboard--compact .student-stats-row {
+    gap: var(--s-4);
+    margin-bottom: var(--s-4);
+}
+
+.student-dashboard--compact .stat-card-value-display {
+    font-size: 2.25rem;
+}
+
+.student-dashboard-main-grid.student-grid-73 {
+    gap: var(--s-6);
+    grid-template-columns: 1.6fr 1fr;
+}
+
+.student-dashboard-col-gap {
+    gap: var(--s-6);
+}
+
+.student-dashboard-bottom-grid.student-grid-37 {
+    margin-top: var(--s-6);
+    gap: var(--s-6);
+    grid-template-columns: 1.15fr 1.85fr;
+}
+
+.student-dashboard-announce-scroll {
+    max-height: 220px;
+    overflow-y: auto;
+    padding-right: 6px;
+}
+
+.student-dashboard-char-row {
+    margin-bottom: var(--s-4);
+    padding: var(--s-3) var(--s-6);
+}
+
+.student-dashboard--compact #self-record-dropzone {
+    height: 92px;
+    padding: 12px;
+}
+
+.student-dashboard--compact .section-card {
+    padding: var(--s-6);
+}
+
+.student-dashboard--compact .section-card-header {
+    margin-bottom: var(--s-4);
+    padding-bottom: var(--s-3);
+}
+
+.student-dashboard--compact .section-card-title {
+    font-size: 1.25rem;
+}
+
+.student-dashboard--compact .interactive-item {
+    padding: var(--s-4);
+    margin-bottom: var(--s-3);
+}
+
 .student-welcome {
     margin-bottom: var(--s-4);
     text-align: left;
@@ -164,6 +241,11 @@
 
 @media (max-width: 1200px) {
     .student-grid, .student-grid-73, .student-grid-37 {
+        grid-template-columns: 1fr;
+    }
+
+    .student-dashboard-main-grid.student-grid-73,
+    .student-dashboard-bottom-grid.student-grid-37 {
         grid-template-columns: 1fr;
     }
 }
@@ -271,4 +353,4 @@
 @keyframes bounce {
     0%, 100% { transform: translateY(0) rotate(0deg); }
     50% { transform: translateY(-15px) rotate(2deg); }
-}
+}

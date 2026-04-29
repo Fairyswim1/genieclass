@@ -556,6 +556,17 @@ export async function getStudentSelfRecords(studentId) {
         .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 }
 
+export async function getStudentSelfRecordsByClass(classId) {
+    const q = query(
+        collection(db, COLLECTIONS.STUDENT_SELF_RECORDS),
+        where('classId', '==', classId)
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs
+        .map(doc => doc.data())
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+}
+
 // ========== Announcements ==========
 export async function createAnnouncement(classId, data) {
     const id = generateId();
