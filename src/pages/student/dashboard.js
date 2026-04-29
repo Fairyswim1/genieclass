@@ -10,7 +10,8 @@ import {
   showToast, downloadFile, getStudentByCode,
   submitAssignment, saveFile, updateStudentCharacterType,
   getPresentationsByClass, toggleSharePresentation,
-  createStudentSelfRecord, getStudentSelfRecords
+  createStudentSelfRecord, getStudentSelfRecords,
+  createStudentNote, getStudentNotesByStudent
 } from '../../store.js';
 import { renderCharacter, getLevelConfig, PLANT_TYPES, getLevelProgress } from '../../components/characterAvatar.js';
 
@@ -48,6 +49,7 @@ export function renderStudentDashboard(container) {
     let resources = [];
     let sharedPresentations = [];
     let selfRecords = [];
+    let studentNotes = [];
 
     try {
       freshStudent = await getStudentByCode(student.uniqueCode) || student;
@@ -56,13 +58,14 @@ export function renderStudentDashboard(container) {
       progress = getLevelProgress(freshStudent.totalPoints || 0);
 
       let allPresentations = [];
-      [assignments, submissions, announcements, resources, allPresentations, selfRecords] = await Promise.all([
+      [assignments, submissions, announcements, resources, allPresentations, selfRecords, studentNotes] = await Promise.all([
         cls ? getAssignmentsByClass(cls.id) : [],
         getSubmissionsByStudent(freshStudent.id),
         cls ? getAnnouncementsByClass(cls.id) : [],
         cls ? getResourcesByClass(cls.id) : [],
         cls ? getPresentationsByClass(cls.id) : [],
         getStudentSelfRecords(freshStudent.id),
+        getStudentNotesByStudent(freshStudent.id),
       ]);
       presentations = allPresentations.filter(p => p.studentId === freshStudent.id);
       sharedPresentations = allPresentations.filter(p => p.studentId !== freshStudent.id && p.shared === true);
@@ -110,6 +113,86 @@ export function renderStudentDashboard(container) {
             <div class="card stat-card">
               <div class="stat-card-label">총 포인트</div>
               <div class="stat-card-value-display" style="color: var(--primary-light)">${freshStudent.totalPoints}</div>
+            </div>
+          </section>
+
+          <div class="student-grid-37 student-dashboard-presentations-grid">
+            <!-- My Presentations -->
+            <div class="section-card card">
+              <div class="section-card-header">
+                <span style="font-size: 1.2rem;">🎤</span>
+                <h2 class="section-card-title">나의 발표 기록</h2>
+              </div>
+              <div class="grid" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--s-4);">
+                 ${presentations.length === 0 ? '<p class="text-center" style="color: var(--text-dim); padding: 20px;">발표 기록이 없습니다.</p>' : presentations.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt)).map(p => `
+                   <div class="card presentation-item" style="padding: 10px;">
+                     <div class="flex justify-between items-center" style="margin-bottom: 5px;">
+                        <span class="badge badge-main">${formatDate(p.createdAt)}</span>
+                        <button class="btn btn-sm ${p.shared ? 'btn-danger' : 'btn-primary'} btn-toggle-share" data-id="${p.id}" data-shared="${p.shared}">${p.shared ? '공유 끄기' : '친구와 공유'}</button>
+                     </div>
+                     <img src="${p.whiteboardImage?.url}" style="width:100%; aspect-ratio: 16/9; object-fit: contain; background: #000; border-radius: 4px; margin-bottom: 5px; cursor:pointer;" class="img-preview" onclick="window.open('${p.whiteboardImage?.url}')"/>
+                     ${p.audioData ? `
+                       <button class="btn btn-secondary w-full btn-sm btn-play-video" data-url="${p.audioData.url}">
+                         ${p.recordingMode === 'video' ? '🎬 발표 영상 보기' : '🔊 발표 음성 듣기'}
+                       </button>
+                     ` : `<button class="btn btn-ghost w-full btn-sm" disabled>기록 없음</button>`}
+                   </div>
+                 `).join('')}
+              </div>
+            </div>
+
+            <!-- Shared Presentations -->
+            <div class="section-card card">
+              <div class="section-card-header">
+                <span style="font-size: 1.2rem;">👀</span>
+                <h2 class="section-card-title">친구들의 멋진 발표</h2>
+              </div>
+              <div class="flex flex-col gap-sm">
+                 ${sharedPresentations.length === 0 ? '<p class="text-center" style="color: var(--text-dim); padding: 20px;">공유된 발표가 없습니다.</p>' : sharedPresentations.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt)).map(p => `
+                   <div class="card presentation-item flex items-center justify-between" style="padding: 12px 16px; margin: 0;">
+                     <div class="flex items-center gap-md">
+                        <span class="badge badge-purple">친구 공유</span>
+                        <span style="font-weight: 700; font-size: 1.05rem;">${p.title || '제목 없는 발표'}</span>
+                     </div>
+                     <div class="flex items-center gap-sm">
+                        <span style="font-size: 0.85rem; color: var(--text-dim); margin-right: 10px;">${formatDate(p.createdAt)}</span>
+                        ${p.audioData ? `
+                          <button class="btn btn-secondary btn-sm btn-play-video" data-url="${p.audioData.url}">
+                            ${p.recordingMode === 'video' ? '🎬 영상보기' : '🔊 음성듣기'}
+                          </button>
+                        ` : `
+                          <button class="btn btn-ghost btn-sm" onclick="window.open('${p.whiteboardImage?.url}')">🖼️ 보기</button>
+                        `}
+                     </div>
+                   </div>
+                 `).join('')}
+              </div>
+            </div>
+          </div>
+
+          <section class="section-card card student-teacher-note-card">
+            <div class="section-card-header">
+              <span style="font-size: 1.2rem;">💬</span>
+              <h2 class="section-card-title">선생님께 쪽지</h2>
+            </div>
+            <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; margin-bottom: var(--s-4);">
+              질문이나 하고 싶은 말을 남기면 선생님 화면에 표시됩니다.
+            </p>
+            ${cls && cls.teacherId ? `
+              <textarea class="input-field" id="student-note-message" rows="2" placeholder="질문 또는 할 말을 적어 주세요"></textarea>
+              <div class="flex justify-end" style="margin-top: var(--s-3);">
+                <button type="button" class="btn btn-primary btn-sm" id="btn-send-student-note">보내기</button>
+              </div>
+            ` : '<p style="font-size: 0.88rem; color: var(--text-dim);">클래스에 연결되지 않아 쪽지를 보낼 수 없습니다.</p>' }
+            <div class="divider" style="margin: var(--s-4) 0;"></div>
+            <div class="student-note-sent-label" style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); margin-bottom: var(--s-2);">내가 보낸 쪽지</div>
+            <div class="flex flex-col gap-sm" id="student-note-history">
+              ${studentNotes.length === 0 ? '<p class="text-center" style="color: var(--text-dim); padding: 6px;">아직 보낸 쪽지가 없습니다.</p>' : studentNotes.slice(0, 12).map(n => `
+                <div class="student-note-sent-item">
+                  <div class="student-note-sent-meta">${formatDate(n.createdAt)}</div>
+                  <div style="font-size: 0.88rem; line-height: 1.45; white-space: pre-wrap;">${(n.message || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+                </div>
+              `).join('')}
             </div>
           </section>
 
@@ -239,60 +322,6 @@ export function renderStudentDashboard(container) {
               </div>
             </div>
           </div>
-
-          <div class="student-grid-37 student-dashboard-bottom-grid">
-            <!-- My Presentations -->
-            <div class="section-card card">
-              <div class="section-card-header">
-                <span style="font-size: 1.2rem;">🎤</span>
-                <h2 class="section-card-title">나의 발표 기록</h2>
-              </div>
-              <div class="grid" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--s-4);">
-                 ${presentations.length === 0 ? '<p class="text-center" style="color: var(--text-dim); padding: 20px;">발표 기록이 없습니다.</p>' : presentations.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt)).map(p => `
-                   <div class="card presentation-item" style="padding: 10px;">
-                     <div class="flex justify-between items-center" style="margin-bottom: 5px;">
-                        <span class="badge badge-main">${formatDate(p.createdAt)}</span>
-                        <button class="btn btn-sm ${p.shared ? 'btn-danger' : 'btn-primary'} btn-toggle-share" data-id="${p.id}" data-shared="${p.shared}">${p.shared ? '공유 끄기' : '친구와 공유'}</button>
-                     </div>
-                     <img src="${p.whiteboardImage?.url}" style="width:100%; aspect-ratio: 16/9; object-fit: contain; background: #000; border-radius: 4px; margin-bottom: 5px; cursor:pointer;" class="img-preview" onclick="window.open('${p.whiteboardImage?.url}')"/>
-                     ${p.audioData ? `
-                       <button class="btn btn-secondary w-full btn-sm btn-play-video" data-url="${p.audioData.url}">
-                         ${p.recordingMode === 'video' ? '🎬 발표 영상 보기' : '🔊 발표 음성 듣기'}
-                       </button>
-                     ` : `<button class="btn btn-ghost w-full btn-sm" disabled>기록 없음</button>`}
-                   </div>
-                 `).join('')}
-              </div>
-            </div>
-
-            <!-- Shared Presentations -->
-            <div class="section-card card">
-              <div class="section-card-header">
-                <span style="font-size: 1.2rem;">👀</span>
-                <h2 class="section-card-title">친구들의 멋진 발표</h2>
-              </div>
-              <div class="flex flex-col gap-sm">
-                 ${sharedPresentations.length === 0 ? '<p class="text-center" style="color: var(--text-dim); padding: 20px;">공유된 발표가 없습니다.</p>' : sharedPresentations.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt)).map(p => `
-                   <div class="card presentation-item flex items-center justify-between" style="padding: 12px 16px; margin: 0;">
-                     <div class="flex items-center gap-md">
-                        <span class="badge badge-purple">학우 공유</span>
-                        <span style="font-weight: 700; font-size: 1.05rem;">${p.title || '제목 없는 발표'}</span>
-                     </div>
-                     <div class="flex items-center gap-sm">
-                        <span style="font-size: 0.85rem; color: var(--text-dim); margin-right: 10px;">${formatDate(p.createdAt)}</span>
-                        ${p.audioData ? `
-                          <button class="btn btn-secondary btn-sm btn-play-video" data-url="${p.audioData.url}">
-                            ${p.recordingMode === 'video' ? '🎬 영상보기' : '🔊 음성듣기'}
-                          </button>
-                        ` : `
-                          <button class="btn btn-ghost btn-sm" onclick="window.open('${p.whiteboardImage?.url}')">🖼️ 보기</button>
-                        `}
-                     </div>
-                   </div>
-                 `).join('')}
-              </div>
-            </div>
-          </div>
         </main>
       </div>
 
@@ -347,7 +376,7 @@ export function renderStudentDashboard(container) {
       </style>
     `;
 
-    bindEvents(assignments, freshStudent);
+    bindEvents(assignments, freshStudent, cls);
   }
 
   function startQuizListener() {
@@ -522,7 +551,7 @@ export function renderStudentDashboard(container) {
     if (existing) existing.remove();
   }
 
-  function bindEvents(assignments, freshStudent) {
+  function bindEvents(assignments, freshStudent, cls) {
     // Media Playback Modal
     const videoModal = document.getElementById('video-modal');
     const player = document.getElementById('player');
@@ -545,6 +574,31 @@ export function renderStudentDashboard(container) {
             }
         });
     }
+
+    document.getElementById('btn-send-student-note')?.addEventListener('click', async () => {
+      const ta = document.getElementById('student-note-message');
+      if (!cls?.teacherId || !ta) return;
+      const message = ta.value.trim();
+      if (!message) { showToast('내용을 입력해 주세요.', 'error'); return; }
+      const sendBtn = document.getElementById('btn-send-student-note');
+      if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = '보내는 중...'; }
+      try {
+        await createStudentNote({
+          classId: cls.id,
+          teacherId: cls.teacherId,
+          className: cls.name || '',
+          studentId: freshStudent.id,
+          studentName: freshStudent.name,
+          message,
+        });
+        showToast('선생님께 쪽지를 보냈어요!');
+        render();
+      } catch (err) {
+        console.error(err);
+        showToast('전송에 실패했습니다.', 'error');
+        if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = '보내기'; }
+      }
+    });
 
     // Toggle Share
     document.querySelectorAll('.btn-toggle-share').forEach(btn => {

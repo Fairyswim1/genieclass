@@ -40,6 +40,7 @@ const COLLECTIONS = {
     QUIZZES: 'quizzes',
     QUIZ_SUBMISSIONS: 'quiz_submissions',
     STUDENT_SELF_RECORDS: 'student_self_records',
+    STUDENT_NOTES: 'student_notes',
     FILES: 'files',
 };
 
@@ -565,6 +566,61 @@ export async function getStudentSelfRecordsByClass(classId) {
     return snapshot.docs
         .map(doc => doc.data())
         .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+}
+
+// ========== Student ↔ Teacher notes (쪽지) ==========
+export async function createStudentNote({
+    classId,
+    teacherId,
+    className = '',
+    studentId,
+    studentName,
+    message,
+}) {
+    const id = generateId();
+    const trimmed = String(message || '').trim();
+    if (!trimmed) {
+        throw new Error('쪽지 내용이 비었습니다.');
+    }
+    const note = {
+        id,
+        classId,
+        teacherId,
+        className,
+        studentId,
+        studentName,
+        message: trimmed,
+        read: false,
+        createdAt: new Date().toISOString(),
+    };
+    await setDoc(doc(db, COLLECTIONS.STUDENT_NOTES, id), note);
+    return note;
+}
+
+export async function getStudentNotesByStudent(studentId) {
+    const q = query(
+        collection(db, COLLECTIONS.STUDENT_NOTES),
+        where('studentId', '==', studentId)
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs
+        .map(d => d.data())
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+}
+
+export async function getStudentNotesForTeacher(teacherId) {
+    const q = query(
+        collection(db, COLLECTIONS.STUDENT_NOTES),
+        where('teacherId', '==', teacherId)
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs
+        .map(d => d.data())
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+}
+
+export async function markStudentNoteRead(noteId, read = true) {
+    await updateDoc(doc(db, COLLECTIONS.STUDENT_NOTES, noteId), { read });
 }
 
 // ========== Announcements ==========
