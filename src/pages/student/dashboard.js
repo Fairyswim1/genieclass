@@ -11,7 +11,8 @@ import {
   submitAssignment, saveFile, updateStudentCharacterType,
   getPresentationsByClass, toggleSharePresentation,
   createStudentSelfRecord, getStudentSelfRecords,
-  createStudentNote, getStudentNotesByStudent
+  createStudentNote, getStudentNotesByStudent,
+  getFileById
 } from '../../store.js';
 import { escapeHtml, renderQuizMath } from '../../utils/quizMath.js';
 import { renderCharacter, getLevelConfig, PLANT_TYPES, getLevelProgress } from '../../components/characterAvatar.js';
@@ -32,6 +33,8 @@ export function renderStudentDashboard(container) {
   // File Queue for assignment submissions
   let submissionFilesQueue = [];
   let selfRecordFilesQueue = [];
+  /** 상단 '선생님께 쪽지' 버튼으로만 열림 */
+  let studentNotePanelOpen = false;
 
   async function init() {
     await render();
@@ -89,7 +92,19 @@ export function renderStudentDashboard(container) {
           <div class="student-topbar-user">
             <div class="student-topbar-avatar">${renderCharacter(progress.level, 34, freshStudent.characterType || 'apple', freshStudent.totalPoints)}</div>
             <div class="student-topbar-name">${freshStudent.name}</div>
-            <button class="btn btn-ghost btn-sm" id="btn-student-logout" style="margin-left: 10px;">로그아웃</button>
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm student-topbar-note-btn ${studentNotePanelOpen ? 'student-topbar-note-btn--open' : ''}"
+              id="btn-toggle-student-note"
+              title="${cls?.teacherId ? '쪽지 작성·내역 보기' : '클래스에 연결되지 않았습니다'}"
+              aria-expanded="${studentNotePanelOpen}"
+              aria-controls="student-teacher-note-panel"
+              ${cls?.teacherId ? '' : 'disabled'}
+            >
+              <span class="student-topbar-note-btn-icon" aria-hidden="true">💬</span>
+              <span class="student-topbar-note-btn-label">선생님께 쪽지</span>
+            </button>
+            <button class="btn btn-ghost btn-sm" id="btn-student-logout" style="margin-left: 4px;">로그아웃</button>
           </div>
         </header>
 
@@ -171,7 +186,8 @@ export function renderStudentDashboard(container) {
             </div>
           </div>
 
-          <section class="section-card card student-teacher-note-card">
+          ${studentNotePanelOpen ? `
+          <section class="section-card card student-teacher-note-card" id="student-teacher-note-panel">
             <div class="section-card-header">
               <span style="font-size: 1.2rem;">💬</span>
               <h2 class="section-card-title">선생님께 쪽지</h2>
@@ -196,6 +212,7 @@ export function renderStudentDashboard(container) {
               `).join('')}
             </div>
           </section>
+          ` : ''}
 
           <!-- Character & Progress -->
           <section class="card student-dashboard-char-row flex items-center gap-md">
@@ -450,7 +467,18 @@ export function renderStudentDashboard(container) {
                     <div class="latex-preview-body">${escapeHtml(activeQuiz.problemText)}</div>
                   </div>
                 </div>` : ''}
-                ${activeQuiz.problemImage ? `<div class="quiz-problem-shell__img-wrap"><img class="quiz-problem-shell__img" src="${activeQuiz.problemImage.url}" alt="문제 이미지" loading="lazy" decoding="async"/></div>` : ''}
+                ${(() => {
+      const pi = activeQuiz.problemImage;
+      if (!pi) return '';
+      const rawUrl = typeof pi.url === 'string' ? pi.url.trim() : '';
+      if (rawUrl) {
+        return `<div class="quiz-problem-shell__img-wrap"><img class="quiz-problem-shell__img" src="${escapeHtml(rawUrl)}" alt="문제 이미지" loading="eager" decoding="async"/></div>`;
+      }
+      if (pi.id) {
+        return `<div class="quiz-problem-shell__img-wrap"><img class="quiz-problem-shell__img" data-quiz-problem-file="${escapeHtml(String(pi.id))}" alt="문제 이미지" loading="eager" decoding="async"/></div>`;
+      }
+      return '';
+    })()}
               </div>
             </section>
             
@@ -485,6 +513,20 @@ export function renderStudentDashboard(container) {
       </div>
     `;
     document.body.appendChild(overlay);
+
+    void (async () => {
+      const pending = overlay.querySelector('img[data-quiz-problem-file]');
+      if (!pending) return;
+      const id = pending.getAttribute('data-quiz-problem-file');
+      if (!id) return;
+      try {
+        const meta = await getFileById(id);
+        if (meta?.url) {
+          pending.src = meta.url;
+          pending.removeAttribute('data-quiz-problem-file');
+        }
+      } catch (_) { /* ignore */ }
+    })();
 
     // 닫기 버튼: 현재 퀴즈를 무시 목록에 추가하고 오버레이 제거
     overlay.querySelector('#btn-close-quiz-overlay').addEventListener('click', () => {
@@ -530,7 +572,7 @@ export function renderStudentDashboard(container) {
     });
 
     setTimeout(() => {
-      renderQuizMath(overlay);
+      overlay.querySelectorAll('.quiz-math-render-root').forEach((el) => renderQuizMath(el));
     }, 0);
 
     if (quizSubmissions.length > 0) startSubmissionsListener(activeQuiz.id);
@@ -564,6 +606,11 @@ export function renderStudentDashboard(container) {
             }
         });
     }
+
+    document.getElementById('btn-toggle-student-note')?.addEventListener('click', () => {
+      studentNotePanelOpen = !studentNotePanelOpen;
+      render();
+    });
 
     document.getElementById('btn-send-student-note')?.addEventListener('click', async () => {
       const ta = document.getElementById('student-note-message');

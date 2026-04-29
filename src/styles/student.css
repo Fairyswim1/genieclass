@@ -51,7 +51,47 @@
 .student-topbar-user {
     display: flex;
     align-items: center;
-    gap: var(--s-4);
+    gap: var(--s-3);
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.student-topbar-note-btn.student-topbar-note-btn {
+    padding: 6px 10px;
+    font-weight: 700;
+    border: 1.5px solid var(--border-subtle);
+    border-radius: var(--r-md);
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    max-width: 100%;
+}
+
+.student-topbar-note-btn--open {
+    background: rgba(79, 70, 229, 0.09);
+    border-color: rgba(79, 70, 229, 0.45) !important;
+    color: var(--primary-dark, #4338ca);
+}
+
+.student-topbar-note-btn-icon {
+    font-size: 1.05rem;
+    line-height: 1;
+}
+
+.student-topbar-note-btn-label {
+    font-size: 0.82rem;
+    white-space: nowrap;
+}
+
+.student-topbar-note-btn:disabled {
+    opacity: 0.42;
+    cursor: not-allowed;
+}
+
+@media (max-width: 520px) {
+    .student-topbar-note-btn-label {
+        display: none;
+    }
 }
 
 .student-topbar-avatar {
@@ -97,12 +137,29 @@
 }
 
 .student-dashboard--compact .student-stats-row {
-    gap: var(--s-4);
-    margin-bottom: var(--s-4);
+    gap: var(--s-3);
+    margin-bottom: var(--s-3);
+}
+
+.student-dashboard--compact .stat-card {
+    padding: var(--s-3) var(--s-4);
+    box-shadow: 3px 4px 0 0 var(--border-subtle);
+}
+
+.student-dashboard--compact .stat-card:hover {
+    transform: none;
+    box-shadow: 3px 4px 0 0 var(--border-main);
+}
+
+.student-dashboard--compact .stat-card-label {
+    font-size: 0.82rem;
+    margin-bottom: 2px;
 }
 
 .student-dashboard--compact .stat-card-value-display {
-    font-size: 2.25rem;
+    font-size: 1.45rem;
+    margin-bottom: 0;
+    line-height: 1.1;
 }
 
 .student-dashboard-main-grid.student-grid-73 {

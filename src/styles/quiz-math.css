@@ -151,27 +151,40 @@
   flex-direction: column;
   gap: 12px;
   min-width: 0;
+  align-items: stretch;
 }
 
 .quiz-problem-shell__img-wrap {
+  box-sizing: border-box;
   width: 100%;
-  max-height: min(48dvh, 420px);
-  min-height: 0;
+  max-height: min(48vh, 420px);
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   background: rgba(15, 23, 42, 0.04);
   border-radius: 10px;
-  overflow: hidden;
+  overflow: auto;
 }
 
 .quiz-problem-shell__img {
   display: block;
+  box-sizing: border-box;
   max-width: 100%;
-  max-height: min(48dvh, 420px);
-  width: auto;
   height: auto;
+  max-height: min(48vh, 420px);
+  width: auto;
   object-fit: contain;
+}
+
+@supports (height: 1dvh) {
+  .quiz-problem-shell__img-wrap {
+    max-height: min(48dvh, 420px);
+  }
+
+  .quiz-problem-shell__img {
+    max-height: min(48dvh, 420px);
+  }
 }
 
 .quiz-problem-shell__head.quiz-head-light {
