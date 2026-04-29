@@ -26,7 +26,7 @@ import {
     onSnapshot
 } from 'firebase/firestore';
 import { auth, db, storage, googleProvider } from './firebase.js';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
 const COLLECTIONS = {
     TEACHERS: 'teachers',
@@ -398,6 +398,48 @@ export async function toggleSharePresentation(presentationId, title = null) {
         return { ...data, ...updates };
     }
     return null;
+}
+
+async function deleteFileByIdMaybe(fileLike) {
+    if (!fileLike || typeof fileLike !== 'object') return;
+
+    try {
+        if (fileLike.id) {
+            try {
+                await deleteDoc(doc(db, COLLECTIONS.FILES, fileLike.id));
+            } catch (_) {
+                // ignore file metadata delete failures
+            }
+        }
+
+        let storagePath = fileLike.storagePath;
+        const id = fileLike.id;
+        if (!storagePath && id && typeof fileLike.name === 'string') {
+            storagePath = `files/${id}_${fileLike.name}`;
+        }
+
+        if (storagePath) {
+            await deleteObject(ref(storage, storagePath)).catch(() => {});
+        }
+    } catch (e) {
+        console.warn('[deletePresentation] Attachment cleanup skipped:', e);
+    }
+}
+
+export async function deletePresentationById(presentationId) {
+    if (!presentationId) return false;
+
+    const refDoc = doc(db, COLLECTIONS.PRESENTATIONS, presentationId);
+    const snap = await getDoc(refDoc);
+    if (!snap.exists()) return false;
+
+    const data = snap.data();
+
+    await deleteFileByIdMaybe(data.whiteboardImage);
+    await deleteFileByIdMaybe(data.audioData);
+
+    await deleteDoc(refDoc);
+    return true;
 }
 
 // ========== Assignments ==========

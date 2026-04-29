@@ -5,7 +5,8 @@ import {
   getCurrentTeacher, getClassById, getStudentsByClass,
   praiseStudent, showToast, getStudentById, addPresentation,
   toggleSharePresentation, startQuiz, stopQuiz, listenToQuizSubmissions,
-  saveFile, getPresentationsByStudent, formatDate, addStudentPoints
+  saveFile, getPresentationsByStudent, formatDate, addStudentPoints,
+  deletePresentationById
 } from '../../store.js';
 import { renderCharacter, getLevelConfig, renderPraiseAnimation } from '../../components/characterAvatar.js';
 import { getStroke } from 'perfect-freehand';
@@ -1283,7 +1284,7 @@ export function renderLessonMode(container, params) {
               <p style="color: var(--text-muted);">아직 저장된 발표 자료가 없습니다.</p>
             </div>
           ` : `
-            <div class="grid" style="grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: var(--s-8);">
+            <div class="grid" style="grid-template-columns: repeat(auto-fill, minmax(460px, 1fr)); gap: var(--s-8);">
               ${studentPresentations.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map(p => {
                 const isVideo = p.recordingMode === 'video';
                 return `
@@ -1303,11 +1304,16 @@ export function renderLessonMode(container, params) {
                     ` : `
                       <button class="btn btn-ghost w-full" disabled>기록 없음</button>
                     `}
-                    <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 10px;">
-                      <button class="btn btn-secondary btn-sm" onclick="window.open('${p.whiteboardImage?.url}')">🖼️ 원본 이미지</button>
-                      <button class="btn ${p.shared ? 'btn-danger' : 'btn-purple'} btn-sm btn-toggle-share" data-id="${p.id}" data-shared="${p.shared}">
-                        ${p.shared ? '공유 끄기' : '전체 공유'}
-                      </button>
+                    <div class="flex flex-col gap-xs">
+                      <button class="btn btn-secondary btn-sm w-full" onclick="window.open('${p.whiteboardImage?.url}')">🖼️ 원본 이미지</button>
+                      <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <button class="btn ${p.shared ? 'btn-danger' : 'btn-purple'} btn-sm btn-toggle-share" data-id="${p.id}" data-shared="${p.shared}">
+                          ${p.shared ? '공유 끄기' : '전체 공유'}
+                        </button>
+                        <button class="btn btn-ghost btn-sm btn-delete-presentation" data-id="${p.id}" title="발표 기록 삭제" style="color: var(--error); border: 1px solid rgba(239,68,68,0.35);">
+                          삭제
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1377,6 +1383,27 @@ export function renderLessonMode(container, params) {
           render();
         } catch (err) {
           showToast('오류가 발생했습니다.', 'error');
+        }
+      });
+    });
+
+    document.querySelectorAll('.btn-delete-presentation').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const presentationId = btn.dataset.id;
+        if (!presentationId || !confirm('이 발표 기록을 영구히 삭제할까요?')) return;
+
+        try {
+          const ok = await deletePresentationById(presentationId);
+          if (!ok) {
+            showToast('발표 기록을 찾을 수 없습니다.', 'error');
+            return;
+          }
+          showToast('발표 기록이 삭제되었습니다.');
+          studentPresentations = await getPresentationsByStudent(selectedStudent.id);
+          render();
+        } catch (err) {
+          console.error('Presentation delete error:', err);
+          showToast('삭제 중 오류가 발생했습니다.', 'error');
         }
       });
     });
