@@ -21,36 +21,46 @@ const PLANT_TYPES = {
   mango: { name: '망고', icon: '🥭' }
 };
 
+/** Lv1~8 표시용 (씨앗 → 새싹 → 줄기 → 꽃 → 열매×3 → 나무) */
 const GROWTH_STAGES = {
   1: { name: '잠든 씨앗', badge: '🌰', glow: 'rgba(235, 227, 213, 0.4)' },
   2: { name: '파릇파릇 새싹', badge: '🌱', glow: 'rgba(153, 204, 153, 0.4)' },
   3: { name: '무럭무럭 줄기', badge: '🌿', glow: 'rgba(102, 178, 102, 0.4)' },
   4: { name: '활짝 핀 꽃', badge: '🌸', glow: 'rgba(230, 164, 180, 0.4)' },
-  5: { name: '탐스러운 열매', badge: '✨', glow: 'rgba(255, 204, 102, 0.5)' }
+  5: { name: '열매 1개', badge: '✨', glow: 'rgba(255, 204, 102, 0.45)' },
+  6: { name: '열매 2개', badge: '✨', glow: 'rgba(255, 204, 102, 0.48)' },
+  7: { name: '열매 3개', badge: '✨', glow: 'rgba(255, 204, 102, 0.5)' },
+  8: { name: '우거진 나무', badge: '🌳', glow: 'rgba(120, 180, 140, 0.5)' }
 };
 
+/**
+ * 단계별 에셋 인덱스: 0씨앗 1새싹 2줄기 3꽃 456열매(동일 아이콘×단계) 7나무
+ */
 const PLANT_LEVEL_ASSETS = {
-  apple: ['🌰', '🌱', '🌿', '🌸', '🍎'],
-  grape: ['🌰', '🌱', '🌿', '🌸', '🍇'],
-  strawberry: ['🌰', '🌱', '🌿', '🌸', '🍓'],
-  tangerine: ['🌰', '🌱', '🌿', '🌸', '🍊'],
-  baobab: ['🌰', '🌱', '🌿', '🌸', '🌳'],
-  watermelon: ['🌰', '🌱', '🌿', '🌸', '🍉'],
-  pineapple: ['🌰', '🌱', '🌿', '🌸', '🍍'],
-  banana: ['🌰', '🌱', '🌿', '🌸', '🍌'],
-  peach: ['🌰', '🌱', '🌿', '🌸', '🍑'],
-  cherry: ['🌰', '🌱', '🌿', '🌸', '🍒'],
-  melon: ['🌰', '🌱', '🌿', '🌸', '🍈'],
-  lemon: ['🌰', '🌱', '🌿', '🌸', '🍋'],
-  blueberry: ['🌰', '🌱', '🌿', '🌸', '🫐'],
-  coconut: ['🌰', '🌱', '🌿', '🌸', '🥥'],
-  mango: ['🌰', '🌱', '🌿', '🌸', '🥭']
+  apple: ['🌰', '🌱', '🌿', '🌸', '🍎', '🍎', '🍎', '🌳'],
+  grape: ['🌰', '🌱', '🌿', '🌸', '🍇', '🍇', '🍇', '🌳'],
+  strawberry: ['🌰', '🌱', '🌿', '🌸', '🍓', '🍓', '🍓', '🌳'],
+  tangerine: ['🌰', '🌱', '🌿', '🌸', '🍊', '🍊', '🍊', '🌳'],
+  baobab: ['🌰', '🌱', '🌿', '🌸', '🌳', '🌳', '🌳', '🌳'],
+  watermelon: ['🌰', '🌱', '🌿', '🌸', '🍉', '🍉', '🍉', '🌳'],
+  pineapple: ['🌰', '🌱', '🌿', '🌸', '🍍', '🍍', '🍍', '🌳'],
+  banana: ['🌰', '🌱', '🌿', '🌸', '🍌', '🍌', '🍌', '🌳'],
+  peach: ['🌰', '🌱', '🌿', '🌸', '🍑', '🍑', '🍑', '🌳'],
+  cherry: ['🌰', '🌱', '🌿', '🌸', '🍒', '🍒', '🍒', '🌳'],
+  melon: ['🌰', '🌱', '🌿', '🌸', '🍈', '🍈', '🍈', '🌳'],
+  lemon: ['🌰', '🌱', '🌿', '🌸', '🍋', '🍋', '🍋', '🌳'],
+  blueberry: ['🌰', '🌱', '🌿', '🌸', '🫐', '🫐', '🫐', '🌳'],
+  coconut: ['🌰', '🌱', '🌿', '🌸', '🥥', '🥥', '🥥', '🌳'],
+  mango: ['🌰', '🌱', '🌿', '🌸', '🥭', '🥭', '🥭', '🌳']
 };
 
-/** 각 레벨 구간 시작에 필요한 누적 포인트 (Lv.1≥0 … Lv.5≥마지막 값) — store와 동기화 */
-export const LEVEL_THRESHOLDS = [0, 5, 12, 25, 50];
+/** 최고 단계 (Lv.8 = 나무) */
+export const MAX_CHARACTER_LEVEL = 8;
 
-/** 총 포인트로 레벨 1~5 산정 (Firestore characterLevel 과 맞춤) */
+/** 누적 포인트 구간 시작점 [Lv1 … Lv8] — 단계마다 1P씩 진행(0~7P로 1~8단계) */
+export const LEVEL_THRESHOLDS = [0, 1, 2, 3, 4, 5, 6, 7];
+
+/** 총 포인트로 레벨 1~8 산정 (Firestore characterLevel 과 맞춤) */
 export function deriveCharacterLevelFromPoints(totalPoints) {
   const pts = Math.max(0, Number(totalPoints) || 0);
   let level = 1;
@@ -60,77 +70,81 @@ export function deriveCharacterLevelFromPoints(totalPoints) {
       break;
     }
   }
-  return Math.min(5, level);
+  return Math.min(MAX_CHARACTER_LEVEL, level);
 }
 
 export function getLevelProgress(totalPoints) {
   const pts = Math.max(0, Number(totalPoints) || 0);
   const level = deriveCharacterLevelFromPoints(pts);
   const currentThreshold = LEVEL_THRESHOLDS[level - 1];
-  const nextThreshold = level < 5 ? LEVEL_THRESHOLDS[level] : currentThreshold;
+  const nextThreshold = level < MAX_CHARACTER_LEVEL ? LEVEL_THRESHOLDS[level] : currentThreshold;
   const pointsInCurrentLevel = pts - currentThreshold;
-  const pointsNeededForNext = level < 5 ? nextThreshold - currentThreshold : 0;
-  const progressPercent = level < 5 && pointsNeededForNext > 0
+  const pointsNeededForNext = level < MAX_CHARACTER_LEVEL ? nextThreshold - currentThreshold : 0;
+  const progressPercent = level < MAX_CHARACTER_LEVEL && pointsNeededForNext > 0
     ? (pointsInCurrentLevel / pointsNeededForNext) * 100
     : 100;
-  const remainingPoints = level < 5 ? nextThreshold - pts : 0;
+  const remainingPoints = level < MAX_CHARACTER_LEVEL ? nextThreshold - pts : 0;
 
-  const lv5Floor = LEVEL_THRESHOLDS[4];
-  const fruitCount = level === 5 ? (1 + Math.floor((pts - lv5Floor) / 3)) : 0;
+  const fruitCount = level >= 5 && level <= 7 ? level - 4 : 0;
 
-  return { level, progressPercent, remainingPoints, isMaxLevel: level === 5, fruitCount };
+  return {
+    level,
+    progressPercent,
+    remainingPoints,
+    isMaxLevel: level === MAX_CHARACTER_LEVEL,
+    fruitCount,
+  };
 }
 
 export function getLevelConfig(level, type = 'apple') {
   if (!PLANT_TYPES[type]) type = 'apple';
-  const stage = GROWTH_STAGES[Math.min(5, Math.max(1, level))] || GROWTH_STAGES[1];
+  const safe = Math.min(MAX_CHARACTER_LEVEL, Math.max(1, level));
+  const stage = GROWTH_STAGES[safe] || GROWTH_STAGES[1];
   const plantName = PLANT_TYPES[type]?.name || '사과나무';
+  const emoji = PLANT_LEVEL_ASSETS[type]?.[safe - 1] || '🌰';
   return {
     ...stage,
     fullName: `${stage.name}(${plantName})`,
-    emoji: PLANT_LEVEL_ASSETS[type]?.[level - 1] || '🌰'
+    emoji,
   };
 }
 
-export function renderCharacter(level, size = 80, type = 'apple', totalPoints = 0) {
+export function renderCharacter(level, size = 80, type = 'apple', _totalPoints = 0) {
   if (!PLANT_TYPES[type]) type = 'apple';
-  const safeLevel = Math.min(5, Math.max(1, level));
+  const safeLevel = Math.min(MAX_CHARACTER_LEVEL, Math.max(1, level));
   const config = getLevelConfig(safeLevel, type);
   const fontSize = size * 0.6;
   const glowSize = size * 0.8;
 
-  const fruitEmoji = PLANT_LEVEL_ASSETS[type]?.[4] || '🍎';
-  const displayEmoji = safeLevel === 1 ? '🌰' : (PLANT_LEVEL_ASSETS[type]?.[safeLevel - 1] || '🌰');
-
-  // 무한 성장 로직 (Level 5일 때만 적용)
-  const lv5Floor = LEVEL_THRESHOLDS[4];
-  const fruitCount = safeLevel === 5
-    ? (1 + Math.floor((Math.max(lv5Floor, totalPoints) - lv5Floor) / 3))
-    : 1;
+  const assets = PLANT_LEVEL_ASSETS[type] || PLANT_LEVEL_ASSETS.apple;
+  const fruitEmoji = assets[4] || '🍎';
+  const treeEmoji = assets[7] || '🌳';
+  const plantIcon = PLANT_TYPES[type]?.icon || '🍎';
+  /** 나무 꼭대기 장식용: 열매와 나무 이모지가 같을 때(바오밥 등)는 과일 종류 아이콘 */
+  const fruitOnTree = fruitEmoji === treeEmoji ? plantIcon : fruitEmoji;
 
   let content = '';
-  if (safeLevel === 5) {
-    if (fruitCount === 1) {
-      content = `<div style="font-size: ${fontSize}px;">${fruitEmoji}</div>`;
-    } else if (fruitCount === 2) {
-      content = `<div style="font-size: ${fontSize * 0.85}px; display: flex; gap: 4px;">${fruitEmoji}<span>${fruitEmoji}</span></div>`;
-    } else if (fruitCount === 3) {
-      content = `<div style="display: flex; flex-direction: column; align-items: center; gap: -5px;">
+  if (safeLevel <= 4) {
+    const emoji = assets[safeLevel - 1] || '🌰';
+    content = `<div style="font-size: ${fontSize}px;">${emoji}</div>`;
+  } else if (safeLevel === 5) {
+    content = `<div style="font-size: ${fontSize}px;">${fruitEmoji}</div>`;
+  } else if (safeLevel === 6) {
+    content = `<div style="font-size: ${fontSize * 0.85}px; display: flex; gap: 4px;">${fruitEmoji}<span>${fruitEmoji}</span></div>`;
+  } else if (safeLevel === 7) {
+    content = `<div style="display: flex; flex-direction: column; align-items: center; gap: -5px;">
         <div style="font-size: ${fontSize * 0.65}px; display: flex; gap: 2px;">${fruitEmoji}${fruitEmoji}</div>
         <div style="font-size: ${fontSize * 0.65}px;">${fruitEmoji}</div>
       </div>`;
-    } else {
-      // 4개 이상일 때: 사과나무 (더 이상 징그럽지 않게 큰 나무 하나로 표현)
-      content = `<div style="font-size: ${fontSize * 1.1}px; position: relative; display: flex; align-items: center; justify-content: center;">
-        🌳
-        <div style="position: absolute; top: 20%; left: 50%; transform: translateX(-50%); display: flex; gap: 2px;">
-           <span style="font-size: 0.3em; filter: drop-shadow(1px 1px 1px rgba(0,0,0,0.2));">${fruitEmoji}</span>
-           <span style="font-size: 0.3em; filter: drop-shadow(1px 1px 1px rgba(0,0,0,0.2)); margin-top: 5px;">${fruitEmoji}</span>
+  } else {
+    content = `<div style="font-size: ${fontSize * 1.08}px; position: relative; display: inline-flex; align-items: center; justify-content: center; line-height: 1;">
+        <span aria-hidden="true">${treeEmoji}</span>
+        <div style="position: absolute; top: 14%; left: 50%; transform: translateX(-50%); width: 78%; display: flex; justify-content: space-around; align-items: flex-start; flex-wrap: wrap; gap: 2px; pointer-events: none;" aria-hidden="true">
+          <span style="font-size: 0.34em; line-height: 1; filter: drop-shadow(1px 1px 1px rgba(0,0,0,0.2));">${fruitOnTree}</span>
+          <span style="font-size: 0.38em; line-height: 1; filter: drop-shadow(1px 1px 1px rgba(0,0,0,0.2)); margin-top: 1px;">${fruitOnTree}</span>
+          <span style="font-size: 0.34em; line-height: 1; filter: drop-shadow(1px 1px 1px rgba(0,0,0,0.2));">${fruitOnTree}</span>
         </div>
       </div>`;
-    }
-  } else {
-    content = `<div style="font-size: ${fontSize}px;">${displayEmoji}</div>`;
   }
 
   return `
