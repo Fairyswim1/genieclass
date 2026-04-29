@@ -5,7 +5,7 @@ import {
   getCurrentTeacher, logoutTeacher, getClassesByTeacher,
   createClass, getStudentsByClass, deleteClass, addStudent,
   addStudentsBatch, showToast, formatDate,
-  getStudentNotesForTeacher, markStudentNoteRead
+  getStudentNotesForTeacher, markStudentNoteRead, deleteStudentNote
 } from '../../store.js';
 import { parseExcelFile, downloadSampleExcel, exportStudentsToExcel } from '../../utils/excelImport.js';
 import { renderCharacter } from '../../components/characterAvatar.js';
@@ -60,6 +60,15 @@ export function renderTeacherDashboard(container) {
               <div class="sidebar-class-icon add-class-sidebar-icon">+</div>
               <span>클래스 추가</span>
             </div>
+
+            <div class="sidebar-comm-section">
+              <div class="sidebar-section-title">소통</div>
+              <button type="button" class="sidebar-inbox-trigger ${unreadNoteCount ? 'sidebar-inbox-trigger--unread' : ''}" id="btn-open-notes-inbox" aria-label="학생 쪽지함 열기" title="학생이 보낸 쪽지">
+                <span class="sidebar-inbox-icon" aria-hidden="true">📬</span>
+                <span class="sidebar-inbox-text">쪽지함</span>
+                ${unreadNoteCount ? `<span class="sidebar-new-stack"><span class="sidebar-new-label">NEW</span>${unreadNoteCount > 1 ? `<span class="sidebar-new-count">${unreadNoteCount > 99 ? '99+' : unreadNoteCount}</span>` : ''}</span>` : ''}
+              </button>
+            </div>
           </div>
           <div class="sidebar-footer">
             <div class="sidebar-user-card">
@@ -81,59 +90,6 @@ export function renderTeacherDashboard(container) {
             <div class="dashboard-header animate-fade-in-down">
               <h1 class="dashboard-greeting">안녕하세요, <span>${teacher.displayName || '선생님'}</span> 선생님! 👋</h1>
               <p class="dashboard-subtitle">오늘도 좋은 수업 되세요</p>
-            </div>
-
-            <div class="card" id="teacher-notes-inbox" style="margin-bottom: var(--s-8); padding: var(--s-6); border: 2px solid ${unreadNoteCount ? 'var(--primary-light)' : 'var(--border-main)'};">
-              <div class="flex justify-between items-start flex-wrap gap-sm" style="margin-bottom: var(--s-4);">
-                <div>
-                  <h2 class="section-title" style="margin: 0; font-size: 1.15rem;">💌 학생 쪽지함</h2>
-                  <p style="font-size: 0.88rem; color: var(--text-muted); margin-top: 6px;">학생이 대시보드에서 보낸 쪽지입니다. 읽음 처리하면 목록에 남고, 새 쪽지 여부만 구분됩니다.</p>
-                </div>
-                ${unreadNoteCount ? `<span class="badge badge-danger" style="align-self: center;">새 ${unreadNoteCount}개</span>` : '<span class="badge" style="align-self: center;">새 쪽지 없음</span>'}
-              </div>
-              ${teacherNotes.length === 0 ? `
-                <div class="empty-board" style="padding: var(--s-8);">
-                  <p style="color: var(--text-dim);">아직 받은 쪽지가 없습니다.</p>
-                </div>
-              ` : `
-                <div style="overflow-x: auto;">
-                  <table class="student-table" style="width: 100%; min-width: 520px;">
-                    <thead>
-                      <tr style="border-bottom: 2px solid var(--bg-main);">
-                        <th align="left" style="padding: 8px; width: 120px;">시간</th>
-                        <th align="left" style="padding: 8px; width: 120px;">학급</th>
-                        <th align="left" style="padding: 8px; width: 90px;">학생</th>
-                        <th align="left" style="padding: 8px;">내용</th>
-                        <th align="center" style="padding: 8px; width: 100px;">상태</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      ${teacherNotes.slice(0, 50).map(n => {
-                        const preview = String(n.message || '').length > 200
-                          ? String(n.message).slice(0, 200) + '…'
-                          : (n.message || '');
-                        const esc = (s) => String(s || '')
-                          .replace(/&/g, '&amp;')
-                          .replace(/</g, '&lt;')
-                          .replace(/>/g, '&gt;');
-                        return `
-                        <tr style="border-bottom: 1px solid var(--bg-main); background: ${n.read ? 'transparent' : 'rgba(79, 70, 229, 0.06)'};">
-                          <td style="padding: 10px 8px; font-size: 0.82rem; color: var(--text-muted); vertical-align: top;">${formatDate(n.createdAt)}</td>
-                          <td style="padding: 10px 8px; vertical-align: top;"><span style="font-size: 0.85rem;">${esc(n.className || '클래스')}</span></td>
-                          <td style="padding: 10px 8px; vertical-align: top;"><strong>${esc(n.studentName || '')}</strong></td>
-                          <td style="padding: 10px 8px; vertical-align: top;"><div style="font-size: 0.88rem; line-height: 1.45; white-space: pre-wrap;">${esc(preview)}</div></td>
-                          <td align="center" style="padding: 10px 8px; vertical-align: top;">
-                            ${n.read
-                              ? '<span class="badge badge-green">읽음</span>'
-                              : `<button type="button" class="btn btn-secondary btn-sm btn-mark-note-read" data-note-id="${n.id}">읽음</button>`}
-                          </td>
-                        </tr>
-                      `;
-                      }).join('')}
-                    </tbody>
-                  </table>
-                </div>
-              `}
             </div>
 
             <div class="section-header">
@@ -199,6 +155,65 @@ export function renderTeacherDashboard(container) {
         </div>
       </div>
 
+      <div class="modal-backdrop" id="notes-inbox-modal">
+        <div class="modal-content notes-inbox-modal-content" style="max-width: 920px;">
+          <div class="modal-header">
+            <h3 class="modal-title">💌 학생 쪽지함</h3>
+            <button type="button" class="modal-close" id="close-notes-inbox-modal">✕</button>
+          </div>
+          <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: var(--s-4); line-height: 1.5;">
+            학생이 대시보드에서 보낸 쪽지입니다. 읽음 처리 후에도 목록에 남으며, 삭제하면 영구적으로 지워집니다.
+          </p>
+          ${teacherNotes.length === 0 ? `
+            <div class="empty-board" style="padding: var(--s-10);">
+              <p style="color: var(--text-dim);">아직 받은 쪽지가 없습니다.</p>
+            </div>
+          ` : `
+            <div class="notes-inbox-table-wrap">
+              <table class="student-table notes-inbox-table">
+                <thead>
+                  <tr>
+                    <th align="left">시간</th>
+                    <th align="left">학급</th>
+                    <th align="left">학생</th>
+                    <th align="left">내용</th>
+                    <th align="center" style="width: 88px;">상태</th>
+                    <th align="center" style="width: 72px;">삭제</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${teacherNotes.slice(0, 100).map((n) => {
+                    const preview = String(n.message || '').length > 200
+                      ? String(n.message).slice(0, 200) + '…'
+                      : (n.message || '');
+                    const esc = (s) => String(s || '')
+                      .replace(/&/g, '&amp;')
+                      .replace(/</g, '&lt;')
+                      .replace(/>/g, '&gt;');
+                    return `
+                    <tr class="${n.read ? '' : 'notes-inbox-row--unread'}">
+                      <td class="notes-inbox-td-time">${formatDate(n.createdAt)}</td>
+                      <td>${esc(n.className || '클래스')}</td>
+                      <td><strong>${esc(n.studentName || '')}</strong></td>
+                      <td class="notes-inbox-td-msg"><div class="notes-inbox-preview">${esc(preview)}</div></td>
+                      <td align="center">
+                        ${n.read
+                          ? '<span class="badge badge-green">읽음</span>'
+                          : `<button type="button" class="btn btn-secondary btn-sm btn-mark-note-read" data-note-id="${n.id}">읽음</button>`}
+                      </td>
+                      <td align="center">
+                        <button type="button" class="btn btn-ghost btn-sm btn-delete-student-note" data-note-id="${n.id}" title="쪽지 삭제" style="color: var(--error);">🗑</button>
+                      </td>
+                    </tr>
+                  `;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          `}
+        </div>
+      </div>
+
       <div class="modal-backdrop" id="mode-select-modal">
         <div class="modal-content" style="max-width:600px;background:transparent;border:none;box-shadow:none;">
           <div class="mode-selection" id="mode-selection-btns"></div>
@@ -229,6 +244,31 @@ export function renderTeacherDashboard(container) {
     document.getElementById('btn-logout')?.addEventListener('click', async () => {
       await logoutTeacher();
       window.location.hash = '/teacher/login';
+    });
+
+    document.getElementById('btn-open-notes-inbox')?.addEventListener('click', () => openModal('notes-inbox-modal'));
+    document.getElementById('close-notes-inbox-modal')?.addEventListener('click', () => closeModal('notes-inbox-modal'));
+    document.getElementById('notes-inbox-modal')?.addEventListener('click', (e) => {
+      if (e.target.id === 'notes-inbox-modal') closeModal('notes-inbox-modal');
+    });
+
+    document.querySelectorAll('.btn-delete-student-note').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const id = btn.dataset.noteId;
+        if (!id) return;
+        if (!confirm('이 쪽지를 삭제할까요?')) return;
+        try {
+          await deleteStudentNote(id);
+          showToast('쪽지를 삭제했습니다.');
+          closeModal('notes-inbox-modal');
+          render();
+        } catch (err) {
+          console.error(err);
+          showToast('삭제 중 오류가 발생했습니다.', 'error');
+        }
+      });
     });
 
     document.querySelectorAll('.btn-mark-note-read').forEach(btn => {

@@ -623,6 +623,10 @@ export async function markStudentNoteRead(noteId, read = true) {
     await updateDoc(doc(db, COLLECTIONS.STUDENT_NOTES, noteId), { read });
 }
 
+export async function deleteStudentNote(noteId) {
+    await deleteDoc(doc(db, COLLECTIONS.STUDENT_NOTES, noteId));
+}
+
 // ========== Announcements ==========
 export async function createAnnouncement(classId, data) {
     const id = generateId();

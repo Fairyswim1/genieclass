@@ -744,3 +744,157 @@
     font-weight: 600;
     color: var(--text-main);
 }
+
+/* 사이드바 · 학생 쪽지함 */
+.sidebar-comm-section {
+    padding-top: var(--s-5);
+    margin-top: var(--s-4);
+    border-top: 1px dashed var(--border-subtle);
+}
+
+.sidebar-inbox-trigger {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    width: 100%;
+    padding: var(--s-3) var(--s-4);
+    border-radius: var(--r-md);
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.2s, color 0.2s;
+}
+
+.sidebar-inbox-trigger:hover {
+    background: var(--bg-main);
+    color: var(--primary);
+}
+
+.sidebar-inbox-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--r-md);
+    background: linear-gradient(135deg, #6366f1, #818cf8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.95rem;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.sidebar-inbox-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.sidebar-new-stack {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    flex-shrink: 0;
+}
+
+.sidebar-new-label {
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    color: #fff;
+    padding: 3px 7px;
+    border-radius: 4px;
+    background: linear-gradient(135deg, #ef4444, #f97316);
+    box-shadow: 0 1px 4px rgba(239, 68, 68, 0.45);
+}
+
+.sidebar-new-count {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--error);
+    background: rgba(239, 68, 68, 0.12);
+    padding: 2px 6px;
+    border-radius: 10px;
+}
+
+.sidebar-inbox-trigger--unread {
+    position: relative;
+    background: rgba(239, 68, 68, 0.06);
+    color: var(--text-main);
+    animation: sidebar-inbox-glow 2.2s ease-in-out infinite;
+}
+
+.sidebar-inbox-trigger--unread .sidebar-new-label {
+    animation: sidebar-new-blink 1.3s ease-in-out infinite;
+}
+
+@keyframes sidebar-inbox-glow {
+    0%, 100% {
+        box-shadow: 0 0 0 1px rgba(239, 68, 68, 0);
+    }
+    50% {
+        box-shadow: 0 0 14px 3px rgba(239, 68, 68, 0.42);
+    }
+}
+
+@keyframes sidebar-new-blink {
+    0%, 100% {
+        opacity: 1;
+        filter: brightness(1);
+    }
+    50% {
+        opacity: 0.92;
+        filter: brightness(1.15);
+    }
+}
+
+.notes-inbox-table-wrap {
+    max-height: min(58vh, 520px);
+    overflow: auto;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--r-md);
+}
+
+.notes-inbox-table {
+    width: 100%;
+    min-width: 640px;
+}
+
+.notes-inbox-table th {
+    padding: 10px 12px;
+    font-size: 0.8rem;
+    position: sticky;
+    top: 0;
+    background: var(--bg-surface);
+    z-index: 1;
+    border-bottom: 2px solid var(--bg-main);
+}
+
+.notes-inbox-table td {
+    padding: 10px 12px;
+    font-size: 0.85rem;
+    vertical-align: top;
+}
+
+.notes-inbox-td-time {
+    white-space: nowrap;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
+.notes-inbox-td-msg {
+    max-width: 280px;
+}
+
+.notes-inbox-preview {
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+tr.notes-inbox-row--unread td {
+    background: rgba(79, 70, 229, 0.05);
+}
