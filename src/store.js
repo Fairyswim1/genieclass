@@ -39,6 +39,7 @@ const COLLECTIONS = {
     RESOURCES: 'resources',
     QUIZZES: 'quizzes',
     QUIZ_SUBMISSIONS: 'quiz_submissions',
+    STUDENT_SELF_RECORDS: 'student_self_records',
     FILES: 'files',
 };
 
@@ -484,6 +485,33 @@ export async function getSharedSubmissions(assignmentId) {
         where('shared', '==', true));
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => doc.data());
+}
+
+// ========== Student Self Records ==========
+export async function createStudentSelfRecord(studentId, classId, data) {
+    const id = generateId();
+    const record = {
+        id,
+        studentId,
+        classId,
+        title: data.title,
+        content: data.content || '',
+        files: data.files || [],
+        createdAt: new Date().toISOString(),
+    };
+    await setDoc(doc(db, COLLECTIONS.STUDENT_SELF_RECORDS, id), record);
+    return record;
+}
+
+export async function getStudentSelfRecords(studentId) {
+    const q = query(
+        collection(db, COLLECTIONS.STUDENT_SELF_RECORDS),
+        where('studentId', '==', studentId)
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs
+        .map(doc => doc.data())
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 }
 
 // ========== Announcements ==========

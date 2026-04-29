@@ -9,7 +9,8 @@ import {
   listenToActiveQuiz, listenToQuizSubmissions, submitQuizSolution,
   showToast, downloadFile, getStudentByCode,
   submitAssignment, saveFile, updateStudentCharacterType,
-  getPresentationsByClass, toggleSharePresentation
+  getPresentationsByClass, toggleSharePresentation,
+  createStudentSelfRecord, getStudentSelfRecords
 } from '../../store.js';
 import { renderCharacter, getLevelConfig, PLANT_TYPES, getLevelProgress } from '../../components/characterAvatar.js';
 
@@ -28,6 +29,7 @@ export function renderStudentDashboard(container) {
 
   // File Queue for assignment submissions
   let submissionFilesQueue = [];
+  let selfRecordFilesQueue = [];
 
   async function init() {
     await render();
@@ -45,6 +47,7 @@ export function renderStudentDashboard(container) {
     let announcements = [];
     let resources = [];
     let sharedPresentations = [];
+    let selfRecords = [];
 
     try {
       freshStudent = await getStudentByCode(student.uniqueCode) || student;
@@ -53,12 +56,13 @@ export function renderStudentDashboard(container) {
       progress = getLevelProgress(freshStudent.totalPoints || 0);
 
       let allPresentations = [];
-      [assignments, submissions, announcements, resources, allPresentations] = await Promise.all([
+      [assignments, submissions, announcements, resources, allPresentations, selfRecords] = await Promise.all([
         cls ? getAssignmentsByClass(cls.id) : [],
         getSubmissionsByStudent(freshStudent.id),
         cls ? getAnnouncementsByClass(cls.id) : [],
         cls ? getResourcesByClass(cls.id) : [],
         cls ? getPresentationsByClass(cls.id) : [],
+        getStudentSelfRecords(freshStudent.id),
       ]);
       presentations = allPresentations.filter(p => p.studentId === freshStudent.id);
       sharedPresentations = allPresentations.filter(p => p.studentId !== freshStudent.id && p.shared === true);
@@ -169,25 +173,69 @@ export function renderStudentDashboard(container) {
               </div>
             </div>
 
-            <!-- Announcements -->
-            <div class="section-card card">
-              <div class="section-card-header">
-                <span style="font-size: 1.2rem;">📢</span>
-                <h2 class="section-card-title">공지사항</h2>
+            <div class="flex flex-col gap-lg">
+              <!-- Announcements -->
+              <div class="section-card card">
+                <div class="section-card-header">
+                  <span style="font-size: 1.2rem;">📢</span>
+                  <h2 class="section-card-title">공지사항</h2>
+                </div>
+                <div class="flex flex-col gap-sm" style="max-height: 320px; overflow-y: auto; padding-right: 4px;">
+                   ${announcements.length === 0 ? '<p class="text-center" style="color: var(--text-dim); padding: 20px;">새로운 소식이 없습니다.</p>' : announcements.map(ann => `
+                     <div class="feed-item" style="margin-bottom: 0;">
+                       <div style="font-weight: 700; margin-bottom: 8px; color: var(--text-white);">${ann.title}</div>
+                       <p style="font-size: 0.9rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 15px;">${ann.content}</p>
+                       ${ann.files && ann.files.length > 0 ? `
+                         <div class="flex gap-sm" style="margin-bottom: 10px; flex-wrap: wrap;">
+                           ${ann.files.map(f => `<span class="badge badge-blue" style="cursor: pointer; text-transform: none;" onclick="window.downloadFile('${f.id}')">📎 ${f.name}</span>`).join('')}
+                         </div>
+                       ` : ''}
+                       <div style="font-size: 0.75rem; color: var(--text-dim);">${formatDate(ann.createdAt)}</div>
+                     </div>
+                   `).join('')}
+                </div>
               </div>
-              <div class="flex flex-col gap-sm">
-                 ${announcements.length === 0 ? '<p class="text-center" style="color: var(--text-dim); padding: 20px;">새로운 소식이 없습니다.</p>' : announcements.map(ann => `
-                   <div class="feed-item" style="margin-bottom: 0;">
-                     <div style="font-weight: 700; margin-bottom: 8px; color: var(--text-white);">${ann.title}</div>
-                     <p style="font-size: 0.9rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 15px;">${ann.content}</p>
-                     ${ann.files && ann.files.length > 0 ? `
-                       <div class="flex gap-sm" style="margin-bottom: 10px; flex-wrap: wrap;">
-                         ${ann.files.map(f => `<span class="badge badge-blue" style="cursor: pointer; text-transform: none;" onclick="window.downloadFile('${f.id}')">📎 ${f.name}</span>`).join('')}
-                       </div>
-                     ` : ''}
-                     <div style="font-size: 0.75rem; color: var(--text-dim);">${formatDate(ann.createdAt)}</div>
-                   </div>
-                 `).join('')}
+
+              <!-- Student Self Records -->
+              <div class="section-card card">
+                <div class="section-card-header">
+                  <span style="font-size: 1.2rem;">📌</span>
+                  <h2 class="section-card-title">나의 생기부 참고 기록</h2>
+                </div>
+                <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; margin-bottom: var(--s-4);">
+                  수업 중 배운 점, 발표 준비, 탐구 활동, 느낀 점 등을 스스로 남겨보세요. 이 기록은 생기부 작성을 위한 참고 자료로 활용될 수 있습니다.
+                </p>
+                <div class="form-group" style="margin-bottom: var(--s-3);">
+                  <input type="text" class="input-field" id="self-record-title" placeholder="제목을 입력하세요" />
+                </div>
+                <div class="form-group" style="margin-bottom: var(--s-3);">
+                  <textarea class="input-field" id="self-record-content" rows="4" placeholder="기록할 내용을 입력하세요"></textarea>
+                </div>
+                <div class="drop-zone" id="self-record-dropzone" style="height: 110px; padding: 16px; margin-bottom: var(--s-3);">
+                  <div style="font-size: 1.4rem;">📎</div>
+                  <div style="font-weight: 600; font-size: 0.9rem;">파일을 추가하려면 클릭하거나 끌어오세요</div>
+                  <input type="file" id="self-record-files" multiple class="hidden" />
+                </div>
+                <div id="self-record-file-list" class="file-queue-list" style="margin-bottom: var(--s-3);"></div>
+                <button class="btn btn-primary w-full" id="btn-save-self-record">기록 저장하기</button>
+
+                <div class="divider" style="margin: var(--s-6) 0;"></div>
+                <div class="flex flex-col gap-sm" id="self-record-list">
+                  ${selfRecords.length === 0 ? '<p class="text-center" style="color: var(--text-dim); padding: 10px;">아직 작성한 기록이 없습니다.</p>' : selfRecords.map(record => `
+                    <div class="interactive-item" style="flex-direction: column; align-items: flex-start; gap: 8px;">
+                      <div class="flex justify-between items-center" style="width: 100%; gap: 10px;">
+                        <div style="font-weight: 700; font-size: 0.95rem;">${record.title}</div>
+                        <span style="font-size: 0.75rem; color: var(--text-dim); white-space: nowrap;">${formatDate(record.createdAt)}</span>
+                      </div>
+                      <div style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.5; white-space: pre-line;">${record.content}</div>
+                      ${record.files && record.files.length > 0 ? `
+                        <div class="flex gap-sm" style="flex-wrap: wrap;">
+                          ${record.files.map(f => `<button class="btn btn-secondary btn-sm" style="font-size: 0.75rem;" onclick="window.downloadFile('${f.id}')">📎 ${f.name}</button>`).join('')}
+                        </div>
+                      ` : ''}
+                    </div>
+                  `).join('')}
+                </div>
               </div>
             </div>
           </div>
@@ -559,6 +607,84 @@ export function renderStudentDashboard(container) {
     document.getElementById('btn-change-character')?.addEventListener('click', () => {
       const modal = document.getElementById('selection-modal');
       if (modal) modal.classList.add('active');
+    });
+
+    function updateSelfRecordFileListUI() {
+      const listContainer = document.getElementById('self-record-file-list');
+      if (!listContainer) return;
+
+      listContainer.innerHTML = selfRecordFilesQueue.map((f, idx) => `
+        <div class="file-queue-item" style="border-left: 4px solid var(--primary);">
+          <div class="file-item-info">
+            <span style="font-size: 1.1rem;">📄</span>
+            <span class="file-item-name">${f.name}</span>
+          </div>
+          <button class="btn-remove-file" onclick="window.removeQueuedSelfRecordFile(${idx})">✕</button>
+        </div>
+      `).join('');
+    }
+
+    window.removeQueuedSelfRecordFile = (index) => {
+      selfRecordFilesQueue.splice(index, 1);
+      updateSelfRecordFileListUI();
+    };
+
+    const selfRecordDropzone = document.getElementById('self-record-dropzone');
+    const selfRecordFileInput = document.getElementById('self-record-files');
+
+    const addSelfRecordFiles = (files) => {
+      const fileArray = Array.from(files);
+      const newFiles = fileArray.filter(nf => !selfRecordFilesQueue.some(qf => qf.name === nf.name && qf.size === nf.size));
+      selfRecordFilesQueue = [...selfRecordFilesQueue, ...newFiles];
+      updateSelfRecordFileListUI();
+    };
+
+    selfRecordDropzone?.addEventListener('click', () => selfRecordFileInput.click());
+    selfRecordFileInput?.addEventListener('change', () => {
+      if (selfRecordFileInput.files.length > 0) {
+        addSelfRecordFiles(selfRecordFileInput.files);
+        selfRecordFileInput.value = '';
+      }
+    });
+    selfRecordDropzone?.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      selfRecordDropzone.classList.add('dragover');
+    });
+    selfRecordDropzone?.addEventListener('dragleave', () => {
+      selfRecordDropzone.classList.remove('dragover');
+    });
+    selfRecordDropzone?.addEventListener('drop', (e) => {
+      e.preventDefault();
+      selfRecordDropzone.classList.remove('dragover');
+      if (e.dataTransfer.files.length > 0) addSelfRecordFiles(e.dataTransfer.files);
+    });
+
+    document.getElementById('btn-save-self-record')?.addEventListener('click', async () => {
+      const title = document.getElementById('self-record-title').value.trim();
+      const content = document.getElementById('self-record-content').value.trim();
+      if (!title) { showToast('제목을 입력해주세요.', 'error'); return; }
+      if (!content && selfRecordFilesQueue.length === 0) { showToast('내용을 쓰거나 파일을 추가해주세요.', 'error'); return; }
+
+      const saveBtn = document.getElementById('btn-save-self-record');
+      saveBtn.disabled = true;
+      saveBtn.textContent = '저장 중...';
+
+      try {
+        const files = [];
+        for (const file of selfRecordFilesQueue) {
+          const saved = await saveFile(file);
+          files.push({ id: saved.id, name: saved.name });
+        }
+        await createStudentSelfRecord(freshStudent.id, freshStudent.classId, { title, content, files });
+        selfRecordFilesQueue = [];
+        showToast('나의 기록이 저장되었습니다!');
+        render();
+      } catch (err) {
+        console.error('Self record save error:', err);
+        showToast('기록 저장 중 오류가 발생했습니다.', 'error');
+        saveBtn.disabled = false;
+        saveBtn.textContent = '기록 저장하기';
+      }
     });
 
     document.getElementById('btn-student-logout')?.addEventListener('click', () => {
