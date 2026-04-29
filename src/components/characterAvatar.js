@@ -47,25 +47,36 @@ const PLANT_LEVEL_ASSETS = {
   mango: ['🌰', '🌱', '🌿', '🌸', '🥭']
 };
 
-export const LEVEL_THRESHOLDS = [0, 1, 3, 6, 10]; // Required points for Lv 1, 2, 3, 4, 5
+/** 각 레벨 구간 시작에 필요한 누적 포인트 (Lv.1≥0 … Lv.5≥마지막 값) — store와 동기화 */
+export const LEVEL_THRESHOLDS = [0, 5, 12, 25, 50];
 
-export function getLevelProgress(totalPoints) {
+/** 총 포인트로 레벨 1~5 산정 (Firestore characterLevel 과 맞춤) */
+export function deriveCharacterLevelFromPoints(totalPoints) {
+  const pts = Math.max(0, Number(totalPoints) || 0);
   let level = 1;
   for (let i = LEVEL_THRESHOLDS.length - 1; i >= 0; i--) {
-    if (totalPoints >= LEVEL_THRESHOLDS[i]) {
+    if (pts >= LEVEL_THRESHOLDS[i]) {
       level = i + 1;
       break;
     }
   }
+  return Math.min(5, level);
+}
+
+export function getLevelProgress(totalPoints) {
+  const pts = Math.max(0, Number(totalPoints) || 0);
+  const level = deriveCharacterLevelFromPoints(pts);
   const currentThreshold = LEVEL_THRESHOLDS[level - 1];
   const nextThreshold = level < 5 ? LEVEL_THRESHOLDS[level] : currentThreshold;
-  const pointsInCurrentLevel = totalPoints - currentThreshold;
+  const pointsInCurrentLevel = pts - currentThreshold;
   const pointsNeededForNext = level < 5 ? nextThreshold - currentThreshold : 0;
-  const progressPercent = level < 5 ? (pointsInCurrentLevel / pointsNeededForNext) * 100 : 100;
-  const remainingPoints = level < 5 ? nextThreshold - totalPoints : 0;
+  const progressPercent = level < 5 && pointsNeededForNext > 0
+    ? (pointsInCurrentLevel / pointsNeededForNext) * 100
+    : 100;
+  const remainingPoints = level < 5 ? nextThreshold - pts : 0;
 
-  // 열매 개수 계산: 10P(lv5)에서 1개, 이후 3P마다 1개씩 추가
-  const fruitCount = level === 5 ? (1 + Math.floor((totalPoints - 10) / 3)) : 0;
+  const lv5Floor = LEVEL_THRESHOLDS[4];
+  const fruitCount = level === 5 ? (1 + Math.floor((pts - lv5Floor) / 3)) : 0;
 
   return { level, progressPercent, remainingPoints, isMaxLevel: level === 5, fruitCount };
 }
@@ -92,7 +103,10 @@ export function renderCharacter(level, size = 80, type = 'apple', totalPoints = 
   const displayEmoji = safeLevel === 1 ? '🌰' : (PLANT_LEVEL_ASSETS[type]?.[safeLevel - 1] || '🌰');
 
   // 무한 성장 로직 (Level 5일 때만 적용)
-  const fruitCount = safeLevel === 5 ? (1 + Math.floor((Math.max(10, totalPoints) - 10) / 3)) : 1;
+  const lv5Floor = LEVEL_THRESHOLDS[4];
+  const fruitCount = safeLevel === 5
+    ? (1 + Math.floor((Math.max(lv5Floor, totalPoints) - lv5Floor) / 3))
+    : 1;
 
   let content = '';
   if (safeLevel === 5) {

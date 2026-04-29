@@ -2,6 +2,7 @@
 // Genie Class - Excel Import Utility
 // ========================================
 import * as XLSX from 'xlsx';
+import { deriveCharacterLevelFromPoints } from '../components/characterAvatar.js';
 
 export function parseExcelFile(file) {
     return new Promise((resolve, reject) => {
@@ -79,7 +80,7 @@ export function exportStudentsToExcel(students, className) {
             s.number || '-',
             s.name,
             s.uniqueCode,
-            `Lv.${s.characterLevel}`,
+            `Lv.${deriveCharacterLevelFromPoints(s.totalPoints ?? 0)}`,
             s.totalPoints
         ]);
     });

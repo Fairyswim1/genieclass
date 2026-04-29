@@ -41,8 +41,8 @@ export function renderStudentDashboard(container) {
   async function render() {
     let freshStudent = student;
     let cls = null;
-    let config = getLevelConfig(student.characterLevel, student.characterType || 'apple');
     let progress = getLevelProgress(student.totalPoints || 0);
+    let config = getLevelConfig(progress.level, student.characterType || 'apple');
     let presentations = [];
     let assignments = [];
     let submissions = [];
@@ -55,8 +55,8 @@ export function renderStudentDashboard(container) {
     try {
       freshStudent = await getStudentByCode(student.uniqueCode) || student;
       cls = await getClassById(freshStudent.classId);
-      config = getLevelConfig(freshStudent.characterLevel, freshStudent.characterType || 'apple');
       progress = getLevelProgress(freshStudent.totalPoints || 0);
+      config = getLevelConfig(progress.level, freshStudent.characterType || 'apple');
 
       let allPresentations = [];
       [assignments, submissions, announcements, resources, allPresentations, selfRecords, studentNotes] = await Promise.all([
@@ -87,7 +87,7 @@ export function renderStudentDashboard(container) {
             <div class="student-topbar-title">Genie Class</div>
           </div>
           <div class="student-topbar-user">
-            <div class="student-topbar-avatar">${renderCharacter(freshStudent.characterLevel, 34, freshStudent.characterType || 'apple', freshStudent.totalPoints)}</div>
+            <div class="student-topbar-avatar">${renderCharacter(progress.level, 34, freshStudent.characterType || 'apple', freshStudent.totalPoints)}</div>
             <div class="student-topbar-name">${freshStudent.name}</div>
             <button class="btn btn-ghost btn-sm" id="btn-student-logout" style="margin-left: 10px;">로그아웃</button>
           </div>
@@ -97,7 +97,7 @@ export function renderStudentDashboard(container) {
           <section class="student-welcome flex justify-between items-end">
             <div>
               <h1 class="student-welcome-title">반가워요, <span>${freshStudent.name}</span>님!</h1>
-              <p class="student-welcome-subtitle">${cls?.name || '클래스 정보 없음'} · ${config.name} (Lv.${freshStudent.characterLevel})</p>
+              <p class="student-welcome-subtitle">${cls?.name || '클래스 정보 없음'} · ${config.name} (Lv.${progress.level})</p>
             </div>
             <div class="badge badge-purple animate-up" style="padding: 8px 16px; font-size: 0.9rem;">포인트: ${freshStudent.totalPoints}P</div>
           </section>
@@ -200,7 +200,7 @@ export function renderStudentDashboard(container) {
           <!-- Character & Progress -->
           <section class="card student-dashboard-char-row flex items-center gap-md">
             <div class="student-character-float">
-              ${renderCharacter(freshStudent.characterLevel, 70, freshStudent.characterType || 'apple', freshStudent.totalPoints)}
+              ${renderCharacter(progress.level, 70, freshStudent.characterType || 'apple', freshStudent.totalPoints)}
             </div>
             <div class="flex-1">
               <div class="flex justify-between items-end" style="margin-bottom: var(--s-2);">

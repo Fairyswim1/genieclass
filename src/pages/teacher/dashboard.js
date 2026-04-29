@@ -8,7 +8,7 @@ import {
   getStudentNotesForTeacher, markStudentNoteRead, deleteStudentNote
 } from '../../store.js';
 import { parseExcelFile, downloadSampleExcel, exportStudentsToExcel } from '../../utils/excelImport.js';
-import { renderCharacter } from '../../components/characterAvatar.js';
+import { renderCharacter, deriveCharacterLevelFromPoints } from '../../components/characterAvatar.js';
 
 export function renderTeacherDashboard(container) {
   const teacher = getCurrentTeacher();
@@ -447,7 +447,9 @@ export function renderTeacherDashboard(container) {
               </tr>
             </thead>
             <tbody>
-              ${students.length === 0 ? `<tr><td colspan="4" align="center" style="padding:40px; color:var(--text-dim)">아직 등록된 학생이 없습니다.</td></tr>` : students.map(s => `
+              ${students.length === 0 ? `<tr><td colspan="4" align="center" style="padding:40px; color:var(--text-dim)">아직 등록된 학생이 없습니다.</td></tr>` : students.map(s => {
+                const lv = deriveCharacterLevelFromPoints(s.totalPoints ?? 0);
+                return `
                 <tr style="border-bottom:1px solid var(--bg-main)">
                   <td style="padding:12px 0;">
                     <div style="font-size:0.75rem; color:var(--text-dim)">[${s.number || '-'}]</div>
@@ -455,7 +457,7 @@ export function renderTeacherDashboard(container) {
                     <small style="color:var(--primary); font-family:monospace">${s.uniqueCode}</small>
                   </td>
                   <td>${s.loginId ? `<span class="badge badge-blue">ID: ${s.loginId}</span>` : '<span class="badge">미가입</span>'}</td>
-                  <td align="center">${renderCharacter(s.characterLevel, 28, s.characterType, s.totalPoints)}</td>
+                  <td align="center">${renderCharacter(lv, 28, s.characterType, s.totalPoints)}</td>
                   <td align="right">
                     <div class="flex gap-xs justify-end">
                       <button class="btn btn-sm btn-ghost reset-btn" data-id="${s.id}" title="계정 초기화">🔄</button>
@@ -464,7 +466,8 @@ export function renderTeacherDashboard(container) {
                     </div>
                   </td>
                 </tr>
-              `).join('')}
+              `;
+              }).join('')}
             </tbody>
           </table>
         </div>

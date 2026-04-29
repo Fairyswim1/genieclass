@@ -10,7 +10,7 @@ import {
 } from '../../store.js';
 import { escapeHtml, renderQuizMath } from '../../utils/quizMath.js';
 import { renderQuizLatexKeyboardHtml } from '../../utils/quizLatexKeyboard.js';
-import { renderCharacter, getLevelConfig, renderPraiseAnimation } from '../../components/characterAvatar.js';
+import { renderCharacter, getLevelConfig, renderPraiseAnimation, deriveCharacterLevelFromPoints } from '../../components/characterAvatar.js';
 import { getStroke } from 'perfect-freehand';
 import { Capacitor } from '@capacitor/core';
 import { VoiceRecorder } from 'capacitor-voice-recorder';
@@ -98,11 +98,11 @@ export function renderLessonMode(container, params) {
 
           <div class="student-grid" style="grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--s-6);">
             ${students.map(s => {
-      const config = getLevelConfig(s.characterLevel, s.characterType || 'apple');
+      const lv = deriveCharacterLevelFromPoints(s.totalPoints ?? 0);
       return `
                 <div class="student-avatar-card card ${selectedStudent?.id === s.id ? 'selected' : ''}" data-student-id="${s.id}">
                   <div class="student-character">
-                    ${renderCharacter(s.characterLevel, 80, s.characterType || 'apple', s.totalPoints)}
+                    ${renderCharacter(lv, 80, s.characterType || 'apple', s.totalPoints)}
                   </div>
                   <div class="student-name">${s.name}</div>
                   <div class="student-praise-count">⭐ ${s.totalPoints}P</div>
@@ -115,7 +115,9 @@ export function renderLessonMode(container, params) {
 
         <!-- Student Action Panel -->
         <div class="student-action-panel ${selectedStudent ? 'open' : ''}">
-          ${selectedStudent ? `
+          ${selectedStudent ? (() => {
+            const selLv = deriveCharacterLevelFromPoints(selectedStudent.totalPoints ?? 0);
+            return `
             <div class="action-panel-header">
               <h3 style="font-weight: 800; font-size: 1.25rem;">${selectedStudent.name}</h3>
               <button class="modal-close" id="close-action-panel">✕</button>
@@ -123,9 +125,9 @@ export function renderLessonMode(container, params) {
             <div class="action-panel-body">
                <div class="text-center" style="margin-bottom: var(--s-8);">
                  <div style="width: 120px; height: 120px; margin: 0 auto 15px;">
-                   ${renderCharacter(selectedStudent.characterLevel, 120, selectedStudent.characterType || 'apple', selectedStudent.totalPoints)}
+                   ${renderCharacter(selLv, 120, selectedStudent.characterType || 'apple', selectedStudent.totalPoints)}
                  </div>
-                 <div class="badge badge-purple">${getLevelConfig(selectedStudent.characterLevel, selectedStudent.characterType || 'apple').fullName}</div>
+                 <div class="badge badge-purple">${getLevelConfig(selLv, selectedStudent.characterType || 'apple').fullName}</div>
                </div>
                <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 10px;">
                  <button class="btn btn-primary" id="btn-praise" style="flex-direction: column; height: 100px; gap: 10px;">
@@ -146,7 +148,8 @@ export function renderLessonMode(container, params) {
                  </button>
                </div>
             </div>
-          ` : ''}
+          `;
+          })() : ''}
         </div>
 
         <!-- Observation Modal -->

@@ -26,6 +26,7 @@ import {
     onSnapshot
 } from 'firebase/firestore';
 import { auth, db, storage, googleProvider } from './firebase.js';
+import { deriveCharacterLevelFromPoints } from './components/characterAvatar.js';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
 const COLLECTIONS = {
@@ -283,12 +284,7 @@ export async function praiseStudent(studentId) {
     if (snap.exists()) {
         const data = snap.data();
         const newPoints = data.totalPoints + 1;
-        
-        let newLevel = 1;
-        if (newPoints >= 10) newLevel = 5;
-        else if (newPoints >= 6) newLevel = 4;
-        else if (newPoints >= 3) newLevel = 3;
-        else if (newPoints >= 1) newLevel = 2;
+        const newLevel = deriveCharacterLevelFromPoints(newPoints);
 
         await updateDoc(studentRef, {
             praiseCount: increment(1),
@@ -306,12 +302,7 @@ export async function addStudentPoints(studentId, pointsToAdd) {
     if (snap.exists()) {
         const data = snap.data();
         const newPoints = data.totalPoints + pointsToAdd;
-        
-        let newLevel = 1;
-        if (newPoints >= 10) newLevel = 5;
-        else if (newPoints >= 6) newLevel = 4;
-        else if (newPoints >= 3) newLevel = 3;
-        else if (newPoints >= 1) newLevel = 2;
+        const newLevel = deriveCharacterLevelFromPoints(newPoints);
 
         await updateDoc(studentRef, {
             totalPoints: increment(pointsToAdd),
