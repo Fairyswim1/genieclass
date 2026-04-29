@@ -1,0 +1,151 @@
+/* ========================================
+   번개 퀴즈 · 수식 표시 (KaTeX)
+   ======================================== */
+
+.quiz-math-board {
+  position: relative;
+  border-radius: var(--r-lg, 12px);
+  padding: var(--s-6, 24px) var(--s-8, 32px);
+  min-height: 120px;
+  background: linear-gradient(165deg, #1e293b 0%, #0f172a 48%, #172554 100%);
+  color: #e2e8f0;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 -2px 12px rgba(0, 0, 0, 0.35),
+    0 8px 32px rgba(15, 23, 42, 0.45);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  overflow: hidden;
+}
+
+/* 은은한 칠판 격자 */
+.quiz-math-board::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.12;
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.35) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.28) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.quiz-math-board__inner {
+  position: relative;
+  z-index: 1;
+  font-size: 1.15rem;
+  line-height: 1.75;
+  letter-spacing: -0.01em;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* KaTeX on dark board */
+.quiz-math-board .katex {
+  font-size: 1.12em;
+  color: #f8fafc;
+}
+
+.quiz-math-board .katex .mord,
+.quiz-math-board .katex .mrel,
+.quiz-math-board .katex .mbin,
+.quiz-math-board .katex .mop {
+  color: inherit;
+}
+
+.quiz-math-board .katex-display {
+  display: block;
+  margin: 1em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 8px 4px;
+  text-align: center;
+}
+
+.quiz-math-board .katex-display > .katex {
+  font-size: 1.2em;
+  color: #f1f5f9;
+}
+
+/* 스크롤 바 (긴 수식) */
+.quiz-math-board .katex-display::-webkit-scrollbar {
+  height: 6px;
+}
+.quiz-math-board .katex-display::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.45);
+  border-radius: 4px;
+}
+
+/* 문제 패널 (학생 오버레이 상단) */
+.quiz-problem-shell {
+  border-radius: var(--r-lg, 12px);
+  overflow: hidden;
+  border: 2px solid rgba(99, 102, 241, 0.45);
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.35);
+}
+
+.quiz-problem-shell__head {
+  margin: 0;
+  padding: 12px 18px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: linear-gradient(90deg, rgba(79, 70, 229, 0.35), rgba(30, 41, 59, 0.95));
+  color: #c7d2fe;
+  border-bottom: 1px solid rgba(129, 140, 248, 0.25);
+}
+
+.quiz-problem-shell__body {
+  padding: 0;
+}
+
+.quiz-problem-shell__img {
+  display: block;
+  width: 100%;
+  max-height: min(52vh, 480px);
+  object-fit: contain;
+  background: #020617;
+}
+
+/* 출제 화면: 미리보기 */
+.quiz-math-board--live {
+  min-height: 140px;
+  margin-top: var(--s-4, 16px);
+}
+
+.quiz-math-placeholder {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+/* 갤러리 · 풀이 텍스트 (밝은 카드 안) */
+.quiz-solution-math {
+  font-size: 0.92rem;
+  line-height: 1.6;
+  padding: 12px;
+  background: rgba(248, 250, 252, 0.92);
+  border-radius: var(--r-sm, 8px);
+  border: 1px solid var(--border-subtle, #e2e8f0);
+  text-align: left;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.quiz-solution-math .katex {
+  font-size: 1.05em;
+}
+
+.quiz-solution-math .katex-display {
+  margin: 0.85em 0;
+  overflow-x: auto;
+}
+
+/* 답안 입력란 도움말 줄 */
+.quiz-math-hint {
+  margin-top: 8px;
+  font-size: 0.82rem;
+  color: var(--text-dim, #64748b);
+  line-height: 1.45;
+}

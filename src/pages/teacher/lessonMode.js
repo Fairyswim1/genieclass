@@ -8,6 +8,7 @@ import {
   saveFile, getPresentationsByStudent, formatDate, addStudentPoints,
   deletePresentationById
 } from '../../store.js';
+import { escapeHtml, renderQuizMath } from '../../utils/quizMath.js';
 import { renderCharacter, getLevelConfig, renderPraiseAnimation } from '../../components/characterAvatar.js';
 import { getStroke } from 'perfect-freehand';
 import { Capacitor } from '@capacitor/core';
@@ -489,22 +490,31 @@ export function renderLessonMode(container, params) {
                   <h3 style="margin-bottom: var(--s-6); text-align: center;">⚡ 새 퀴즈 출제하기</h3>
                   
                   <div class="form-group" style="margin-bottom: var(--s-6);">
-                    <label class="input-label">문제 설명 (텍스트/수식)</label>
-                    <textarea class="input-field" id="quiz-text-input" rows="4" placeholder="문제를 입력하세요. (예: 다음 식을 계산하세요. $2x + 5 = 11$)"></textarea>
+                    <label class="input-label">문제 설명 (텍스트·수식)</label>
+                    <textarea class="input-field quiz-text-input-enhanced" id="quiz-text-input" rows="5" spellcheck="false" placeholder="예) $2x^2 - 5x + 3 = 0$ 의 두 근을 구하시오.&#10;&#10;긴 수식은 오른쪽처럼 별도 줄에 $$ ... $$ 로 감싸면 가운데 정렬됩니다."></textarea>
                     
-                    <div class="math-toolbar" style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 5px;">
-                      <button class="btn btn-ghost btn-sm btn-math" data-latex="\\frac{ }{ }">分</button>
-                      <button class="btn btn-ghost btn-sm btn-math" data-latex="\\sqrt{ }">√</button>
-                      <button class="btn btn-ghost btn-sm btn-math" data-latex="^2">x²</button>
-                      <button class="btn btn-ghost btn-sm btn-math" data-latex="\\pm">±</button>
-                      <button class="btn btn-ghost btn-sm btn-math" data-latex="\\times">×</button>
-                      <button class="btn btn-ghost btn-sm btn-math" data-latex="\\div">÷</button>
-                      <button class="btn btn-ghost btn-sm btn-math" data-latex="\\pi">π</button>
-                      <button class="btn btn-ghost btn-sm btn-math" data-latex="\\alpha">α</button>
-                      <button class="btn btn-ghost btn-sm btn-math" data-latex="\\beta">β</button>
-                      <button class="btn btn-ghost btn-sm btn-math" data-latex="\\theta">θ</button>
-                      <button class="btn btn-ghost btn-sm btn-math" data-latex="\\sum">Σ</button>
-                      <button class="btn btn-ghost btn-sm btn-math" data-latex="\\infty">∞</button>
+                    <div class="quiz-math-toolbar" style="margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center;">
+                      <span style="font-size: 0.75rem; color: var(--text-dim); width: 100%; margin-bottom: 2px;">자주 쓰는 기호 삽입 (커서 위치에 추가)</span>
+                      <button type="button" class="btn btn-ghost btn-sm btn-math" data-latex="\\frac{a}{b}" title="분수 템플릿">분수</button>
+                      <button type="button" class="btn btn-ghost btn-sm btn-math" data-latex="\\sqrt{x}" title="루트">√</button>
+                      <button type="button" class="btn btn-ghost btn-sm btn-math" data-latex="x^2" title="제곱">$x^2$</button>
+                      <button type="button" class="btn btn-ghost btn-sm btn-math" data-latex="\\pm">±</button>
+                      <button type="button" class="btn btn-ghost btn-sm btn-math" data-latex="\\times">×</button>
+                      <button type="button" class="btn btn-ghost btn-sm btn-math" data-latex="\\div">÷</button>
+                      <button type="button" class="btn btn-ghost btn-sm btn-math" data-latex="\\leq">≤</button>
+                      <button type="button" class="btn btn-ghost btn-sm btn-math" data-latex="\\geq">≥</button>
+                      <button type="button" class="btn btn-ghost btn-sm btn-math" data-latex="\\neq">≠</button>
+                      <button type="button" class="btn btn-ghost btn-sm btn-math" data-latex="\\pi">π</button>
+                      <button type="button" class="btn btn-ghost btn-sm btn-math" data-latex="\\alpha">α</button>
+                      <button type="button" class="btn btn-ghost btn-sm btn-math" data-latex="\\beta">β</button>
+                      <button type="button" class="btn btn-ghost btn-sm btn-math" data-latex="\\theta">θ</button>
+                      <button type="button" class="btn btn-ghost btn-sm btn-math" data-latex="\\sum">Σ</button>
+                      <button type="button" class="btn btn-ghost btn-sm btn-math" data-latex="\\infty">∞</button>
+                      <button type="button" class="btn btn-ghost btn-sm btn-math" data-latex="\\int">∫</button>
+                    </div>
+                    <label class="input-label" style="margin-top: var(--s-6);">미리보기 (출제 후 학생에게도 같은 스타일로 보입니다)</label>
+                    <div id="quiz-live-math-preview" class="quiz-math-board quiz-math-board--live" aria-live="polite">
+                      <p class="quiz-math-placeholder">위에 문제를 입력하면 여기에서 수식이 렌더링됩니다. 예: 근의 공식은 $x=\frac{-b\pm\sqrt{b^2-4ac}}{2a}$ 입니다.</p>
                     </div>
                   </div>
 
@@ -520,10 +530,18 @@ export function renderLessonMode(container, params) {
                   <button class="btn btn-primary btn-lg w-full" style="height: 60px; font-size: 1.2rem;" id="btn-start-quiz">🚀 퀴즈 시작하기</button>
                 </div>
               ` : `
-                <div class="card" style="padding: var(--s-6);">
-                  <div class="input-label">출제된 문제</div>
-                  ${activeQuiz.problemText ? `<div class="quiz-problem-text" style="font-size: 1.3rem; margin-bottom: 15px; padding: 15px; background: var(--bg-surface); border-radius: 8px; line-height: 1.6; white-space: pre-wrap;">${activeQuiz.problemText}</div>` : ''}
-                  ${activeQuiz.problemImage ? `<img src="${activeQuiz.problemImage.url}" style="max-height: 400px; width: 100%; object-fit: contain; background: #000; border-radius: var(--r-md);" />` : ''}
+                <div class="card" style="padding: var(--s-8); margin-bottom: var(--s-4);">
+                  <div class="input-label" style="margin-bottom: 12px; font-weight: 700;">출제 중인 문제</div>
+                  ${activeQuiz.problemText ? `
+                  <div class="quiz-math-render-root">
+                    <div class="quiz-math-board">
+                      <div class="quiz-math-board__inner">${escapeHtml(activeQuiz.problemText)}</div>
+                    </div>
+                  </div>` : ''}
+                  ${activeQuiz.problemImage ? `
+                    <div style="margin-top: ${activeQuiz.problemText ? '16px' : '0'}; border-radius: var(--r-md); overflow: hidden; border: 1px solid rgba(148,163,184,0.35); background: #020617;">
+                      <img src="${activeQuiz.problemImage.url}" alt="문제 이미지" style="width:100%; max-height: 420px; object-fit: contain; display: block;">
+                    </div>` : ''}
                 </div>
                 
                 <div class="section-header" style="margin-top: var(--s-8);">
@@ -532,9 +550,9 @@ export function renderLessonMode(container, params) {
                 <div class="grid" style="grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--s-6);">
                   ${quizSubmissions.map(s => `
                     <div class="card" style="padding: var(--s-3); display: flex; flex-direction: column; gap: 10px;">
-                      ${s.image ? `<img src="${s.image.url}" style="width: 100%; aspect-ratio: 4/3; object-fit: cover; border-radius: var(--r-sm); cursor: pointer;" onclick="window.open('${s.image.url}')" />` : ''}
-                      ${s.solutionText ? `<div class="solution-text" style="padding: 10px; background: var(--bg-main); border-radius: 6px; font-size: 0.95rem; line-height: 1.5; white-space: pre-wrap;">${s.solutionText}</div>` : ''}
-                      <div style="margin-top: auto; font-weight: 700; text-align: center; color: var(--primary-light);">${s.studentName}</div>
+                      ${s.image ? `<img src="${s.image.url}" alt="" style="width: 100%; aspect-ratio: 4/3; object-fit: cover; border-radius: var(--r-sm); cursor: pointer;" onclick="window.open('${s.image.url}')" />` : ''}
+                      ${s.solutionText ? `<div class="quiz-solution-math quiz-math-render-root">${escapeHtml(s.solutionText)}</div>` : ''}
+                      <div style="margin-top: auto; font-weight: 700; text-align: center; color: var(--primary-light);">${escapeHtml(s.studentName || '')}</div>
                     </div>
                   `).join('')}
                 </div>
@@ -564,6 +582,9 @@ export function renderLessonMode(container, params) {
     `;
 
     bindQuizEvents();
+    queueMicrotask(() => {
+      container.querySelectorAll('.quiz-math-render-root').forEach((el) => renderQuizMath(el));
+    });
   }
 
   function bindQuizEvents() {
@@ -592,8 +613,29 @@ export function renderLessonMode(container, params) {
         textInput.value = text.substring(0, start) + latex + text.substring(end);
         textInput.focus();
         textInput.setSelectionRange(start + latex.length, start + latex.length);
+        refreshTeacherQuizPreview();
       });
     });
+
+    let previewDebounce;
+    const refreshTeacherQuizPreview = () => {
+      const preview = document.getElementById('quiz-live-math-preview');
+      const ti = document.getElementById('quiz-text-input');
+      if (!preview || !ti) return;
+      const raw = ti.value;
+      if (!raw.trim()) {
+        preview.innerHTML = '<p class="quiz-math-placeholder">위에 문제를 입력하면 여기에서 수식이 렌더링됩니다. 예: 근의 공식은 $x=\\frac{-b\\pm\\sqrt{b^2-4ac}}{2a}$ 입니다.</p>';
+        return;
+      }
+      preview.innerHTML = `<div class="quiz-math-board"><div class="quiz-math-board__inner">${escapeHtml(raw)}</div></div>`;
+      renderQuizMath(preview);
+    };
+
+    textInput?.addEventListener('input', () => {
+      clearTimeout(previewDebounce);
+      previewDebounce = setTimeout(refreshTeacherQuizPreview, 100);
+    });
+    refreshTeacherQuizPreview();
 
     document.getElementById('btn-start-quiz')?.addEventListener('click', async () => {
       const problemText = textInput.value.trim();
@@ -635,22 +677,8 @@ export function renderLessonMode(container, params) {
     unsubscribeSubmissions = listenToQuizSubmissions(quizId, (subs) => {
       quizSubmissions = subs;
       render();
-      
-      // LaTeX rendering
-      setTimeout(() => {
-        if (window.renderMathInElement) {
-          renderMathInElement(container, {
-            delimiters: [
-              {left: '$$', right: '$$', display: true},
-              {left: '$', right: '$', display: false}
-            ],
-            throwOnError: false
-          });
-        }
-      }, 100);
     });
-}
-
+  }
   // --- Whiteboard Mode --- (Keep existing logic but styled)
   function renderWhiteboardMode() {
     container.innerHTML = `

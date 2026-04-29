@@ -3,7 +3,7 @@
 // ========================================
 import './styles/global.css';
 import './styles/teacher.css';
-import './styles/student.css';
+import './styles/quiz-math.css';
 
 import { addRoute, initRouter } from './router.js';
 import { renderLanding } from './pages/landing.js';

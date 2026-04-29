@@ -13,6 +13,7 @@ import {
   createStudentSelfRecord, getStudentSelfRecords,
   createStudentNote, getStudentNotesByStudent
 } from '../../store.js';
+import { escapeHtml, renderQuizMath } from '../../utils/quizMath.js';
 import { renderCharacter, getLevelConfig, PLANT_TYPES, getLevelProgress } from '../../components/characterAvatar.js';
 
 export function renderStudentDashboard(container) {
@@ -408,22 +409,14 @@ export function renderStudentDashboard(container) {
       const gallery = document.getElementById('quiz-gallery');
       if (gallery) {
         gallery.innerHTML = subs.map(s => `
-          <div class="card" style="padding: 10px; text-align: center; display: flex; flex-direction: column; gap: 8px;">
-            ${s.image ? `<img src="${s.image.url}" style="width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px;" />` : ''}
-            ${s.solutionText ? `<div style="font-size: 0.85rem; background: var(--bg-main); padding: 8px; border-radius: 6px; text-align: left; white-space: pre-wrap;">${s.solutionText}</div>` : ''}
-            <div style="font-size: 0.8rem; margin-top: auto; font-weight: 700; color: var(--primary-light);">${s.studentName}</div>
+          <div class="card" style="padding: 12px; display: flex; flex-direction: column; gap: 10px;">
+            ${s.image ? `<img src="${s.image.url}" style="width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px;" alt="" />` : ''}
+            ${s.solutionText ? `<div class="quiz-solution-math quiz-math-render-root">${escapeHtml(s.solutionText)}</div>` : ''}
+            <div style="font-size: 0.8rem; margin-top: auto; font-weight: 700; color: var(--primary-light);">${escapeHtml(s.studentName || '')}</div>
           </div>
         `).join('');
         
-        if (window.renderMathInElement) {
-          renderMathInElement(gallery, {
-            delimiters: [
-              {left: '$$', right: '$$', display: true},
-              {left: '$', right: '$', display: false}
-            ],
-            throwOnError: false
-          });
-        }
+        renderQuizMath(gallery);
       }
     });
 }
@@ -446,41 +439,47 @@ export function renderStudentDashboard(container) {
             <button class="modal-close" id="btn-close-quiz-overlay" title="닫기">✕</button>
           </div>
         </div>
-        <div class="flex-1" style="display: grid; grid-template-columns: 1fr 340px; gap: 20px; overflow: hidden; padding: 10px 0;">
-          <div style="overflow-y: auto; display: flex; flex-direction: column; gap: 20px;">
-            <div class="card" style="background: var(--bg-surface); padding: 0; overflow: hidden; border: 2px solid var(--primary-light);">
-              <div class="input-label" style="padding: 10px 15px; background: rgba(255,255,255,0.05); margin: 0; font-size: 1.1rem; color: var(--primary-light);">📋 문제</div>
-              <div style="padding: 20px;">
-                ${activeQuiz.problemText ? `<div id="quiz-problem-text" style="font-size: 1.4rem; line-height: 1.6; margin-bottom: 20px; white-space: pre-wrap;">${activeQuiz.problemText}</div>` : ''}
-                ${activeQuiz.problemImage ? `<img src="${activeQuiz.problemImage.url}" style="width: 100%; max-height: 500px; object-fit: contain; border-radius: 8px; background: #000;" />` : ''}
+        <div class="flex-1" style="display: grid; grid-template-columns: 1fr minmax(280px, 340px); gap: 20px; overflow: hidden; padding: 12px 16px 16px;">
+          <div style="overflow-y: auto; display: flex; flex-direction: column; gap: var(--s-6); min-width: 0;">
+            <section class="quiz-problem-shell">
+              <h3 class="quiz-problem-shell__head">문제</h3>
+              <div class="quiz-problem-shell__body">
+                ${activeQuiz.problemText ? `
+                <div class="quiz-math-render-root">
+                  <div class="quiz-math-board">
+                    <div class="quiz-math-board__inner">${escapeHtml(activeQuiz.problemText)}</div>
+                  </div>
+                </div>` : ''}
+                ${activeQuiz.problemImage ? `<img class="quiz-problem-shell__img" src="${activeQuiz.problemImage.url}" alt="문제 이미지"/>` : ''}
               </div>
-            </div>
+            </section>
             
-            <div class="card" style="padding: 25px;">
-              <h3 style="margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+            <div class="card" style="padding: 22px;">
+              <h3 style="margin-bottom: 16px; display: flex; align-items: center; gap: 10px;">
                 <span style="font-size: 1.5rem;">✍️</span> 내 풀이 제출
               </h3>
               
-              <div class="form-group" style="margin-bottom: 20px;">
-                <label class="input-label">답안 입력 (선택)</label>
-                <textarea class="input-field" id="quiz-solve-text" rows="3" placeholder="답안을 입력하세요. 수식은 $...$ 사이에 입력하세요."></textarea>
+              <div class="form-group" style="margin-bottom: 16px;">
+                <label class="input-label">답안·풀이 (텍스트)</label>
+                <textarea class="input-field" id="quiz-solve-text" rows="4" spellcheck="false" placeholder="풀이를 작성하세요. 수식은 $x^2$ 나 $$ \\frac{\\sqrt{3}}{2} $$ 같은 LaTeX를 쓸 수 있습니다."></textarea>
+                <p class="quiz-math-hint"><strong>팁:</strong> 짧은 수식은 가운데 $ 두 개 사이에, 새 줄에서 크게 나오게 하려면 같은 기호 두 개($$)로 줄 전체를 감싸 보세요.</p>
               </div>
 
-              <div class="form-group" style="margin-bottom: 20px;">
+              <div class="form-group" style="margin-bottom: 16px;">
                 <label class="input-label">사진 제출 (선택)</label>
-                <div class="drop-zone" id="quiz-solve-dropzone" style="padding: 20px; height: 120px;">
+                <div class="drop-zone" id="quiz-solve-dropzone" style="padding: 20px; min-height: 100px;">
                   <span style="font-size: 1.5rem;">📷</span>
                   <p id="quiz-solve-status">풀이 사진을 업로드하세요</p>
                   <input type="file" id="quiz-solve-input" class="hidden" accept="image/*" />
                 </div>
               </div>
 
-              <button class="btn btn-primary btn-lg w-full" style="height: 60px; font-size: 1.2rem;" id="btn-submit-quiz-solve">✨ 풀이 제출 및 공유</button>
+              <button class="btn btn-primary btn-lg w-full" style="min-height: 56px; font-size: 1.1rem;" id="btn-submit-quiz-solve">✨ 풀이 제출 및 공유</button>
             </div>
           </div>
-          <div style="display: flex; flex-direction: column; height: 100%; overflow: hidden;">
-            <h4 style="margin-bottom: 15px; color: var(--text-muted);">친구들의 풀이</h4>
-            <div id="quiz-gallery" style="flex: 1; overflow-y: auto; display: grid; grid-template-columns: 1fr; gap: 15px; align-content: start;"></div>
+          <div style="display: flex; flex-direction: column; height: 100%; overflow: hidden; min-height: 0;">
+            <h4 style="margin-bottom: 12px; color: var(--text-muted); font-size: 0.95rem;">친구들의 풀이</h4>
+            <div id="quiz-gallery" style="flex: 1; overflow-y: auto; display: grid; grid-template-columns: 1fr; gap: 12px; align-content: start;"></div>
           </div>
         </div>
       </div>
@@ -530,18 +529,9 @@ export function renderStudentDashboard(container) {
       }
     });
 
-    // LaTeX rendering for problem and gallery
     setTimeout(() => {
-      if (window.renderMathInElement) {
-        renderMathInElement(overlay, {
-          delimiters: [
-            {left: '$$', right: '$$', display: true},
-            {left: '$', right: '$', display: false}
-          ],
-          throwOnError: false
-        });
-      }
-    }, 100);
+      renderQuizMath(overlay);
+    }, 0);
 
     if (quizSubmissions.length > 0) startSubmissionsListener(activeQuiz.id);
 }
