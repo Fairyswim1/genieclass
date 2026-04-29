@@ -132,6 +132,25 @@ export function renderStudentDashboard(container) {
             </div>
           </section>
 
+          <!-- Character & Progress -->
+          <section class="card student-dashboard-char-row flex items-center gap-md">
+            <div class="student-character-float">
+              ${renderCharacter(progress.level, 70, freshStudent.characterType || 'apple', freshStudent.totalPoints)}
+            </div>
+            <div class="flex-1">
+              <div class="flex justify-between items-end" style="margin-bottom: var(--s-2);">
+                <span style="font-family: var(--font-title); font-size: 1.2rem;">${config.emoji} ${config.name}</span>
+                <div class="flex items-center gap-sm">
+                  <span style="font-family: var(--font-hand); font-size: 1.2rem;">${progress.isMaxLevel ? '최고 레벨 도달! 🎉' : `다음 레벨까지 ${progress.remainingPoints}P 남음`}</span>
+                  <button class="btn btn-ghost btn-sm" id="btn-change-character" style="font-size: 0.8rem; padding: 4px 10px; border: 1px solid var(--border-subtle); border-radius: var(--r-md);">🔄 열매 변경</button>
+                </div>
+              </div>
+              <div style="background: var(--bg-main); height: 14px; border-radius: 7px; overflow: hidden; border: 2px solid var(--border-main);">
+                <div style="width: ${progress.progressPercent}%; height: 100%; background: var(--primary); transition: width 0.5s;"></div>
+              </div>
+            </div>
+          </section>
+
           <div class="student-grid-37 student-dashboard-presentations-grid">
             <!-- My Presentations -->
             <div class="section-card card">
@@ -196,24 +215,6 @@ export function renderStudentDashboard(container) {
             </div>
           </div>
 
-          <!-- Character & Progress -->
-          <section class="card student-dashboard-char-row flex items-center gap-md">
-            <div class="student-character-float">
-              ${renderCharacter(progress.level, 70, freshStudent.characterType || 'apple', freshStudent.totalPoints)}
-            </div>
-            <div class="flex-1">
-              <div class="flex justify-between items-end" style="margin-bottom: var(--s-2);">
-                <span style="font-family: var(--font-title); font-size: 1.2rem;">${config.emoji} ${config.name}</span>
-                <div class="flex items-center gap-sm">
-                  <span style="font-family: var(--font-hand); font-size: 1.2rem;">${progress.isMaxLevel ? '최고 레벨 도달! 🎉' : `다음 레벨까지 ${progress.remainingPoints}P 남음`}</span>
-                  <button class="btn btn-ghost btn-sm" id="btn-change-character" style="font-size: 0.8rem; padding: 4px 10px; border: 1px solid var(--border-subtle); border-radius: var(--r-md);">🔄 열매 변경</button>
-                </div>
-              </div>
-              <div style="background: var(--bg-main); height: 14px; border-radius: 7px; overflow: hidden; border: 2px solid var(--border-main);">
-                <div style="width: ${progress.progressPercent}%; height: 100%; background: var(--primary); transition: width 0.5s;"></div>
-              </div>
-            </div>
-          </section>
           <div class="student-grid-73 student-dashboard-main-grid">
             <!-- Assignments & Records -->
             <div class="flex flex-col student-dashboard-col-gap">
