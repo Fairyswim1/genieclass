@@ -18,6 +18,7 @@
     "android:sync": "npm run build && npx cap sync android",
     "android:open": "npx cap open android",
     "android:build": "npm run build && npx cap sync android && npx cap open android",
+    "android:assemble": "npm run android:sync && cd android && gradlew.bat assembleDebug",
     "android:sync:student": "npm run build:student && node scripts/with-student-cap.mjs sync android",
     "android:open:student": "node scripts/with-student-cap.mjs open android",
     "android:add:student": "node scripts/with-student-cap.mjs add android",

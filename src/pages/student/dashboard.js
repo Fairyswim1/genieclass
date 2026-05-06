@@ -79,6 +79,8 @@ export function renderStudentDashboard(container) {
     let announcements = [];
     let resources = [];
     let sharedPresentations = [];
+    /** 반 전체 발표(문제 풀이 type 필터에 사용) — 템플릿에서 참조하므로 try 바깥에 선언 */
+    let allPresentations = [];
     let selfRecords = [];
     let studentNotes = [];
     let problemPrompts = [];
@@ -121,7 +123,6 @@ export function renderStudentDashboard(container) {
         else assignmentsLoadError = 'unknown';
       }
 
-      let allPresentations = [];
       [submissions, announcements, resources, allPresentations, selfRecords, studentNotes, problemPrompts] = await Promise.all([
         loadOr('제출물', getSubmissionsByStudent(freshStudent.id), []),
         loadOr('공지', cls ? getAnnouncementsByClass(cls.id) : Promise.resolve([]), []),
