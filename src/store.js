@@ -6,6 +6,7 @@ import {
     signInWithCredential,
     GoogleAuthProvider,
     signOut,
+    signInAnonymously,
     onAuthStateChanged
 } from 'firebase/auth';
 import { Capacitor } from '@capacitor/core';
@@ -116,8 +117,32 @@ export function getCurrentStudent() {
     return data ? JSON.parse(data) : null;
 }
 
-export function logoutStudent() {
+/**
+ * 학생은 Google 로그인 없이 localStorage만 쓰므로, Firestore/Storage 규칙이 auth를 요구하면
+ * 제출·업로드가 permission-denied로 실패한다. 익명 로그인으로 request.auth를 채운다.
+ * Firebase 콘솔 → Authentication → Sign-in method → 익명(Anonymous) 사용 설정 필요.
+ */
+export async function ensureStudentFirestoreAuth() {
+    const u = auth.currentUser;
+    if (u?.isAnonymous) return;
+
+    if (u && !u.isAnonymous) {
+        console.warn('[Genie] 학생 세션을 위해 기존 Firebase 로그인을 종료하고 익명 로그인으로 전환합니다.');
+        await signOut(auth);
+    }
+
+    await signInAnonymously(auth);
+}
+
+export async function logoutStudent() {
     localStorage.removeItem('genie_current_student');
+    try {
+        if (auth.currentUser?.isAnonymous) {
+            await signOut(auth);
+        }
+    } catch (e) {
+        console.warn('[logoutStudent] signOut:', e);
+    }
 }
 
 // ========== Class ==========
@@ -223,6 +248,7 @@ export async function getStudentById(studentId) {
 
 export async function getStudentByCode(code) {
     if (!code) return null;
+    await ensureStudentFirestoreAuth();
     const q = query(collection(db, COLLECTIONS.STUDENTS), where('uniqueCode', '==', code.toUpperCase()));
     const snapshot = await getDocs(q);
     return !snapshot.empty ? snapshot.docs[0].data() : null;
@@ -230,6 +256,7 @@ export async function getStudentByCode(code) {
 
 export async function checkLoginIdExists(loginId) {
     if (!loginId || loginId.trim() === '') return false;
+    await ensureStudentFirestoreAuth();
     const q = query(collection(db, COLLECTIONS.STUDENTS), where('loginId', '==', loginId.trim()));
     const snapshot = await getDocs(q);
     if (!snapshot.empty) {
@@ -240,6 +267,7 @@ export async function checkLoginIdExists(loginId) {
 }
 
 export async function setupStudentAuth(studentId, loginId, password) {
+    await ensureStudentFirestoreAuth();
     const ref = doc(db, COLLECTIONS.STUDENTS, studentId);
     await updateDoc(ref, {
         loginId: loginId.trim(),
@@ -266,6 +294,7 @@ export async function updateStudentPassword(studentId, newPassword) {
 }
 
 export async function loginStudentByIdPw(loginId, password) {
+    await ensureStudentFirestoreAuth();
     const q = query(collection(db, COLLECTIONS.STUDENTS),
         where('loginId', '==', loginId),
         where('password', '==', password));

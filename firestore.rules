@@ -1,0 +1,10 @@
+rules_version = '2';
+// 배포: 프로젝트 연결 후 `firebase deploy --only firestore:rules,storage:rules`
+// 학생 앱은 익명 로그인(Authentication → 익명 사용) 후 request.auth != null 이 된다.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}

@@ -32,12 +32,12 @@ addRoute('/s', (container) => renderStudentLogin(container));
 addRoute('/student/login', (container) => renderStudentLogin(container));
 addRoute('/student/dashboard', (container) => renderStudentDashboard(container));
 
-// Initialize application after Auth state is determined
+// 라우터는 Auth 리스너가 한 번 돌 때 초기화한다(초기 user는 null일 수 있음 — “로그인 완료”와 무관).
 let isInitialized = false;
-onAuthStateChanged(auth, (user) => {
+onAuthStateChanged(auth, (_user) => {
     if (!isInitialized) {
         initRouter();
         isInitialized = true;
-        console.log('✨ Genie Class initialized (Auth ready)');
+        console.log('✨ Genie Class initialized');
     }
 });

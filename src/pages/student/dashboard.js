@@ -2,7 +2,7 @@
 // Student Dashboard (v2.0)
 // ========================================
 import {
-  getCurrentStudent, logoutStudent, getClassById,
+  getCurrentStudent, logoutStudent, ensureStudentFirestoreAuth, getClassById,
   getPresentationsByStudent, getAssignmentsByClass,
   getSubmissionsByStudent, getAnnouncementsByClass,
   getResourcesByClass, getStudentById, formatDate,
@@ -53,7 +53,17 @@ export function renderStudentDashboard(container) {
   let quizListenClassId = student.classId || '';
   let lastQuizBoundClassId = '';
 
+  /** 익명 Firebase 로그인 실패 시 권한 오류(permission-denied, storage/unauthorized)가 난다 */
+  let firebaseAuthSetupError = null;
+
   async function init() {
+    firebaseAuthSetupError = null;
+    try {
+      await ensureStudentFirestoreAuth();
+    } catch (e) {
+      console.error('[StudentDashboard] Firebase 익명 로그인 실패:', e);
+      firebaseAuthSetupError = e;
+    }
     await render();
   }
 
@@ -135,6 +145,24 @@ export function renderStudentDashboard(container) {
       return;
     }
 
+    const firebaseAuthBanner = (() => {
+      if (!firebaseAuthSetupError) return '';
+      const code = firebaseAuthSetupError?.code || '';
+      const msg = firebaseAuthSetupError?.message || '';
+      let hint = 'Firebase에 “학생용 익명 로그인”이 꺼져 있거나, 보안 규칙이 로그인한 사용자만 허용하는데 이 기기에서 로그인에 실패했습니다.';
+      if (code === 'auth/operation-not-allowed') {
+        hint = 'Firebase 콘솔 → Authentication → Sign-in method → <strong>익명(Anonymous)</strong> 을 사용함으로 켜 주세요. (관리자 설정)';
+      } else if (code === 'auth/network-request-failed') {
+        hint = '인증 서버에 연결하지 못했습니다. Wi-Fi·VPN·방화벽(학교망)을 바꿔 보세요.';
+      }
+      return `<div class="card" style="margin-bottom:var(--s-4);padding:var(--s-4);border:2px solid var(--error);background:rgba(239,68,68,0.08);font-size:0.88rem;line-height:1.55;">
+        <strong>데이터·파일 서버 연결 실패</strong>
+        <p style="margin:8px 0 0;">${hint}</p>
+        <p style="margin:8px 0 0;color:var(--text-dim);font-size:0.8rem;">기술 코드: ${code || '—'} ${msg ? `· ${String(msg).slice(0, 120)}` : ''}</p>
+        <p style="margin:10px 0 0;">해결 후 이 페이지를 새로고침(F5) 하거나 로그아웃했다가 다시 로그인해 주세요.</p>
+      </div>`;
+    })();
+
     const assignmentSectionBanner = (() => {
       if (assignmentsLoadError === 'permission') {
         return `<div class="card" style="margin-bottom:var(--s-3);padding:var(--s-4);border:1px solid var(--error);background:rgba(239,68,68,0.06);font-size:0.88rem;line-height:1.5;">
@@ -185,6 +213,7 @@ export function renderStudentDashboard(container) {
         </header>
 
         <main class="student-dashboard student-dashboard--compact">
+          ${firebaseAuthBanner}
           <section class="student-welcome flex justify-between items-end">
             <div>
               <h1 class="student-welcome-title">반가워요, <span>${freshStudent.name}</span>님!</h1>
@@ -966,8 +995,10 @@ export function renderStudentDashboard(container) {
       }
     });
 
-    document.getElementById('btn-student-logout')?.addEventListener('click', () => {
-      logoutStudent(); if (unsubscribeQuiz) unsubscribeQuiz(); window.location.hash = '/student/login';
+    document.getElementById('btn-student-logout')?.addEventListener('click', async () => {
+      if (unsubscribeQuiz) unsubscribeQuiz();
+      await logoutStudent();
+      window.location.hash = '/student/login';
     });
 
     document.querySelectorAll('.assignment-item').forEach(item => {
