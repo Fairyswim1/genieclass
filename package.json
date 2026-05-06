@@ -9,13 +9,21 @@
   "main": "electron/main.js",
   "scripts": {
     "dev": "vite",
+    "dev:student": "vite --mode student",
     "build": "vite build",
+    "build:student": "vite build --mode student",
     "preview": "vite preview",
     "electron:dev": "concurrently -k \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
     "electron:build": "npm run build && electron-packager . \"Genie Class\" --platform=win32 --arch=x64 --out=release --overwrite",
     "android:sync": "npm run build && npx cap sync android",
     "android:open": "npx cap open android",
-    "android:build": "npm run build && npx cap sync android && npx cap open android"
+    "android:build": "npm run build && npx cap sync android && npx cap open android",
+    "android:sync:student": "npm run build:student && node scripts/with-student-cap.mjs sync android",
+    "android:open:student": "node scripts/with-student-cap.mjs open android",
+    "android:add:student": "node scripts/with-student-cap.mjs add android",
+    "ios:add:student": "npm run build:student && node scripts/with-student-cap.mjs add ios",
+    "ios:sync:student": "npm run build:student && node scripts/with-student-cap.mjs sync ios",
+    "ios:open:student": "node scripts/with-student-cap.mjs open ios"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.3.0",
@@ -30,6 +38,7 @@
     "@capacitor/android": "^8.3.0",
     "@capacitor/core": "^8.3.0",
     "@capacitor/filesystem": "^8.1.2",
+    "@capacitor/ios": "^8.3.1",
     "@codetrix-studio/capacitor-google-auth": "^3.4.0-rc.4",
     "capacitor-voice-recorder": "^7.0.6",
     "firebase": "^12.10.0",

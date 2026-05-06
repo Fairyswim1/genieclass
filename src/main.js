@@ -17,6 +17,10 @@ import { renderStudentDashboard } from './pages/student/dashboard.js';
 import { auth } from './firebase.js';
 import { onAuthStateChanged } from 'firebase/auth';
 
+if (import.meta.env.VITE_APP_SHELL === 'student') {
+    document.title = '지니클래스 학생';
+}
+
 // Register routes
 addRoute('/', (container) => renderLanding(container));
 addRoute('/teacher/login', (container) => renderTeacherLogin(container));

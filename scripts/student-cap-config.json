@@ -1,11 +1,14 @@
 {
-  "appId": "com.genieclass.board",
-  "appName": "지니클래스 칠판",
+  "appId": "com.genieclass.student",
+  "appName": "지니클래스 학생",
   "webDir": "dist",
   "bundledWebRuntime": false,
   "android": {
-    "path": "android",
+    "path": "android-student",
     "overrideUserAgent": "Mozilla/5.0 (Linux; Android 13; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
+  },
+  "ios": {
+    "path": "ios-student"
   },
   "plugins": {
     "GoogleAuth": {

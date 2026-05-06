@@ -67,10 +67,18 @@ export function initRouter() {
     const handleRoute = () => {
         const path = window.location.pathname;
         let hash = window.location.hash.slice(1) || '/';
+
+        const isStudentShell = import.meta.env.VITE_APP_SHELL === 'student';
         
         // Handle direct path-based entry (e.g., genieclass.vercel.app/student or /s)
         if ((path === '/student' || path === '/s') && (hash === '/' || hash === '')) {
             window.location.hash = '/student';
+            return;
+        }
+
+        // 학생용 앱 빌드: 루트는 항상 학생 로그인
+        if (isStudentShell && (hash === '/' || hash === '')) {
+            window.location.hash = '/student/login';
             return;
         }
 
@@ -79,7 +87,7 @@ export function initRouter() {
         const isCapacitor = window.Capacitor && window.Capacitor.isNativePlatform;
         const isElectron = navigator.userAgent.includes('ElectronApp');
         
-        if (hash === '/' && path === '/' && (isCapacitor || isElectron)) {
+        if (hash === '/' && path === '/' && (isCapacitor || isElectron) && !isStudentShell) {
             window.location.hash = '/teacher/login';
             return;
         }
