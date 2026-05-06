@@ -337,6 +337,9 @@ export function renderLessonMode(container, params) {
 
     try {
       const isNativeMode = Capacitor.isNativePlatform();
+
+      // Capacitor 앱(WebView)에서는 MediaRecorder만 쓸 때 마이크 스트림은 열리는데
+      // 실제 인코딩 데이터가 비는 경우가 많아, 관찰 기록(음성 전용)은 네이티브 플러그인을 먼저 씀.
       if (isNativeMode) {
         try {
           const permStatus = await VoiceRecorder.requestAudioRecordingPermission();
@@ -346,8 +349,14 @@ export function renderLessonMode(container, params) {
             document.getElementById('observation-voice-view')?.classList.add('hidden');
             return;
           }
-        } catch (err) {
-          console.warn('[관찰 녹음] 네이티브 권한 요청 실패:', err);
+          await VoiceRecorder.startRecording();
+          obsNativeRecording = true;
+          obsIsRecording = true;
+          startObservationTimer();
+          showToast('관찰 음성 녹음을 시작했습니다.', 'info');
+          return;
+        } catch (nativeErr) {
+          console.warn('[관찰 녹음] 네이티브 녹음 실패, 브라우저 녹음으로 재시도:', nativeErr);
         }
       }
 
@@ -1316,20 +1325,24 @@ export function renderLessonMode(container, params) {
                   <div class="badge badge-main" style="position: absolute; top: 15px; left: 15px; z-index: 2;">
                     ${formatDate(p.createdAt)}
                   </div>
-                  <div class="presentation-media" style="background: #000; border-radius: var(--r-md); overflow: hidden; margin-bottom: var(--s-4); border: 2px solid var(--border-light);">
-                    <img src="${p.whiteboardImage?.url}" style="width: 100%; aspect-ratio: 16/9; object-fit: contain;" />
+                  <div class="presentation-media" style="position: relative; background: #000; border-radius: var(--r-md); overflow: hidden; margin-bottom: var(--s-4); border: 2px solid var(--border-light); min-height: 120px;">
+                    ${p.whiteboardImage?.url
+      ? `<img src="${escapeHtml(p.whiteboardImage.url)}" alt="" style="width: 100%; aspect-ratio: 16/9; object-fit: contain;" />`
+      : `<div style="display:flex;align-items:center;justify-content:center;aspect-ratio:16/9;color:rgba(255,255,255,0.5);font-size:0.9rem;">발표판 이미지 없음</div>`}
                     ${p.audioData ? `<div style="position: absolute; bottom: 100px; right: 20px; font-size: 2rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));">${isVideo ? '📹' : '🎙️'}</div>` : ''}
                   </div>
                   <div class="flex flex-col gap-sm">
                     ${p.audioData ? `
-                      <button class="btn ${isVideo ? 'btn-primary' : 'btn-blue'} w-full play-video-btn" data-url="${p.audioData.url}" data-mode="${p.recordingMode}">
+                      <button class="btn ${isVideo ? 'btn-primary' : 'btn-blue'} w-full play-video-btn" data-url="${escapeHtml(p.audioData.url)}" data-mode="${p.recordingMode}">
                         ${isVideo ? '🎬 발표 영상 재생' : '🔊 발표 음성 듣기'}
                       </button>
                     ` : `
                       <button class="btn btn-ghost w-full" disabled>기록 없음</button>
                     `}
                     <div class="flex flex-col gap-xs">
-                      <button class="btn btn-secondary btn-sm w-full" onclick="window.open('${p.whiteboardImage?.url}')">🖼️ 원본 이미지</button>
+                      ${p.whiteboardImage?.url
+      ? `<button type="button" class="btn btn-secondary btn-sm w-full" onclick="window.open('${escapeHtml(p.whiteboardImage.url)}', '_blank')">🖼️ 원본 이미지</button>`
+      : `<button type="button" class="btn btn-secondary btn-sm w-full" disabled>🖼️ 원본 이미지 없음</button>`}
                       <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 10px;">
                         <button class="btn ${p.shared ? 'btn-danger' : 'btn-purple'} btn-sm btn-toggle-share" data-id="${p.id}" data-shared="${p.shared}">
                           ${p.shared ? '공유 끄기' : '전체 공유'}

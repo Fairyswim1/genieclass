@@ -1,3 +1,8 @@
+plugins {
+    // JDK 21 툴체인 자동 다운로드(로컬에 JDK 21이 없어도 Gradle 빌드 가능)
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '0.10.0'
+}
+
 include ':app'
 include ':capacitor-cordova-android-plugins'
 project(':capacitor-cordova-android-plugins').projectDir = new File('./capacitor-cordova-android-plugins/')

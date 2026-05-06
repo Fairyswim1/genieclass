@@ -363,16 +363,21 @@ export async function addPresentation(studentId, classId, data) {
     return presentation;
 }
 
+function normalizePresentationDoc(docSnap) {
+    const data = docSnap.data();
+    return { ...data, id: data.id || docSnap.id };
+}
+
 export async function getPresentationsByStudent(studentId) {
     const q = query(collection(db, COLLECTIONS.PRESENTATIONS), where('studentId', '==', studentId));
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => doc.data());
+    return snapshot.docs.map(normalizePresentationDoc);
 }
 
 export async function getPresentationsByClass(classId) {
     const q = query(collection(db, COLLECTIONS.PRESENTATIONS), where('classId', '==', classId));
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => doc.data());
+    return snapshot.docs.map(normalizePresentationDoc);
 }
 
 export async function toggleSharePresentation(presentationId, title = null) {
@@ -488,14 +493,18 @@ export async function submitAssignment(assignmentId, studentId, data) {
     const existing = await getDocs(q);
 
     const id = existing.empty ? generateId() : existing.docs[0].id;
+    const prev = existing.empty ? {} : existing.docs[0].data();
+
     const submission = {
         id,
         assignmentId,
         studentId,
-        files: data.files || [],
-        audioData: data.audioData || null,
-        shared: data.shared || false,
-        createdAt: new Date().toISOString(),
+        files: 'files' in data ? data.files : (prev.files ?? []),
+        textAnswer: 'textAnswer' in data ? data.textAnswer : (prev.textAnswer ?? ''),
+        audioData: 'audioData' in data ? data.audioData : (prev.audioData ?? null),
+        shared: 'shared' in data ? data.shared : (prev.shared ?? false),
+        createdAt: prev.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
     };
     await setDoc(doc(db, COLLECTIONS.SUBMISSIONS, id), submission);
     return submission;

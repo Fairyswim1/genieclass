@@ -16,6 +16,8 @@ import {
 } from '../../store.js';
 import { escapeHtml, renderQuizMath } from '../../utils/quizMath.js';
 import { renderCharacter, getLevelConfig, PLANT_TYPES, getLevelProgress } from '../../components/characterAvatar.js';
+import { Capacitor } from '@capacitor/core';
+import { VoiceRecorder } from 'capacitor-voice-recorder';
 
 export function renderStudentDashboard(container) {
   const student = getCurrentStudent();
@@ -32,6 +34,17 @@ export function renderStudentDashboard(container) {
 
   // File Queue for assignment submissions
   let submissionFilesQueue = [];
+  /** 과제 제출 화면 음성 녹음(선택) */
+  const assignmentRecState = {
+    blob: null,
+    mime: 'audio/webm',
+    mediaRecorder: null,
+    chunks: [],
+    stream: null,
+    native: false,
+    recording: false,
+    cleared: false,
+  };
   let selfRecordFilesQueue = [];
   /** 상단 '선생님께 쪽지' 버튼으로만 열림 */
   let studentNotePanelOpen = false;
@@ -55,24 +68,41 @@ export function renderStudentDashboard(container) {
     let selfRecords = [];
     let studentNotes = [];
 
+    const loadOr = async (label, promise, fallback) => {
+      try {
+        return await promise;
+      } catch (e) {
+        console.error(`[StudentDashboard] ${label} 로드 실패:`, e);
+        return fallback;
+      }
+    };
+
     try {
-      freshStudent = await getStudentByCode(student.uniqueCode) || student;
+      if (student.uniqueCode) {
+        const byCode = await getStudentByCode(student.uniqueCode);
+        if (byCode) freshStudent = byCode;
+      }
+      if (freshStudent === student && student.id) {
+        const byId = await getStudentById(student.id);
+        if (byId) freshStudent = byId;
+      }
+
       cls = await getClassById(freshStudent.classId);
       progress = getLevelProgress(freshStudent.totalPoints || 0);
       config = getLevelConfig(progress.level, freshStudent.characterType || 'apple');
 
       let allPresentations = [];
       [assignments, submissions, announcements, resources, allPresentations, selfRecords, studentNotes] = await Promise.all([
-        cls ? getAssignmentsByClass(cls.id) : [],
-        getSubmissionsByStudent(freshStudent.id),
-        cls ? getAnnouncementsByClass(cls.id) : [],
-        cls ? getResourcesByClass(cls.id) : [],
-        cls ? getPresentationsByClass(cls.id) : [],
-        getStudentSelfRecords(freshStudent.id),
-        getStudentNotesByStudent(freshStudent.id),
+        loadOr('과제', cls ? getAssignmentsByClass(cls.id) : Promise.resolve([]), []),
+        loadOr('제출물', getSubmissionsByStudent(freshStudent.id), []),
+        loadOr('공지', cls ? getAnnouncementsByClass(cls.id) : Promise.resolve([]), []),
+        loadOr('자료', cls ? getResourcesByClass(cls.id) : Promise.resolve([]), []),
+        loadOr('발표', cls ? getPresentationsByClass(cls.id) : Promise.resolve([]), []),
+        loadOr('자기기록', getStudentSelfRecords(freshStudent.id), []),
+        loadOr('쪽지', getStudentNotesByStudent(freshStudent.id), []),
       ]);
-      presentations = allPresentations.filter(p => p.studentId === freshStudent.id);
-      sharedPresentations = allPresentations.filter(p => p.studentId !== freshStudent.id && p.shared === true);
+      presentations = allPresentations.filter(p => p.studentId === freshStudent.id && p.type !== 'observation');
+      sharedPresentations = allPresentations.filter(p => p.studentId !== freshStudent.id && p.shared === true && p.type !== 'observation');
     } catch (err) {
       console.error('Data loading error:', err);
     }
@@ -894,7 +924,30 @@ export function renderStudentDashboard(container) {
     });
   }
 
+  function resetAssignmentRecording() {
+    try {
+      assignmentRecState.stream?.getTracks().forEach((t) => t.stop());
+    } catch (_) {}
+    assignmentRecState.stream = null;
+    try {
+      if (assignmentRecState.mediaRecorder && assignmentRecState.recording && !assignmentRecState.native) {
+        assignmentRecState.mediaRecorder.stop();
+      }
+    } catch (_) {}
+    assignmentRecState.mediaRecorder = null;
+    assignmentRecState.chunks = [];
+    if (assignmentRecState.native && assignmentRecState.recording) {
+      VoiceRecorder.stopRecording().catch(() => {});
+    }
+    assignmentRecState.native = false;
+    assignmentRecState.recording = false;
+    assignmentRecState.blob = null;
+    assignmentRecState.mime = 'audio/webm';
+    assignmentRecState.cleared = false;
+  }
+
   function renderAssignmentDetail(freshStudent, assignment, submissions) {
+    resetAssignmentRecording();
     const sub = submissions.find(s => s.assignmentId === assignment.id);
 
     container.innerHTML = `
@@ -932,9 +985,23 @@ export function renderStudentDashboard(container) {
                        <p style="color: var(--success); font-weight: 600;">과제가 제출되었습니다.</p>
                        <span style="font-size: 0.85rem; color: var(--text-dim);">제출: ${formatDate(sub.createdAt)}</span>
                     </div>
-                    <div class="flex gap-sm" style="flex-wrap: wrap; margin-bottom: var(--s-4);">
+                    ${(sub.files && sub.files.length > 0)
+      ? `<div class="flex gap-sm" style="flex-wrap: wrap; margin-bottom: var(--s-4);">
                       ${sub.files.map(f => `<button class="btn btn-ghost btn-sm" style="border: 1px solid var(--border-subtle);" onclick="window.downloadFile('${f.id}')">📎 ${f.name}</button>`).join('')}
-                    </div>
+                    </div>`
+      : '<p style="font-size: 0.9rem; color: var(--text-dim); margin-bottom: var(--s-4);">첨부 파일 없음</p>'}
+                    ${sub.textAnswer
+      ? `<div style="margin-bottom: var(--s-4); padding: var(--s-4); background: var(--bg-main); border-radius: var(--r-sm); border: 1px solid var(--border-subtle);">
+                        <div class="input-label" style="margin-bottom: 6px;">작성 답안</div>
+                        <div style="font-size: 0.95rem; white-space: pre-wrap; line-height: 1.6;">${escapeHtml(sub.textAnswer)}</div>
+                      </div>`
+      : ''}
+                    ${sub.audioData?.url
+      ? `<div style="margin-bottom: var(--s-4);">
+                        <div class="input-label" style="margin-bottom: 6px;">음성 답안</div>
+                        <audio controls style="width: 100%; max-width: 420px;" src="${escapeHtml(sub.audioData.url)}"></audio>
+                      </div>`
+      : ''}
                     <button class="btn btn-outline btn-sm w-full" id="btn-edit-submission">제출물 수정하기</button>
                   </div>
                 ` : ''}
@@ -948,6 +1015,23 @@ export function renderStudentDashboard(container) {
                    <div id="submission-file-list" style="margin-top: 15px; font-size: 0.9rem; color: var(--primary); font-weight: 500;"></div>
                    <input type="file" id="submission-file" class="hidden" multiple />
                 </div>
+
+                <div style="margin-top: var(--s-8);">
+                  <label class="input-label" for="submission-text">작성 답안 (선택)</label>
+                  <textarea id="submission-text" class="input-field" rows="5" placeholder="풀이 과정이나 생각을 글로 적어 주세요."></textarea>
+                </div>
+
+                <div style="margin-top: var(--s-6);">
+                  <div class="input-label">음성 답안 (선택)</div>
+                  <div class="flex flex-wrap items-center gap-sm" style="margin-top: var(--s-2);">
+                    <button type="button" class="btn btn-primary btn-sm" id="btn-assign-rec-toggle">🎙️ 녹음 시작</button>
+                    <button type="button" class="btn btn-ghost btn-sm hidden" id="btn-assign-rec-clear">녹음·음성 제거</button>
+                    <span id="assign-rec-status" style="font-size: 0.85rem; color: var(--text-muted);">녹음 없음(선택)</span>
+                  </div>
+                </div>
+
+                <p style="font-size: 0.8rem; color: var(--text-dim); margin-top: var(--s-4);">파일·글·녹음 중 <strong>한 가지 이상</strong> 있으면 제출할 수 있습니다.</p>
+
                 <div class="flex gap-md" style="margin-top: var(--s-6);">
                   ${sub ? `<button class="btn btn-ghost btn-lg flex-1" id="btn-cancel-edit">취소</button>` : ''}
                   <button class="btn btn-primary btn-lg ${sub ? 'flex-1' : 'w-full'}" id="btn-submit-assignment">${sub ? '수정 완료' : '과제 제출하기'}</button>
@@ -979,35 +1063,170 @@ export function renderStudentDashboard(container) {
       updateSubmissionFileListUI();
     };
 
-    document.getElementById('btn-back-dashboard')?.addEventListener('click', () => { 
-      submissionFilesQueue = []; 
-      activeView = 'dashboard'; 
-      render(); 
+    function updateAssignRecUI() {
+      const btn = document.getElementById('btn-assign-rec-toggle');
+      const st = document.getElementById('assign-rec-status');
+      const clr = document.getElementById('btn-assign-rec-clear');
+      if (!btn || !st) return;
+      if (assignmentRecState.recording) {
+        btn.textContent = '⏹ 녹음 종료';
+        btn.className = 'btn btn-danger btn-sm';
+        st.textContent = '녹음 중…';
+      } else if (assignmentRecState.blob) {
+        btn.textContent = '🎙️ 다시 녹음';
+        btn.className = 'btn btn-secondary btn-sm';
+        st.textContent = '녹음 완료(제출 시 업로드됩니다)';
+      } else {
+        btn.textContent = '🎙️ 녹음 시작';
+        btn.className = 'btn btn-primary btn-sm';
+        st.textContent = assignmentRecState.cleared ? '기존 음성 답안은 제출 시 삭제됩니다' : '녹음 없음(선택)';
+      }
+      if (clr) {
+        const showClear = !!(assignmentRecState.blob || (sub?.audioData && !assignmentRecState.cleared));
+        clr.classList.toggle('hidden', !showClear);
+      }
+    }
+
+    async function startAssignRec() {
+      if (assignmentRecState.recording) return;
+      assignmentRecState.chunks = [];
+      assignmentRecState.blob = null;
+      const isNative = Capacitor.isNativePlatform();
+      if (isNative) {
+        try {
+          const perm = await VoiceRecorder.requestAudioRecordingPermission();
+          if (!perm.value) {
+            showToast('마이크 권한이 필요합니다.', 'error');
+            return;
+          }
+          await VoiceRecorder.startRecording();
+          assignmentRecState.native = true;
+          assignmentRecState.recording = true;
+          assignmentRecState.cleared = false;
+          updateAssignRecUI();
+          showToast('녹음을 시작했습니다.', 'info');
+          return;
+        } catch (e) {
+          console.warn('[과제 녹음] 네이티브 실패, 웹 녹음 시도:', e);
+        }
+      }
+      if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+        showToast('이 환경에서는 녹음을 지원하지 않습니다.', 'error');
+        return;
+      }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true },
+        });
+        assignmentRecState.stream = stream;
+        const mimeTypes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
+        const mime = mimeTypes.find((m) => MediaRecorder.isTypeSupported(m)) || '';
+        const mr = new MediaRecorder(stream, mime ? { mimeType: mime } : {});
+        assignmentRecState.mediaRecorder = mr;
+        mr.ondataavailable = (e) => {
+          if (e.data.size > 0) assignmentRecState.chunks.push(e.data);
+        };
+        mr.start(200);
+        assignmentRecState.recording = true;
+        assignmentRecState.native = false;
+        assignmentRecState.cleared = false;
+        updateAssignRecUI();
+        showToast('녹음을 시작했습니다.', 'info');
+      } catch (e) {
+        showToast('마이크를 사용할 수 없습니다.', 'error');
+      }
+    }
+
+    async function stopAssignRec() {
+      if (!assignmentRecState.recording) return;
+      if (assignmentRecState.native) {
+        try {
+          const result = await VoiceRecorder.stopRecording();
+          const mimeType = result.value.mimeType || 'audio/webm';
+          const base64Str = result.value.recordDataBase64;
+          const byteChars = atob(base64Str);
+          const arr = new Uint8Array(byteChars.length);
+          for (let i = 0; i < byteChars.length; i++) arr[i] = byteChars.charCodeAt(i);
+          assignmentRecState.blob = new Blob([arr], { type: mimeType });
+          assignmentRecState.mime = mimeType;
+        } catch (e) {
+          console.error(e);
+          showToast('녹음 저장에 실패했습니다.', 'error');
+        }
+        assignmentRecState.native = false;
+        assignmentRecState.recording = false;
+        updateAssignRecUI();
+        return;
+      }
+      const mr = assignmentRecState.mediaRecorder;
+      if (mr) {
+        await new Promise((resolve) => {
+          mr.onstop = () => {
+            const t = mr.mimeType || 'audio/webm';
+            assignmentRecState.blob = new Blob(assignmentRecState.chunks, { type: t });
+            assignmentRecState.mime = t;
+            assignmentRecState.chunks = [];
+            resolve();
+          };
+          mr.stop();
+        });
+      }
+      assignmentRecState.stream?.getTracks().forEach((t) => t.stop());
+      assignmentRecState.stream = null;
+      assignmentRecState.mediaRecorder = null;
+      assignmentRecState.recording = false;
+      updateAssignRecUI();
+    }
+
+    document.getElementById('btn-back-dashboard')?.addEventListener('click', () => {
+      resetAssignmentRecording();
+      submissionFilesQueue = [];
+      activeView = 'dashboard';
+      render();
     });
-    
+
     const statusView = document.getElementById('submission-status-view');
     const formView = document.getElementById('submission-form-view');
     const editBtn = document.getElementById('btn-edit-submission');
     const cancelEditBtn = document.getElementById('btn-cancel-edit');
     const dropzone = document.getElementById('submission-dropzone');
     const fileInput = document.getElementById('submission-file');
-    const fileListDisplay = document.getElementById('submission-file-list');
 
     editBtn?.addEventListener('click', () => {
       submissionFilesQueue = [];
+      resetAssignmentRecording();
+      assignmentRecState.cleared = false;
+      const ta = document.getElementById('submission-text');
+      if (ta) ta.value = sub?.textAnswer ? sub.textAnswer : '';
       statusView.classList.add('hidden');
       formView.classList.remove('hidden');
       updateSubmissionFileListUI();
+      updateAssignRecUI();
     });
 
     cancelEditBtn?.addEventListener('click', () => {
+      resetAssignmentRecording();
       submissionFilesQueue = [];
       formView.classList.add('hidden');
       statusView.classList.remove('hidden');
     });
-    
+
+    document.getElementById('btn-assign-rec-toggle')?.addEventListener('click', async () => {
+      if (assignmentRecState.recording) await stopAssignRec();
+      else await startAssignRec();
+    });
+
+    document.getElementById('btn-assign-rec-clear')?.addEventListener('click', () => {
+      if (assignmentRecState.blob) {
+        assignmentRecState.blob = null;
+        assignmentRecState.mime = 'audio/webm';
+      }
+      if (sub?.audioData) assignmentRecState.cleared = true;
+      updateAssignRecUI();
+    });
+
     dropzone?.addEventListener('click', () => fileInput.click());
-    
+
     fileInput?.addEventListener('change', () => {
       if (fileInput.files.length > 0) {
         submissionFilesQueue = [...submissionFilesQueue, ...Array.from(fileInput.files)];
@@ -1029,29 +1248,63 @@ export function renderStudentDashboard(container) {
     });
 
     document.getElementById('btn-submit-assignment')?.addEventListener('click', async () => {
-      if (submissionFilesQueue.length === 0) { showToast('제출할 파일을 선택해주세요.', 'error'); return; }
+      const textAnswer = document.getElementById('submission-text')?.value?.trim() ?? '';
+      const prevFiles = sub?.files ?? [];
+
+      const fileMetas = [];
+      for (const file of submissionFilesQueue) {
+        const saved = await saveFile(file);
+        fileMetas.push({ id: saved.id, name: saved.name });
+      }
+      const files = fileMetas.length > 0 ? fileMetas : prevFiles;
+
+      const hasPrevAudio = !!(sub?.audioData && !assignmentRecState.cleared);
+      const hasAudio = !!assignmentRecState.blob || hasPrevAudio;
+
+      if (!textAnswer && !hasAudio && files.length === 0) {
+        showToast('파일·글·녹음 중 최소 한 가지는 제출해 주세요.', 'error');
+        return;
+      }
+
       const submitBtn = document.getElementById('btn-submit-assignment');
       submitBtn.disabled = true;
       submitBtn.textContent = '제출 중...';
-      
+
       try {
-        const files = [];
-        for (const file of submissionFilesQueue) {
-          const saved = await saveFile(file);
-          files.push({ id: saved.id, name: saved.name });
+        const payload = { files, textAnswer, shared: true };
+        if (assignmentRecState.blob) {
+          const ext = assignmentRecState.mime.includes('mp4') ? 'm4a' : 'webm';
+          const audioFile = new File(
+            [assignmentRecState.blob],
+            `assignment_voice_${Date.now()}.${ext}`,
+            { type: assignmentRecState.mime || 'audio/webm' },
+          );
+          const savedAudio = await saveFile(audioFile);
+          payload.audioData = savedAudio;
+        } else if (assignmentRecState.cleared) {
+          payload.audioData = null;
         }
-        await submitAssignment(assignment.id, freshStudent.id, { files, shared: true });
-        
+
+        await submitAssignment(assignment.id, freshStudent.id, payload);
+
         showToast(sub ? '제출물이 수정되었습니다! 🎉' : '과제가 제출되었습니다! 🎉');
+        resetAssignmentRecording();
         submissionFilesQueue = [];
         activeView = 'dashboard';
         render();
-      } catch (err) { 
-        showToast('제출 중 오류 발생', 'error'); 
+      } catch (err) {
+        console.error(err);
+        showToast('제출 중 오류 발생', 'error');
         submitBtn.disabled = false;
         submitBtn.textContent = sub ? '수정 완료' : '과제 제출하기';
       }
     });
+
+    if (!sub) {
+      const ta0 = document.getElementById('submission-text');
+      if (ta0) ta0.value = '';
+    }
+    updateAssignRecUI();
   }
 
   // Global download

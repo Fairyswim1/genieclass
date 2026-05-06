@@ -7,6 +7,7 @@ import {
   getStudentById, downloadFile as storeDownloadFile, getObservationsByClass,
   getStudentSelfRecordsByClass
 } from '../../store.js';
+import { escapeHtml } from '../../utils/quizMath.js';
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
 
@@ -137,17 +138,27 @@ export function renderAssignMode(container, params) {
               <div style="padding: var(--s-3); padding-top: 0; display: flex; flex-direction: column; gap: var(--s-2); max-height: 250px; overflow-y: auto;">
                 ${students.map(st => {
                   const sub = subs.find(s => s.studentId === st.id);
+                  const hasSubText = sub?.textAnswer && String(sub.textAnswer).trim();
+                  const hasSubAudio = !!(sub?.audioData?.url);
+                  const hasSubFiles = sub?.files && sub.files.length > 0;
                   return `
                     <div class="flex justify-between items-center" style="padding: 8px; background: var(--bg-main); border-radius: var(--r-sm); gap: 10px;">
                       <span style="font-size: 0.9rem; font-weight: 500; flex-shrink: 0;">${st.name}</span>
                       ${sub ? `
-                        <div class="flex flex-col items-end" style="gap: 4px;">
+                        <div class="flex flex-col items-end" style="gap: 6px; max-width: 72%;">
                           <span class="badge badge-green" style="align-self: flex-end;">${formatDate(sub.createdAt)} 제출</span>
-                          ${sub.files && sub.files.length > 0 ? `
-                            <div class="flex gap-sm flex-wrap justify-end" style="margin-top: 4px;">
+                          ${hasSubText ? `
+                            <div style="font-size: 0.82rem; color: var(--text-main); text-align: right; white-space: pre-wrap; max-height: 100px; overflow-y: auto; padding: 6px 8px; background: var(--bg-surface); border-radius: var(--r-sm); border: 1px solid var(--border-subtle); line-height: 1.45;">${escapeHtml(String(sub.textAnswer))}</div>
+                          ` : ''}
+                          ${hasSubAudio ? `
+                            <audio controls style="max-width: 260px; height: 36px;" src="${escapeHtml(sub.audioData.url)}"></audio>
+                          ` : ''}
+                          ${hasSubFiles ? `
+                            <div class="flex gap-sm flex-wrap justify-end" style="margin-top: 2px;">
                               ${sub.files.map(f => `<button class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 2px 6px;" onclick="window.downloadFile('${f.id}')">📎 ${f.name}</button>`).join('')}
                             </div>
-                          ` : '<span style="font-size: 0.8rem; color: var(--text-dim);">첨부 파일 없음</span>'}
+                          ` : ''}
+                          ${!hasSubText && !hasSubAudio && !hasSubFiles ? '<span style="font-size: 0.8rem; color: var(--text-dim);">제출 내용 없음</span>' : ''}
                         </div>
                       ` : `<span class="badge badge-purple" style="flex-shrink: 0;">미제출</span>`}
                     </div>
@@ -901,6 +912,32 @@ export function renderAssignMode(container, params) {
             } catch (err) {
               console.error(`Failed to download ${f.name}:`, err);
             }
+          }
+        }
+
+        if (sub.textAnswer && String(sub.textAnswer).trim()) {
+          zip.file(`${prefix}_작성답안.txt`, String(sub.textAnswer));
+        }
+
+        if (sub.audioData?.id) {
+          try {
+            const audioInfo = await import('../../store.js').then(m => m.getFileById(sub.audioData.id));
+            if (audioInfo && audioInfo.url) {
+              const response = await fetch(audioInfo.url);
+              const blob = await response.blob();
+              const an = audioInfo.name || `voice_${sub.studentId}.webm`;
+              zip.file(`${prefix}_음성_${an}`, blob);
+            }
+          } catch (err) {
+            console.error('Failed to download submission audio:', err);
+          }
+        } else if (sub.audioData?.url) {
+          try {
+            const response = await fetch(sub.audioData.url);
+            const blob = await response.blob();
+            zip.file(`${prefix}_음성_${sub.studentId}.webm`, blob);
+          } catch (err) {
+            console.error('Failed to download submission audio (url):', err);
           }
         }
       }
