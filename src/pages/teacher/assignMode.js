@@ -98,8 +98,11 @@ export function renderAssignMode(container, params) {
         </div>
       `;
     } else {
-      const assignmentCards = await Promise.all(assignments.map(async a => {
+      const assignmentCards = await Promise.all(assignments.map(async (a) => {
         const subs = await getSubmissionsByAssignment(a.id);
+        const rosterIdSet = new Set(students.map((st) => String(st.id)));
+        const subsOnRoster = subs.filter((s) => s.studentId != null && rosterIdSet.has(String(s.studentId)));
+        const orphanSubCount = subs.length - subsOnRoster.length;
         const isDuePast = a.dueDate && new Date(a.dueDate) < new Date();
         return `
           <div class="card homework-item" style="padding: var(--s-6); display: flex; flex-direction: column; border-top: 4px solid var(--primary);">
@@ -126,18 +129,23 @@ export function renderAssignMode(container, params) {
             <div style="background: var(--bg-main); padding: var(--s-4); border-radius: var(--r-sm); margin-bottom: var(--s-4);">
               <div class="flex justify-between items-center" style="margin-bottom: 8px;">
                 <span style="font-size: 0.85rem; color: var(--text-dim); font-weight: 600;">제출 현황</span>
-                <span style="font-size: 0.9rem; font-weight: 700; color: var(--primary);">${subs.length} <span style="color: var(--text-muted); font-weight: 400;">/ ${students.length}명</span></span>
+                <span style="font-size: 0.9rem; font-weight: 700; color: var(--primary);">${subsOnRoster.length} <span style="color: var(--text-muted); font-weight: 400;">/ ${students.length}명</span></span>
               </div>
               <div style="width: 100%; height: 6px; background: var(--border-subtle); border-radius: 3px; overflow: hidden;">
-                <div style="width: ${students.length ? (subs.length / students.length) * 100 : 0}%; height: 100%; background: var(--primary);"></div>
+                <div style="width: ${students.length ? (subsOnRoster.length / students.length) * 100 : 0}%; height: 100%; background: var(--primary);"></div>
               </div>
+              ${orphanSubCount > 0 ? `
+              <p style="font-size: 0.78rem; color: var(--error); margin-top: 8px; line-height: 1.4;">
+                현재 반 명단과 맞지 않는 제출 ${orphanSubCount}건이 있어 위 숫자에는 포함하지 않았습니다. (삭제된 학생·다른 반 제출 등) Firestore <code style="font-size:0.75em;">submissions</code>에서 assignmentId를 확인해 보세요.
+              </p>
+              ` : ''}
             </div>
 
             <details style="margin-bottom: var(--s-4); border: 1px solid var(--border-subtle); border-radius: var(--r-sm); background: var(--bg-surface);">
               <summary style="padding: var(--s-3); cursor: pointer; font-size: 0.9rem; font-weight: 600; color: var(--text-main); outline: none;">학생별 상세 제출 확인</summary>
               <div style="padding: var(--s-3); padding-top: 0; display: flex; flex-direction: column; gap: var(--s-2); max-height: 250px; overflow-y: auto;">
                 ${students.map(st => {
-                  const sub = subs.find(s => s.studentId === st.id);
+                  const sub = subsOnRoster.find(s => String(s.studentId) === String(st.id));
                   const hasSubText = sub?.textAnswer && String(sub.textAnswer).trim();
                   const hasSubAudio = !!(sub?.audioData?.url);
                   const hasSubFiles = sub?.files && sub.files.length > 0;
