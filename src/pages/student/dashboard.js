@@ -1302,21 +1302,29 @@ export function renderStudentDashboard(container) {
       }
     });
 
+    function firebaseSubmitUserMessage(err) {
+      const code = err && err.code ? String(err.code) : '';
+      const msg = err && err.message ? String(err.message) : '';
+      if (code.includes('storage/unauthorized')) return '파일을 올릴 권한이 없습니다. 다른 네트워크로 시도하거나 선생님께 알려 주세요.';
+      if (code.includes('storage/quota-exceeded')) return '저장 공간이 부족합니다. 더 작은 파일로 시도해 주세요.';
+      if (code.includes('storage/canceled')) return '업로드가 취소되었습니다.';
+      if (code.includes('permission-denied')) return '서버에서 제출을 막았습니다. 로그아웃 후 다시 로그인해 보세요.';
+      if (code.includes('unavailable')) return '인터넷 연결이 불안정합니다. 잠시 후 다시 시도해 주세요.';
+      if (msg && msg.length < 120) return msg;
+      return '제출 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.';
+    }
+
     document.getElementById('btn-submit-assignment')?.addEventListener('click', async () => {
       const textAnswer = document.getElementById('submission-text')?.value?.trim() ?? '';
       const prevFiles = sub?.files ?? [];
-
-      const fileMetas = [];
-      for (const file of submissionFilesQueue) {
-        const saved = await saveFile(file);
-        fileMetas.push({ id: saved.id, name: saved.name });
-      }
-      const files = fileMetas.length > 0 ? fileMetas : prevFiles;
-
+      const hasNewFiles = submissionFilesQueue.length > 0;
+      const hasKeptFiles = prevFiles.length > 0;
+      const hasText = textAnswer.length > 0;
       const hasPrevAudio = !!(sub?.audioData && !assignmentRecState.cleared);
-      const hasAudio = !!assignmentRecState.blob || hasPrevAudio;
+      const hasNewAudioBlob = !!assignmentRecState.blob;
+      const hasAudio = hasNewAudioBlob || hasPrevAudio;
 
-      if (!textAnswer && !hasAudio && files.length === 0) {
+      if (!hasText && !hasAudio && !hasNewFiles && !hasKeptFiles) {
         showToast('파일·글·녹음 중 최소 한 가지는 제출해 주세요.', 'error');
         return;
       }
@@ -1326,13 +1334,21 @@ export function renderStudentDashboard(container) {
       submitBtn.textContent = '제출 중...';
 
       try {
+        const fileMetas = [];
+        for (const file of submissionFilesQueue) {
+          const saved = await saveFile(file);
+          fileMetas.push({ id: saved.id, name: saved.name });
+        }
+        const files = fileMetas.length > 0 ? fileMetas : prevFiles;
+
         const payload = { files, textAnswer, shared: true };
         if (assignmentRecState.blob) {
-          const ext = assignmentRecState.mime.includes('mp4') ? 'm4a' : 'webm';
+          const mime = String(assignmentRecState.mime || 'audio/webm');
+          const ext = mime.includes('mp4') ? 'm4a' : 'webm';
           const audioFile = new File(
             [assignmentRecState.blob],
             `assignment_voice_${Date.now()}.${ext}`,
-            { type: assignmentRecState.mime || 'audio/webm' },
+            { type: mime || 'audio/webm' },
           );
           const savedAudio = await saveFile(audioFile);
           payload.audioData = savedAudio;
@@ -1340,7 +1356,7 @@ export function renderStudentDashboard(container) {
           payload.audioData = null;
         }
 
-        await submitAssignment(assignment.id, freshStudent.id, payload);
+        await submitAssignment(String(assignment.id), String(freshStudent.id), payload);
 
         showToast(sub ? '제출물이 수정되었습니다! 🎉' : '과제가 제출되었습니다! 🎉');
         resetAssignmentRecording();
@@ -1348,8 +1364,8 @@ export function renderStudentDashboard(container) {
         activeView = 'dashboard';
         render();
       } catch (err) {
-        console.error(err);
-        showToast('제출 중 오류 발생', 'error');
+        console.error('Assignment submit error:', err);
+        showToast(firebaseSubmitUserMessage(err || {}), 'error');
         submitBtn.disabled = false;
         submitBtn.textContent = sub ? '수정 완료' : '과제 제출하기';
       }

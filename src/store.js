@@ -487,9 +487,11 @@ export async function updateAssignment(assignmentId, data) {
 
 // ========== Submissions ==========
 export async function submitAssignment(assignmentId, studentId, data) {
+    const aid = assignmentId != null ? String(assignmentId) : '';
+    const sid = studentId != null ? String(studentId) : '';
     const q = query(collection(db, COLLECTIONS.SUBMISSIONS),
-        where('assignmentId', '==', assignmentId),
-        where('studentId', '==', studentId));
+        where('assignmentId', '==', aid),
+        where('studentId', '==', sid));
     const existing = await getDocs(q);
 
     const id = existing.empty ? generateId() : existing.docs[0].id;
@@ -497,8 +499,8 @@ export async function submitAssignment(assignmentId, studentId, data) {
 
     const submission = {
         id,
-        assignmentId,
-        studentId,
+        assignmentId: aid,
+        studentId: sid,
         files: 'files' in data ? data.files : (prev.files ?? []),
         textAnswer: 'textAnswer' in data ? data.textAnswer : (prev.textAnswer ?? ''),
         audioData: 'audioData' in data ? data.audioData : (prev.audioData ?? null),
