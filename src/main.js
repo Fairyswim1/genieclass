@@ -14,8 +14,17 @@ import { renderLessonMode } from './pages/teacher/lessonMode.js';
 import { renderAssignMode } from './pages/teacher/assignMode.js';
 import { renderStudentLogin } from './pages/student/login.js';
 import { renderStudentDashboard } from './pages/student/dashboard.js';
+import { renderStudentProblemBoard } from './pages/student/problemBoard.js';
 import { auth } from './firebase.js';
 import { onAuthStateChanged } from 'firebase/auth';
+import { Capacitor } from '@capacitor/core';
+
+document.documentElement.dataset.appShell =
+    import.meta.env.VITE_APP_SHELL === 'student' ? 'student' : 'teacher';
+
+if (Capacitor.isNativePlatform?.()) {
+    document.documentElement.classList.add('is-native');
+}
 
 if (import.meta.env.VITE_APP_SHELL === 'student') {
     document.title = '지니클래스 학생';
@@ -31,6 +40,7 @@ addRoute('/student', (container) => renderStudentLogin(container));
 addRoute('/s', (container) => renderStudentLogin(container));
 addRoute('/student/login', (container) => renderStudentLogin(container));
 addRoute('/student/dashboard', (container) => renderStudentDashboard(container));
+addRoute('/student/problem-board/:promptId', (container, params) => renderStudentProblemBoard(container, params));
 
 // 라우터는 Auth 리스너가 한 번 돌 때 초기화한다(초기 user는 null일 수 있음 — “로그인 완료”와 무관).
 let isInitialized = false;

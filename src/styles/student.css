@@ -543,3 +543,141 @@
     0%, 100% { transform: translateY(0) rotate(0deg); }
     50% { transform: translateY(-15px) rotate(2deg); }
 }
+
+/* ========================================
+   학생 셸: 모바일·Capacitor (노치·제스처·터치)
+   ======================================== */
+
+html[data-app-shell="student"] {
+    -webkit-text-size-adjust: 100%;
+}
+
+html[data-app-shell="student"] body {
+    overflow-x: hidden;
+}
+
+html[data-app-shell="student"].is-native body {
+    overscroll-behavior-y: contain;
+}
+
+html[data-app-shell="student"] #app {
+    min-height: 100dvh;
+    min-height: 100vh;
+}
+
+/* 상단바: 노치·상태줄 아래로 내리기 */
+html[data-app-shell="student"] .student-topbar {
+    padding-top: calc(var(--s-3) + env(safe-area-inset-top, 0px));
+    padding-left: max(var(--s-4), env(safe-area-inset-left, 0px));
+    padding-right: max(var(--s-4), env(safe-area-inset-right, 0px));
+}
+
+/* 로그인 화면: 작은 화면·홈 인디케이터 */
+html[data-app-shell="student"] .auth-page {
+    min-height: 100dvh;
+    min-height: 100vh;
+    padding: calc(var(--s-6) + env(safe-area-inset-top, 0px))
+        max(var(--s-4), env(safe-area-inset-right, 0px))
+        calc(var(--s-8) + env(safe-area-inset-bottom, 0px))
+        max(var(--s-4), env(safe-area-inset-left, 0px));
+    align-items: flex-start;
+}
+
+html[data-app-shell="student"] .auth-card {
+    padding: var(--s-8) var(--s-6);
+    margin-top: auto;
+    margin-bottom: auto;
+}
+
+@media (max-width: 480px) {
+    html[data-app-shell="student"] .auth-title {
+        font-size: 1.45rem;
+    }
+
+    html[data-app-shell="student"] .auth-logo-icon {
+        width: 56px;
+        height: 56px;
+        font-size: 1.5rem;
+    }
+
+    html[data-app-shell="student"] .tab {
+        padding: 0.7rem 0.5rem;
+        font-size: 0.85rem;
+    }
+}
+
+/* 본문: 하단 제스처 영역 */
+html[data-app-shell="student"] .student-dashboard {
+    padding-bottom: calc(var(--s-12) + env(safe-area-inset-bottom, 0px));
+}
+
+html[data-app-shell="student"] .student-dashboard--compact {
+    padding-bottom: calc(var(--s-10) + env(safe-area-inset-bottom, 0px));
+}
+
+/* 입력: iOS 자동 확대 방지 + 터치 타깃 */
+html[data-app-shell="student"] .input-field,
+html[data-app-shell="student"] textarea.input-field {
+    font-size: 1rem;
+    min-height: 48px;
+}
+
+html[data-app-shell="student"] textarea.input-field {
+    min-height: 96px;
+}
+
+html[data-app-shell="student"] .btn {
+    min-height: 44px;
+    -webkit-tap-highlight-color: rgba(79, 70, 229, 0.15);
+}
+
+html[data-app-shell="student"] .interactive-item {
+    min-height: 52px;
+    padding: var(--s-4) var(--s-6);
+}
+
+/* 터치 기기: 호버 이동 효과 완화 */
+@media (hover: none) and (pointer: coarse) {
+    html[data-app-shell="student"] .interactive-item:hover {
+        transform: none;
+    }
+
+    html[data-app-shell="student"] .stat-card:hover {
+        transform: none;
+    }
+}
+
+/* 통계 카드: 좁은 화면 한 열 */
+@media (max-width: 520px) {
+    html[data-app-shell="student"] .student-stats-row {
+        grid-template-columns: 1fr;
+        gap: var(--s-3);
+    }
+
+    html[data-app-shell="student"] .student-welcome.flex {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--s-3);
+    }
+
+    html[data-app-shell="student"] .student-topbar {
+        padding-left: max(var(--s-3), env(safe-area-inset-left, 0px));
+        padding-right: max(var(--s-3), env(safe-area-inset-right, 0px));
+    }
+
+    html[data-app-shell="student"] .student-topbar-name {
+        max-width: 38vw;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}
+
+/* 과제 상세·모달: 스크롤 영역 높이 */
+html[data-app-shell="student"] #student-note-modal .student-note-modal-body {
+    max-height: min(65dvh, 480px);
+}
+
+html[data-app-shell="student"] .student-pres-list-wrap {
+    max-height: min(420px, 45dvh);
+}

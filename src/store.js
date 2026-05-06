@@ -44,6 +44,7 @@ const COLLECTIONS = {
     STUDENT_SELF_RECORDS: 'student_self_records',
     STUDENT_NOTES: 'student_notes',
     FILES: 'files',
+    PROBLEM_PROMPTS: 'problem_prompts',
 };
 
 // Internal state
@@ -387,6 +388,12 @@ export async function addPresentation(studentId, classId, data) {
         feedback: '',
         createdAt: new Date().toISOString(),
     };
+    if (data.recordingMode) presentation.recordingMode = data.recordingMode;
+    if (data.type) presentation.type = data.type;
+    if (data.problemPromptId != null && data.problemPromptId !== '') {
+        presentation.problemPromptId = String(data.problemPromptId);
+    }
+    if (data.title) presentation.title = data.title;
     await setDoc(doc(db, COLLECTIONS.PRESENTATIONS, id), presentation);
 
     return presentation;
@@ -466,6 +473,42 @@ export async function deletePresentationById(presentationId) {
 
     await deleteDoc(refDoc);
     return true;
+}
+
+// ========== 한 문제 풀이 (선생 출제) ==========
+export async function createProblemPrompt(classId, teacherId, data) {
+    const id = generateId();
+    const prompt = {
+        id,
+        classId,
+        teacherId,
+        title: data.title,
+        description: data.description || '',
+        files: data.files || [],
+        createdAt: new Date().toISOString(),
+    };
+    await setDoc(doc(db, COLLECTIONS.PROBLEM_PROMPTS, id), prompt);
+    return prompt;
+}
+
+export async function getProblemPromptsByClass(classId) {
+    if (!classId) return [];
+    const q = query(collection(db, COLLECTIONS.PROBLEM_PROMPTS), where('classId', '==', classId));
+    const snapshot = await getDocs(q);
+    return snapshot.docs
+        .map((d) => d.data())
+        .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+}
+
+export async function getProblemPromptById(promptId) {
+    if (!promptId) return null;
+    const docSnap = await getDoc(doc(db, COLLECTIONS.PROBLEM_PROMPTS, promptId));
+    return docSnap.exists() ? docSnap.data() : null;
+}
+
+export async function deleteProblemPrompt(promptId) {
+    if (!promptId) return;
+    await deleteDoc(doc(db, COLLECTIONS.PROBLEM_PROMPTS, promptId));
 }
 
 // ========== Assignments ==========

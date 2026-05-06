@@ -21,6 +21,7 @@
     "android:sync:student": "npm run build:student && node scripts/with-student-cap.mjs sync android",
     "android:open:student": "node scripts/with-student-cap.mjs open android",
     "android:add:student": "node scripts/with-student-cap.mjs add android",
+    "android:assemble:student": "npm run android:sync:student && cd android-student && gradlew.bat assembleDebug",
     "ios:add:student": "npm run build:student && node scripts/with-student-cap.mjs add ios",
     "ios:sync:student": "npm run build:student && node scripts/with-student-cap.mjs sync ios",
     "ios:open:student": "node scripts/with-student-cap.mjs open ios"

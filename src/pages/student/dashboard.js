@@ -12,7 +12,7 @@ import {
   getPresentationsByClass, toggleSharePresentation,
   createStudentSelfRecord, getStudentSelfRecords,
   createStudentNote, getStudentNotesByStudent,
-  getFileById
+  getFileById, getProblemPromptsByClass
 } from '../../store.js';
 import { escapeHtml, renderQuizMath } from '../../utils/quizMath.js';
 import { renderCharacter, getLevelConfig, PLANT_TYPES, getLevelProgress } from '../../components/characterAvatar.js';
@@ -81,6 +81,7 @@ export function renderStudentDashboard(container) {
     let sharedPresentations = [];
     let selfRecords = [];
     let studentNotes = [];
+    let problemPrompts = [];
 
     const loadOr = async (label, promise, fallback) => {
       try {
@@ -121,16 +122,23 @@ export function renderStudentDashboard(container) {
       }
 
       let allPresentations = [];
-      [submissions, announcements, resources, allPresentations, selfRecords, studentNotes] = await Promise.all([
+      [submissions, announcements, resources, allPresentations, selfRecords, studentNotes, problemPrompts] = await Promise.all([
         loadOr('제출물', getSubmissionsByStudent(freshStudent.id), []),
         loadOr('공지', cls ? getAnnouncementsByClass(cls.id) : Promise.resolve([]), []),
         loadOr('자료', cls ? getResourcesByClass(cls.id) : Promise.resolve([]), []),
         loadOr('발표', cls ? getPresentationsByClass(cls.id) : Promise.resolve([]), []),
         loadOr('자기기록', getStudentSelfRecords(freshStudent.id), []),
         loadOr('쪽지', getStudentNotesByStudent(freshStudent.id), []),
+        loadOr('한문제', cls ? getProblemPromptsByClass(cls.id) : Promise.resolve([]), []),
       ]);
-      presentations = allPresentations.filter(p => p.studentId === freshStudent.id && p.type !== 'observation');
-      sharedPresentations = allPresentations.filter(p => p.studentId !== freshStudent.id && p.shared === true && p.type !== 'observation');
+      presentations = allPresentations.filter((p) =>
+        p.studentId === freshStudent.id
+        && p.type !== 'observation'
+        && p.type !== 'problem_solution');
+      sharedPresentations = allPresentations.filter((p) =>
+        p.studentId !== freshStudent.id
+        && p.shared === true
+        && p.type !== 'observation');
 
       quizListenClassId = freshStudent.classId || '';
       try {
@@ -325,6 +333,47 @@ export function renderStudentDashboard(container) {
             <div class="flex flex-col student-dashboard-col-gap">
               <div class="section-card card">
                 <div class="section-card-header">
+                  <span style="font-size: 1.2rem;">✏️</span>
+                  <h2 class="section-card-title">한 문제 풀이</h2>
+                </div>
+                <p style="font-size: 0.82rem; color: var(--text-muted); margin: 0 0 var(--s-3); line-height: 1.45;">
+                  선생님이 올린 문제에 칠판·녹화로 풀이를 남길 수 있어요.
+                </p>
+                <div class="flex flex-col gap-sm">
+                  ${problemPrompts.length === 0
+    ? '<p class="text-center" style="color: var(--text-dim); padding: 12px;">출제된 한 문제가 없습니다.</p>'
+    : problemPrompts.map((pr) => {
+      const sols = allPresentations.filter((p) => p.studentId === freshStudent.id
+        && p.type === 'problem_solution'
+        && String(p.problemPromptId || '') === String(pr.id));
+      const sol = sols.length
+        ? sols.slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))[0]
+        : null;
+      const hasSol = !!sol;
+      return `
+                    <div class="interactive-item" style="flex-direction: column; align-items: stretch; gap: 10px;">
+                      <div>
+                        <div style="font-weight: 700; font-size: 0.95rem;">${escapeHtml(pr.title || '제목 없음')}</div>
+                        ${pr.description ? `<div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px; white-space: pre-line;">${escapeHtml(pr.description)}</div>` : ''}
+                        ${pr.files && pr.files.length ? `
+                          <div class="flex gap-sm flex-wrap" style="margin-top: 8px;">
+                            ${pr.files.map((f) => `<button type="button" class="btn btn-secondary btn-sm" style="font-size: 0.72rem;" onclick="window.downloadFile('${f.id}')">📎 ${escapeHtml(f.name)}</button>`).join('')}
+                          </div>` : ''}
+                      </div>
+                      <div class="flex flex-wrap gap-sm items-center justify-end">
+                        ${hasSol ? `<span class="badge badge-green">풀이 저장됨</span>
+                          <button type="button" class="btn btn-ghost btn-sm btn-toggle-share" data-id="${sol.id}" data-shared="${sol.shared ? 'true' : 'false'}">${sol.shared ? '🔒 공유 끄기' : '🌐 공유하기'}</button>` : ''}
+                        <button type="button" class="btn btn-primary btn-sm btn-open-problem-board" data-prompt-id="${pr.id}">
+                          ${hasSol ? '📝 풀이 다시 올리기' : '✍️ 풀이 올리기'}
+                        </button>
+                      </div>
+                    </div>`;
+    }).join('')}
+                </div>
+              </div>
+
+              <div class="section-card card">
+                <div class="section-card-header">
                   <span style="font-size: 1.2rem;">📝</span>
                   <h2 class="section-card-title">과제 목록</h2>
                 </div>
@@ -388,39 +437,37 @@ export function renderStudentDashboard(container) {
 
               <!-- Student Self Records -->
               <div class="section-card card">
-                <div class="section-card-header">
-                  <span style="font-size: 1.2rem;">📌</span>
-                  <h2 class="section-card-title">나의 생기부 참고 기록</h2>
+                <div class="section-card-header" style="margin-bottom: var(--s-2); padding-bottom: var(--s-2);">
+                  <span style="font-size: 1.1rem;">📌</span>
+                  <h2 class="section-card-title" style="font-size: 1.25rem;">나의 기록</h2>
                 </div>
-                <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; margin-bottom: var(--s-4);">
-                  수업 중 배운 점, 발표 준비, 탐구 활동, 느낀 점 등을 스스로 남겨보세요. 이 기록은 생기부 작성을 위한 참고 자료로 활용될 수 있습니다.
-                </p>
-                <div class="form-group" style="margin-bottom: var(--s-3);">
-                  <input type="text" class="input-field" id="self-record-title" placeholder="제목을 입력하세요" />
+                <p style="font-size: 0.8rem; color: var(--text-dim); margin: 0 0 var(--s-3); line-height: 1.4;">제목 없이 내용만 적어도 됩니다.</p>
+                <div class="form-group" style="margin-bottom: var(--s-2);">
+                  <input type="text" class="input-field" id="self-record-title" placeholder="제목 (선택)" />
                 </div>
-                <div class="form-group" style="margin-bottom: var(--s-3);">
-                  <textarea class="input-field" id="self-record-content" rows="3" placeholder="기록할 내용을 입력하세요"></textarea>
+                <div class="form-group" style="margin-bottom: var(--s-2);">
+                  <textarea class="input-field" id="self-record-content" rows="2" placeholder="기록할 내용"></textarea>
                 </div>
-                <div class="drop-zone" id="self-record-dropzone" style="height: 110px; padding: 16px; margin-bottom: var(--s-3);">
-                  <div style="font-size: 1.4rem;">📎</div>
-                  <div style="font-weight: 600; font-size: 0.9rem;">파일을 추가하려면 클릭하거나 끌어오세요</div>
+                <div class="drop-zone" id="self-record-dropzone" style="height: 72px; padding: 12px; margin-bottom: var(--s-2);">
+                  <div style="font-size: 1.1rem;">📎</div>
+                  <div style="font-weight: 600; font-size: 0.82rem;">파일 (선택)</div>
                   <input type="file" id="self-record-files" multiple class="hidden" />
                 </div>
-                <div id="self-record-file-list" class="file-queue-list" style="margin-bottom: var(--s-3);"></div>
-                <button class="btn btn-primary w-full" id="btn-save-self-record">기록 저장하기</button>
+                <div id="self-record-file-list" class="file-queue-list" style="margin-bottom: var(--s-2);"></div>
+                <button class="btn btn-primary w-full" id="btn-save-self-record" style="min-height: 44px;">기록 저장</button>
 
-                <div class="divider" style="margin: var(--s-6) 0;"></div>
+                <div class="divider" style="margin: var(--s-4) 0;"></div>
                 <div class="flex flex-col gap-sm" id="self-record-list">
                   ${selfRecords.length === 0 ? '<p class="text-center" style="color: var(--text-dim); padding: 10px;">아직 작성한 기록이 없습니다.</p>' : selfRecords.map(record => `
-                    <div class="interactive-item" style="flex-direction: column; align-items: flex-start; gap: 8px;">
+                    <div class="interactive-item" style="flex-direction: column; align-items: flex-start; gap: 6px; padding: var(--s-3);">
                       <div class="flex justify-between items-center" style="width: 100%; gap: 10px;">
-                        <div style="font-weight: 700; font-size: 0.95rem;">${record.title}</div>
-                        <span style="font-size: 0.75rem; color: var(--text-dim); white-space: nowrap;">${formatDate(record.createdAt)}</span>
+                        <div style="font-weight: 700; font-size: 0.88rem;">${record.title || '제목 없음'}</div>
+                        <span style="font-size: 0.72rem; color: var(--text-dim); white-space: nowrap;">${formatDate(record.createdAt)}</span>
                       </div>
-                      <div style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.5; white-space: pre-line;">${record.content}</div>
+                      ${record.content ? `<div style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.45; white-space: pre-line;">${record.content}</div>` : ''}
                       ${record.files && record.files.length > 0 ? `
                         <div class="flex gap-sm" style="flex-wrap: wrap;">
-                          ${record.files.map(f => `<button class="btn btn-secondary btn-sm" style="font-size: 0.75rem;" onclick="window.downloadFile('${f.id}')">📎 ${f.name}</button>`).join('')}
+                          ${record.files.map(f => `<button class="btn btn-secondary btn-sm" style="font-size: 0.72rem;" onclick="window.downloadFile('${f.id}')">📎 ${f.name}</button>`).join('')}
                         </div>
                       ` : ''}
                     </div>
@@ -970,8 +1017,10 @@ export function renderStudentDashboard(container) {
     document.getElementById('btn-save-self-record')?.addEventListener('click', async () => {
       const title = document.getElementById('self-record-title').value.trim();
       const content = document.getElementById('self-record-content').value.trim();
-      if (!title) { showToast('제목을 입력해주세요.', 'error'); return; }
-      if (!content && selfRecordFilesQueue.length === 0) { showToast('내용을 쓰거나 파일을 추가해주세요.', 'error'); return; }
+      if (!content && selfRecordFilesQueue.length === 0) {
+        showToast('내용을 쓰거나 파일을 추가해 주세요.', 'error');
+        return;
+      }
 
       const saveBtn = document.getElementById('btn-save-self-record');
       saveBtn.disabled = true;
@@ -1006,6 +1055,13 @@ export function renderStudentDashboard(container) {
         selectedAssignment = assignments.find(a => a.id === item.dataset.id);
         activeView = 'assignment';
         render();
+      });
+    });
+
+    document.querySelectorAll('.btn-open-problem-board').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const pid = btn.dataset.promptId;
+        if (pid) window.location.hash = `/student/problem-board/${pid}`;
       });
     });
   }

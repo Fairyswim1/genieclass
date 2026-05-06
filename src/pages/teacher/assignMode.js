@@ -5,7 +5,8 @@ import {
   addResource, getResourcesByClass, deleteResource,
   getSubmissionsByAssignment, saveFile, showToast, formatDate,
   getStudentById, downloadFile as storeDownloadFile, getObservationsByClass,
-  getStudentSelfRecordsByClass
+  getStudentSelfRecordsByClass,
+  createProblemPrompt, getProblemPromptsByClass, deleteProblemPrompt,
 } from '../../store.js';
 import { escapeHtml } from '../../utils/quizMath.js';
 import * as XLSX from 'xlsx';
@@ -17,7 +18,7 @@ export function renderAssignMode(container, params) {
 
   const classId = params.id;
   let cls = null;
-  let activeTab = 'announcements'; // 'announcements', 'assignments', 'resources', 'observations', 'selfrecords'
+  let activeTab = 'announcements'; // + 'oneproblem'
   let editingAssignmentId = null;
   let otherClasses = []; // All classes for cross-posting
   let currentObservations = [];
@@ -27,6 +28,7 @@ export function renderAssignMode(container, params) {
   let assignFilesQueue = []; // Array of File objects for NEW uploads
   let resFilesQueue = []; // Array of File objects for NEW uploads
   let existingFilesQueue = []; // Array of {id, name} objects for EDITING
+  let probFilesQueue = [];
 
   async function init() {
     cls = await getClassById(classId);
@@ -47,6 +49,7 @@ export function renderAssignMode(container, params) {
     const observations = await getObservationsByClass(classId);
     currentObservations = observations;
     const selfRecords = await getStudentSelfRecordsByClass(classId);
+    const problemPrompts = await getProblemPromptsByClass(classId);
 
     const recordsByStudent = selfRecords.reduce((acc, record) => {
       if (!record.studentId) return acc;
@@ -205,6 +208,7 @@ export function renderAssignMode(container, params) {
           <div class="tabs" style="margin-bottom: var(--s-12); max-width: 100%; flex-wrap: wrap;">
             <div class="tab ${activeTab === 'announcements' ? 'active' : ''}" data-tab="announcements">📢 공지사항</div>
             <div class="tab ${activeTab === 'assignments' ? 'active' : ''}" data-tab="assignments">📝 과제 관리</div>
+            <div class="tab ${activeTab === 'oneproblem' ? 'active' : ''}" data-tab="oneproblem">✏️ 한 문제 풀이</div>
             <div class="tab ${activeTab === 'resources' ? 'active' : ''}" data-tab="resources">📁 수업 자료</div>
             <div class="tab ${activeTab === 'observations' ? 'active' : ''}" data-tab="observations">📋 생기부 관리</div>
             <div class="tab ${activeTab === 'selfrecords' ? 'active' : ''}" data-tab="selfrecords">📌 학생 자기 기록</div>
@@ -344,6 +348,61 @@ export function renderAssignMode(container, params) {
               </div>
             </div>
             ${assignmentsHtml}
+          </div>
+
+          <div id="section-oneproblem" class="${activeTab !== 'oneproblem' ? 'hidden' : 'animate-up'}">
+            <div class="section-header">
+              <h2 class="section-title">한 문제 풀이 (칠판·녹화 제출)</h2>
+              <button class="btn btn-primary btn-sm" id="btn-new-problem">+ 문제 올리기</button>
+            </div>
+
+            <div id="problem-form" class="card hidden" style="margin-bottom: var(--s-8);">
+              <div class="form-group">
+                <label class="input-label">문제 제목</label>
+                <input type="text" class="input-field" id="prob-title" placeholder="예: 2025 모의고사 15번" />
+              </div>
+              <div class="form-group">
+                <label class="input-label">설명·지시 (선택)</label>
+                <textarea class="input-field" id="prob-desc" rows="2" placeholder="풀이 시 유의사항 등"></textarea>
+              </div>
+              <div class="form-group">
+                <label class="input-label">첨부 파일 (선택)</label>
+                <div class="drop-zone" id="prob-dropzone">
+                  <div class="drop-zone-icon">📎</div>
+                  <div style="font-weight: 600;">문제 PDF·이미지 등</div>
+                  <input type="file" id="prob-files" multiple class="hidden" />
+                </div>
+                <div id="prob-file-list" class="file-queue-list"></div>
+              </div>
+              <div class="flex gap-md justify-end">
+                <button class="btn btn-ghost" id="btn-cancel-problem">취소</button>
+                <button class="btn btn-primary" id="btn-submit-problem">학생에게 게시</button>
+              </div>
+            </div>
+
+            <div class="grid" style="grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--s-6);">
+              ${problemPrompts.length === 0 ? `
+                <div class="empty-board w-full" style="grid-column: 1 / -1;">
+                  <div class="empty-board-icon">✏️</div>
+                  <p style="font-size: 1.05rem; font-weight: 600; color: var(--text-main); margin-bottom: 8px;">등록된 한 문제가 없습니다.</p>
+                  <p style="font-size: 0.9rem;">학생이 칠판에 풀이·녹화를 올릴 수 있도록 문제를 게시해 보세요.</p>
+                </div>
+              ` : problemPrompts.map((pr) => `
+                <div class="card" style="padding: var(--s-6); display: flex; flex-direction: column; gap: var(--s-3); border-top: 4px solid var(--accent-amber);">
+                  <div class="flex justify-between items-start gap-sm">
+                    <h3 style="font-size: 1.1rem; font-weight: 700; line-height: 1.35;">${escapeHtml(pr.title)}</h3>
+                    <button class="btn btn-ghost btn-sm delete-btn" data-type="prob" data-id="${pr.id}" style="color: var(--error);">삭제</button>
+                  </div>
+                  ${pr.description ? `<p style="font-size: 0.9rem; color: var(--text-muted); white-space: pre-line;">${escapeHtml(pr.description)}</p>` : ''}
+                  <div class="flex flex-wrap gap-sm">
+                    ${pr.files && pr.files.length ? pr.files.map((f) => `
+                      <button type="button" class="btn btn-secondary btn-sm" style="font-size: 0.75rem;" onclick="window.downloadFile('${f.id}')">📎 ${escapeHtml(f.name)}</button>
+                    `).join('') : '<span style="font-size: 0.85rem; color: var(--text-dim);">첨부 없음</span>'}
+                  </div>
+                  <div style="font-size: 0.78rem; color: var(--text-dim); margin-top: auto;">등록: ${formatDate(pr.createdAt)}</div>
+                </div>
+              `).join('')}
+            </div>
           </div>
 
           <!-- 수업 자료 섹션 (New) -->
@@ -512,6 +571,7 @@ export function renderAssignMode(container, params) {
     if (type === 'ann') { queue = annFilesQueue; listId = "ann-file-list"; }
     else if (type === 'assign') { queue = assignFilesQueue; existing = existingFilesQueue; listId = "assign-file-list"; }
     else if (type === 'res') { queue = resFilesQueue; listId = "res-file-list"; }
+    else if (type === 'prob') { queue = probFilesQueue; listId = "prob-file-list"; }
 
     const listContainer = document.getElementById(listId);
     if (!listContainer) return;
@@ -554,6 +614,7 @@ export function renderAssignMode(container, params) {
       else assignFilesQueue.splice(index, 1);
     }
     else if (type === 'res') resFilesQueue.splice(index, 1);
+    else if (type === 'prob') probFilesQueue.splice(index, 1);
     
     updateFileListUI(type);
   };
@@ -600,6 +661,7 @@ export function renderAssignMode(container, params) {
     if (type === 'ann') annFilesQueue = [...annFilesQueue, ...filterDuplicates(annFilesQueue, fileArray)];
     else if (type === 'assign') assignFilesQueue = [...assignFilesQueue, ...filterDuplicates(assignFilesQueue, fileArray)];
     else if (type === 'res') resFilesQueue = [...resFilesQueue, ...filterDuplicates(resFilesQueue, fileArray)];
+    else if (type === 'prob') probFilesQueue = [...probFilesQueue, ...filterDuplicates(probFilesQueue, fileArray)];
     
     updateFileListUI(type);
   }
@@ -691,10 +753,42 @@ export function renderAssignMode(container, params) {
       document.getElementById('resource-form').classList.add('hidden');
     });
 
+    document.getElementById('btn-new-problem')?.addEventListener('click', () => {
+      probFilesQueue = [];
+      document.getElementById('prob-title').value = '';
+      document.getElementById('prob-desc').value = '';
+      updateFileListUI('prob');
+      document.getElementById('problem-form').classList.remove('hidden');
+    });
+    document.getElementById('btn-cancel-problem')?.addEventListener('click', () => {
+      document.getElementById('problem-form').classList.add('hidden');
+    });
+    document.getElementById('btn-submit-problem')?.addEventListener('click', async () => {
+      const title = document.getElementById('prob-title').value.trim();
+      const description = document.getElementById('prob-desc').value.trim();
+      if (!title) { showToast('문제 제목을 입력하세요.', 'error'); return; }
+      try {
+        const files = [];
+        for (const file of probFilesQueue) {
+          const saved = await saveFile(file);
+          files.push({ id: saved.id, name: saved.name });
+        }
+        await createProblemPrompt(classId, teacher.uid, { title, description, files });
+        showToast('한 문제가 게시되었습니다.');
+        probFilesQueue = [];
+        document.getElementById('problem-form').classList.add('hidden');
+        render();
+      } catch (e) {
+        console.error(e);
+        showToast('게시 중 오류가 발생했습니다.', 'error');
+      }
+    });
+
     // Set up dropzones
     setupDropZone('ann-dropzone', 'ann-files', 'ann');
     setupDropZone('assign-dropzone', 'assign-files', 'assign');
     setupDropZone('res-dropzone', 'res-files', 'res');
+    setupDropZone('prob-dropzone', 'prob-files', 'prob');
 
     // Submit Announcement
     document.getElementById('btn-submit-announcement')?.addEventListener('click', async () => {
@@ -835,6 +929,7 @@ export function renderAssignMode(container, params) {
         if (type === 'ann') await deleteAnnouncement(id);
         else if (type === 'assign') await deleteAssignment(id);
         else if (type === 'res') await deleteResource(id);
+        else if (type === 'prob') await deleteProblemPrompt(id);
         showToast('삭제 완료');
         render();
       });
