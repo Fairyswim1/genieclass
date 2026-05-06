@@ -485,17 +485,43 @@ export async function updateAssignment(assignmentId, data) {
     await updateDoc(ref, updates);
 }
 
+function submissionNewer(a, b) {
+    const ta = new Date(a?.updatedAt || a?.createdAt || 0).getTime();
+    const tb = new Date(b?.updatedAt || b?.createdAt || 0).getTime();
+    return ta - tb;
+}
+
 // ========== Submissions ==========
 export async function submitAssignment(assignmentId, studentId, data) {
     const aid = assignmentId != null ? String(assignmentId) : '';
     const sid = studentId != null ? String(studentId) : '';
+    if (!aid || !sid) {
+        throw new Error('과제 또는 학생 정보가 없습니다. 로그아웃 후 다시 로그인해 주세요.');
+    }
     const q = query(collection(db, COLLECTIONS.SUBMISSIONS),
         where('assignmentId', '==', aid),
         where('studentId', '==', sid));
     const existing = await getDocs(q);
 
-    const id = existing.empty ? generateId() : existing.docs[0].id;
-    const prev = existing.empty ? {} : existing.docs[0].data();
+    let id;
+    let prev = {};
+
+    if (existing.empty) {
+        id = generateId();
+    } else {
+        const refs = existing.docs.map((d) => ({ ref: d.ref, snap: d }));
+        refs.sort((x, y) => submissionNewer(y.snap.data(), x.snap.data()));
+        const keep = refs[0];
+        id = keep.snap.id;
+        prev = keep.snap.data();
+        for (let i = 1; i < refs.length; i++) {
+            try {
+                await deleteDoc(refs[i].ref);
+            } catch (e) {
+                console.warn('[submitAssignment] 중복 제출 문서 삭제 실패:', e);
+            }
+        }
+    }
 
     const submission = {
         id,
@@ -513,15 +539,35 @@ export async function submitAssignment(assignmentId, studentId, data) {
 }
 
 export async function getSubmissionsByAssignment(assignmentId) {
-    const q = query(collection(db, COLLECTIONS.SUBMISSIONS), where('assignmentId', '==', assignmentId));
+    if (assignmentId == null || assignmentId === '') return [];
+    const aid = String(assignmentId);
+    const q = query(collection(db, COLLECTIONS.SUBMISSIONS), where('assignmentId', '==', aid));
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => doc.data());
+    const list = snapshot.docs.map((d) => d.data());
+    const byStudent = new Map();
+    for (const row of list) {
+        if (row.studentId == null) continue;
+        const sk = String(row.studentId);
+        const cur = byStudent.get(sk);
+        if (!cur || submissionNewer(row, cur) > 0) byStudent.set(sk, row);
+    }
+    return [...byStudent.values()];
 }
 
 export async function getSubmissionsByStudent(studentId) {
-    const q = query(collection(db, COLLECTIONS.SUBMISSIONS), where('studentId', '==', studentId));
+    if (studentId == null || studentId === '') return [];
+    const sid = String(studentId);
+    const q = query(collection(db, COLLECTIONS.SUBMISSIONS), where('studentId', '==', sid));
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => doc.data());
+    const list = snapshot.docs.map((d) => d.data());
+    const byAssignment = new Map();
+    for (const row of list) {
+        if (row.assignmentId == null) continue;
+        const ak = String(row.assignmentId);
+        const cur = byAssignment.get(ak);
+        if (!cur || submissionNewer(row, cur) > 0) byAssignment.set(ak, row);
+    }
+    return [...byAssignment.values()];
 }
 
 export async function getSharedSubmissions(assignmentId) {
