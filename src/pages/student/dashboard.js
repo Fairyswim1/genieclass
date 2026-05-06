@@ -49,9 +49,12 @@ export function renderStudentDashboard(container) {
   /** 상단 '선생님께 쪽지' 버튼으로만 열림 */
   let studentNotePanelOpen = false;
 
+  /** listenToActiveQuiz에 넘길 반 ID — render마다 최신화 */
+  let quizListenClassId = student.classId || '';
+  let lastQuizBoundClassId = '';
+
   async function init() {
     await render();
-    startQuizListener();
   }
 
   async function render() {
@@ -61,6 +64,7 @@ export function renderStudentDashboard(container) {
     let config = getLevelConfig(progress.level, student.characterType || 'apple');
     let presentations = [];
     let assignments = [];
+    let assignmentsLoadError = null;
     let submissions = [];
     let announcements = [];
     let resources = [];
@@ -91,9 +95,23 @@ export function renderStudentDashboard(container) {
       progress = getLevelProgress(freshStudent.totalPoints || 0);
       config = getLevelConfig(progress.level, freshStudent.characterType || 'apple');
 
+      try {
+        if (cls) {
+          assignments = await getAssignmentsByClass(cls.id);
+        } else {
+          assignments = [];
+        }
+      } catch (assignErr) {
+        console.error('[StudentDashboard] 과제 목록 조회 실패:', assignErr);
+        assignments = [];
+        const code = assignErr?.code || '';
+        if (code === 'permission-denied') assignmentsLoadError = 'permission';
+        else if (code === 'unavailable') assignmentsLoadError = 'offline';
+        else assignmentsLoadError = 'unknown';
+      }
+
       let allPresentations = [];
-      [assignments, submissions, announcements, resources, allPresentations, selfRecords, studentNotes] = await Promise.all([
-        loadOr('과제', cls ? getAssignmentsByClass(cls.id) : Promise.resolve([]), []),
+      [submissions, announcements, resources, allPresentations, selfRecords, studentNotes] = await Promise.all([
         loadOr('제출물', getSubmissionsByStudent(freshStudent.id), []),
         loadOr('공지', cls ? getAnnouncementsByClass(cls.id) : Promise.resolve([]), []),
         loadOr('자료', cls ? getResourcesByClass(cls.id) : Promise.resolve([]), []),
@@ -103,6 +121,11 @@ export function renderStudentDashboard(container) {
       ]);
       presentations = allPresentations.filter(p => p.studentId === freshStudent.id && p.type !== 'observation');
       sharedPresentations = allPresentations.filter(p => p.studentId !== freshStudent.id && p.shared === true && p.type !== 'observation');
+
+      quizListenClassId = freshStudent.classId || '';
+      try {
+        localStorage.setItem('genie_current_student', JSON.stringify(freshStudent));
+      } catch (_) {}
     } catch (err) {
       console.error('Data loading error:', err);
     }
@@ -111,6 +134,29 @@ export function renderStudentDashboard(container) {
       renderAssignmentDetail(freshStudent, selectedAssignment, submissions);
       return;
     }
+
+    const assignmentSectionBanner = (() => {
+      if (assignmentsLoadError === 'permission') {
+        return `<div class="card" style="margin-bottom:var(--s-3);padding:var(--s-4);border:1px solid var(--error);background:rgba(239,68,68,0.06);font-size:0.88rem;line-height:1.5;">
+          <strong>과제 목록을 불러올 수 없습니다.</strong> 이 기기에서 데이터 접근이 막혔을 수 있습니다. 다른 브라우저(또는 시크릿이 아닌 일반 탭)로 시도하거나, 학교 Wi-Fi 대신 데이터 네트워크로 접속해 보세요. 문제가 계속되면 선생님께 알려 주세요.
+        </div>`;
+      }
+      if (assignmentsLoadError === 'offline') {
+        return `<div class="card" style="margin-bottom:var(--s-3);padding:var(--s-4);border:1px solid var(--primary);background:rgba(99,102,241,0.06);font-size:0.88rem;line-height:1.5;">
+          <strong>네트워크 불안정</strong>으로 과제 목록을 가져오지 못했습니다. 잠시 후 상단을 아래로 당겨 새로고침하거나, 페이지를 새로 열어 주세요.
+        </div>`;
+      }
+      if (assignmentsLoadError === 'unknown') {
+        return `<div class="card" style="margin-bottom:var(--s-3);padding:var(--s-4);border:1px solid var(--border-main);background:var(--bg-main);font-size:0.88rem;line-height:1.5;">
+          <strong>과제 목록을 불러오지 못했습니다.</strong> 새로고침(F5) 후 다시 로그인해 보세요. 반복되면 선생님께 알려 주세요.
+        </div>`;
+      }
+      return '';
+    })();
+
+    const assignmentEmptyMessage = assignmentsLoadError
+      ? ''
+      : '<p class="text-center" style="color: var(--text-dim); padding: 20px;">출제된 과제가 없습니다.</p>';
 
     container.innerHTML = `
       <div class="student-layout page-enter">
@@ -254,8 +300,9 @@ export function renderStudentDashboard(container) {
                   <h2 class="section-card-title">과제 목록</h2>
                 </div>
                 <div class="flex flex-col gap-sm">
-                  ${assignments.length === 0 ? '<p class="text-center" style="color: var(--text-dim); padding: 20px;">출제된 과제가 없습니다.</p>' : assignments.map(a => {
-      const sub = submissions.find(s => s.assignmentId === a.id);
+                  ${assignmentSectionBanner}
+                  ${assignments.length === 0 ? assignmentEmptyMessage : assignments.map(a => {
+      const sub = submissions.find(s => String(s.assignmentId) === String(a.id));
       return `
                       <div class="interactive-item assignment-item ${sub ? 'submitted' : 'pending'}" data-id="${a.id}">
                         <div>
@@ -439,6 +486,12 @@ export function renderStudentDashboard(container) {
     `;
 
     bindEvents(assignments, freshStudent, cls);
+
+    const cid = freshStudent.classId || '';
+    if (cid && cid !== lastQuizBoundClassId) {
+      lastQuizBoundClassId = cid;
+      startQuizListener();
+    }
   }
 
   function fingerprintProblemImage(pi) {
@@ -450,7 +503,9 @@ export function renderStudentDashboard(container) {
 
   function startQuizListener() {
     if (unsubscribeQuiz) unsubscribeQuiz();
-    unsubscribeQuiz = listenToActiveQuiz(student.classId, (quiz) => {
+    const classId = quizListenClassId || student.classId;
+    if (!classId) return;
+    unsubscribeQuiz = listenToActiveQuiz(classId, (quiz) => {
       if (quiz && quiz.active) {
         if (dismissedQuizIds.has(quiz.id)) return;
 
