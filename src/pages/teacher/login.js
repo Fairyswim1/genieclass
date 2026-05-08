@@ -2,9 +2,13 @@
 // Teacher Login Page
 // ========================================
 import { loginWithGoogle, showToast } from '../../store.js';
+import { auth } from '../../firebase.js';
 
 export function renderTeacherLogin(container) {
   function render() {
+    if (auth.currentUser?.isAnonymous) {
+      showToast('같은 브라우저에서 학생 화면을 쓰면 교사 로그인이 익명 세션으로 바뀝니다. 구글로 다시 로그인해 주세요.', 'info');
+    }
     container.innerHTML = `
       <div class="auth-page page-enter">
         <div class="auth-card animate-scale-in">

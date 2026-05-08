@@ -104,8 +104,11 @@ export async function loginWithGoogle() {
     }
 }
 
+/** 교사 화면용: Google 등 실계정만. 학생용 익명 로그인(auth.currentUser.isAnonymous)은 교사로 취급하지 않음 */
 export function getCurrentTeacher() {
-    return auth.currentUser;
+    const u = auth.currentUser;
+    if (!u || u.isAnonymous) return null;
+    return u;
 }
 
 export async function logoutTeacher() {

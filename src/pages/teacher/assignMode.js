@@ -12,6 +12,14 @@ import { escapeHtml } from '../../utils/quizMath.js';
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
 
+/** HTML attribute용 이스케이프 (data-student-name, title 등) */
+function escapeAttr(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;');
+}
+
 export function renderAssignMode(container, params) {
   const teacher = getCurrentTeacher();
   if (!teacher) { window.location.hash = '/teacher/login'; return; }
@@ -144,37 +152,58 @@ export function renderAssignMode(container, params) {
               ` : ''}
             </div>
 
-            <details style="margin-bottom: var(--s-4); border: 1px solid var(--border-subtle); border-radius: var(--r-sm); background: var(--bg-surface);">
+            <details class="assign-submission-details" style="margin-bottom: var(--s-4); border: 1px solid var(--border-subtle); border-radius: var(--r-sm); background: var(--bg-surface);">
               <summary style="padding: var(--s-3); cursor: pointer; font-size: 0.9rem; font-weight: 600; color: var(--text-main); outline: none;">학생별 상세 제출 확인</summary>
-              <div style="padding: var(--s-3); padding-top: 0; display: flex; flex-direction: column; gap: var(--s-2); max-height: 250px; overflow-y: auto;">
-                ${students.map(st => {
+              <div style="padding: var(--s-3); padding-top: var(--s-2);">
+                <label class="input-label" style="font-size: 0.78rem; margin-bottom: 4px; display: block; color: var(--text-muted);">학생 이름 검색 <span style="font-weight: 400; opacity: 0.85;">(부분 일치 · 비우면 전체)</span></label>
+                <input type="search" class="input-field assign-submission-filter" placeholder="예: 박민준" autocomplete="off" style="font-size: 0.9rem; padding: 8px 10px; margin-bottom: var(--s-3);" />
+                <div class="assign-submission-rows" style="display: flex; flex-direction: column; gap: var(--s-2); max-height: 360px; overflow-y: auto; padding-right: 4px;">
+                  ${students.map(st => {
                   const sub = subsOnRoster.find(s => String(s.studentId) === String(st.id));
                   const hasSubText = sub?.textAnswer && String(sub.textAnswer).trim();
                   const hasSubAudio = !!(sub?.audioData?.url);
                   const hasSubFiles = sub?.files && sub.files.length > 0;
+                  const nameAttr = escapeAttr(st.name);
                   return `
-                    <div class="flex justify-between items-center" style="padding: 8px; background: var(--bg-main); border-radius: var(--r-sm); gap: 10px;">
-                      <span style="font-size: 0.9rem; font-weight: 500; flex-shrink: 0;">${st.name}</span>
+                    <div class="assign-submission-row" data-student-name="${nameAttr}" style="padding: 10px 12px; background: var(--bg-main); border-radius: var(--r-sm); border: 1px solid var(--border-subtle); min-width: 0;">
+                      <div class="flex justify-between items-center gap-sm" style="flex-wrap: wrap;">
+                        <span style="font-size: 0.95rem; font-weight: 600;">${escapeHtml(st.name)}</span>
+                        ${sub
+    ? `<span class="badge badge-green" style="flex-shrink: 0;">${formatDate(sub.createdAt)} 제출</span>`
+    : `<span class="badge badge-purple" style="flex-shrink: 0;">미제출</span>`}
+                      </div>
                       ${sub ? `
-                        <div class="flex flex-col items-end" style="gap: 6px; max-width: 72%;">
-                          <span class="badge badge-green" style="align-self: flex-end;">${formatDate(sub.createdAt)} 제출</span>
-                          ${hasSubText ? `
-                            <div style="font-size: 0.82rem; color: var(--text-main); text-align: right; white-space: pre-wrap; max-height: 100px; overflow-y: auto; padding: 6px 8px; background: var(--bg-surface); border-radius: var(--r-sm); border: 1px solid var(--border-subtle); line-height: 1.45;">${escapeHtml(String(sub.textAnswer))}</div>
-                          ` : ''}
-                          ${hasSubAudio ? `
-                            <audio controls style="max-width: 260px; height: 36px;" src="${escapeHtml(sub.audioData.url)}"></audio>
-                          ` : ''}
-                          ${hasSubFiles ? `
-                            <div class="flex gap-sm flex-wrap justify-end" style="margin-top: 2px;">
-                              ${sub.files.map(f => `<button class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 2px 6px;" onclick="window.downloadFile('${f.id}')">📎 ${f.name}</button>`).join('')}
-                            </div>
-                          ` : ''}
-                          ${!hasSubText && !hasSubAudio && !hasSubFiles ? '<span style="font-size: 0.8rem; color: var(--text-dim);">제출 내용 없음</span>' : ''}
-                        </div>
-                      ` : `<span class="badge badge-purple" style="flex-shrink: 0;">미제출</span>`}
+                      <div style="width: 100%; margin-top: 10px; min-width: 0;">
+                        ${hasSubText ? `
+                          <div style="font-size: 0.82rem; color: var(--text-main); white-space: pre-wrap; max-height: 120px; overflow-y: auto; padding: 8px 10px; background: var(--bg-surface); border-radius: var(--r-sm); border: 1px solid var(--border-subtle); line-height: 1.45;">${escapeHtml(String(sub.textAnswer))}</div>
+                        ` : ''}
+                        ${hasSubAudio ? `
+                          <div style="margin-top: 8px;">
+                            <audio controls style="width: 100%; max-width: 100%; height: 40px;" src="${escapeHtml(sub.audioData.url)}"></audio>
+                          </div>
+                        ` : ''}
+                        ${hasSubFiles ? `
+                          <div style="margin-top: 10px; width: 100%; min-width: 0;">
+                            <div style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 6px; font-weight: 600;">첨부 파일 (${sub.files.length}개)</div>
+                            <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; width: 100%;">
+                              ${sub.files.map((f) => {
+      const nameEsc = escapeHtml(f.name);
+      const titleEsc = escapeAttr(f.name);
+      return `<li style="display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--r-sm); min-width: 0;">
+                                  <span style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.82rem; text-align: left;" title="${titleEsc}">📎 ${nameEsc}</span>
+                                  <button type="button" class="btn btn-secondary btn-sm" style="flex-shrink: 0; font-size: 0.72rem; padding: 5px 12px;" onclick='window.downloadFile(${JSON.stringify(f.id)})'>다운로드</button>
+                                </li>`;
+    }).join('')}
+                            </ul>
+                          </div>
+                        ` : ''}
+                        ${!hasSubText && !hasSubAudio && !hasSubFiles ? '<p style="font-size: 0.8rem; color: var(--text-dim); margin: 4px 0 0;">제출 내용 없음</p>' : ''}
+                      </div>
+                      ` : ''}
                     </div>
                   `;
                 }).join('')}
+                </div>
               </div>
             </details>
             
@@ -716,6 +745,22 @@ export function renderAssignMode(container, params) {
     });
 
     // Forms Toggle
+    document.querySelectorAll('.assign-submission-filter').forEach((input) => {
+      const details = input.closest('.assign-submission-details');
+      const rowsContainer = details?.querySelector('.assign-submission-rows');
+      if (!rowsContainer) return;
+      const apply = () => {
+        const q = (input.value || '').trim().toLowerCase();
+        rowsContainer.querySelectorAll('.assign-submission-row').forEach((row) => {
+          const nameNorm = (row.getAttribute('data-student-name') || '').toLowerCase();
+          const show = !q || nameNorm.includes(q);
+          row.style.display = show ? '' : 'none';
+        });
+      };
+      input.addEventListener('input', apply);
+      input.addEventListener('search', apply);
+    });
+
     document.getElementById('btn-new-announcement')?.addEventListener('click', () => {
       document.getElementById('announcement-form').classList.remove('hidden');
     });
