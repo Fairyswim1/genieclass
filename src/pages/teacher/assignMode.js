@@ -165,15 +165,20 @@ export function renderAssignMode(container, params) {
                   const hasSubFiles = sub?.files && sub.files.length > 0;
                   const nameAttr = escapeAttr(st.name);
                   return `
-                    <div class="assign-submission-row" data-student-name="${nameAttr}" style="padding: 10px 12px; background: var(--bg-main); border-radius: var(--r-sm); border: 1px solid var(--border-subtle); min-width: 0;">
-                      <div class="flex justify-between items-center gap-sm" style="flex-wrap: wrap;">
+                    <div class="assign-submission-row" data-student-name="${nameAttr}" style="padding: 0; background: var(--bg-main); border-radius: var(--r-sm); border: 1px solid var(--border-subtle); min-width: 0; overflow: hidden;">
+                      ${!sub ? `
+                      <div class="flex justify-between items-center gap-sm" style="flex-wrap: wrap; padding: 10px 12px;">
                         <span style="font-size: 0.95rem; font-weight: 600;">${escapeHtml(st.name)}</span>
-                        ${sub
-    ? `<span class="badge badge-green" style="flex-shrink: 0;">${formatDate(sub.createdAt)} 제출</span>`
-    : `<span class="badge badge-purple" style="flex-shrink: 0;">미제출</span>`}
+                        <span class="badge badge-purple" style="flex-shrink: 0;">미제출</span>
                       </div>
-                      ${sub ? `
-                      <div style="width: 100%; margin-top: 10px; min-width: 0;">
+                      ` : `
+                      <details class="assign-submission-accordion">
+                        <summary class="assign-submission-accordion-summary">
+                          <span class="assign-submission-accordion-chevron" aria-hidden="true"></span>
+                          <span class="assign-submission-accordion-name">${escapeHtml(st.name)}</span>
+                          <span class="badge badge-green" style="flex-shrink: 0;">${formatDate(sub.createdAt)} 제출</span>
+                        </summary>
+                        <div class="assign-submission-accordion-panel">
                         ${hasSubText ? `
                           <div style="font-size: 0.82rem; color: var(--text-main); white-space: pre-wrap; max-height: 120px; overflow-y: auto; padding: 8px 10px; background: var(--bg-surface); border-radius: var(--r-sm); border: 1px solid var(--border-subtle); line-height: 1.45;">${escapeHtml(String(sub.textAnswer))}</div>
                         ` : ''}
@@ -198,8 +203,9 @@ export function renderAssignMode(container, params) {
                           </div>
                         ` : ''}
                         ${!hasSubText && !hasSubAudio && !hasSubFiles ? '<p style="font-size: 0.8rem; color: var(--text-dim); margin: 4px 0 0;">제출 내용 없음</p>' : ''}
-                      </div>
-                      ` : ''}
+                        </div>
+                      </details>
+                      `}
                     </div>
                   `;
                 }).join('')}

@@ -1033,6 +1033,9 @@ export function renderLessonMode(container, params) {
     recordingCtx.save();
     recordingCtx.setTransform(1, 0, 0, 1, 0, 0);
     recordingCtx.clearRect(0, 0, recordingCanvas.width, recordingCanvas.height);
+    // 지우개로 투명해진 픽셀이 녹화에서 이상하게 보이지 않도록 검은 배경 먼저 채움
+    recordingCtx.fillStyle = '#000000';
+    recordingCtx.fillRect(0, 0, recordingCanvas.width, recordingCanvas.height);
     recordingCtx.restore(); // restore scale ratio
     
     // Draw Background/Permanent lines

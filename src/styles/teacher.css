@@ -898,3 +898,71 @@
 tr.notes-inbox-row--unread td {
     background: rgba(79, 70, 229, 0.05);
 }
+
+/* 과제 관리 — 학생별 제출 아코디언 (이름 클릭 시 펼침) */
+.assign-submission-accordion {
+    margin: 0;
+}
+
+.assign-submission-accordion-summary {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    flex-wrap: wrap;
+    padding: 10px 12px;
+    list-style: none;
+    cursor: pointer;
+    user-select: none;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-main);
+    transition: background 0.15s ease;
+}
+
+.assign-submission-accordion-summary:hover {
+    background: rgba(79, 70, 229, 0.06);
+}
+
+.assign-submission-accordion-summary::-webkit-details-marker {
+    display: none;
+}
+
+.assign-submission-accordion-chevron {
+    display: inline-block;
+    width: 0.45em;
+    height: 0.45em;
+    border-right: 2px solid var(--text-muted);
+    border-bottom: 2px solid var(--text-muted);
+    transform: rotate(-45deg);
+    flex-shrink: 0;
+    margin-top: -2px;
+    transition: transform 0.2s ease;
+}
+
+.assign-submission-accordion[open] .assign-submission-accordion-chevron {
+    transform: rotate(45deg);
+    margin-top: 2px;
+}
+
+.assign-submission-accordion-name {
+    flex: 1;
+    min-width: 6rem;
+    text-align: left;
+}
+
+.assign-submission-accordion-panel {
+    padding: 10px 12px 12px;
+    border-top: 1px solid var(--border-subtle);
+    background: var(--bg-main);
+    animation: assign-accordion-open 0.2s ease;
+}
+
+@keyframes assign-accordion-open {
+    from {
+        opacity: 0.85;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
