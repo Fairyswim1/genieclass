@@ -165,56 +165,34 @@ export function renderAssignMode(container, params) {
                 <input type="search" class="input-field assign-submission-filter" placeholder="예: 박민준" autocomplete="off" style="font-size: 0.9rem; padding: 8px 10px; margin-bottom: var(--s-3);" />
                 <div class="assign-submission-rows" style="display: flex; flex-direction: column; gap: var(--s-2); max-height: 360px; overflow-y: auto; padding-right: 4px;">
                   ${students.map(st => {
-                  const sub = subsOnRoster.find(s => String(s.studentId) === String(st.id));
-                  const hasSubText = sub?.textAnswer && String(sub.textAnswer).trim();
-                  const hasSubAudio = !!(sub?.audioData?.url);
-                  const hasSubFiles = sub?.files && sub.files.length > 0;
-                  const nameAttr = escapeAttr(st.name);
-                  return `
-                    <div class="assign-submission-row" data-student-name="${nameAttr}" style="padding: 0; background: var(--bg-main); border-radius: var(--r-sm); border: 1px solid var(--border-subtle); min-width: 0; overflow: hidden;">
-                      ${!sub ? `
-                      <div class="flex justify-between items-center gap-sm" style="flex-wrap: wrap; padding: 10px 12px;">
-                        <span style="font-size: 0.95rem; font-weight: 600;">${escapeHtml(st.name)}</span>
-                        <span class="badge badge-purple" style="flex-shrink: 0;">미제출</span>
-                      </div>
-                      ` : `
-                      <details class="assign-submission-accordion">
-                        <summary class="assign-submission-accordion-summary">
-                          <span class="assign-submission-accordion-chevron" aria-hidden="true"></span>
-                          <span class="assign-submission-accordion-name">${escapeHtml(st.name)}</span>
-                          <span class="badge badge-green" style="flex-shrink: 0;">${formatDate(sub.createdAt)} 제출</span>
-                        </summary>
-                        <div class="assign-submission-accordion-panel">
-                        ${hasSubText ? `
-                          <div style="font-size: 0.82rem; color: var(--text-main); white-space: pre-wrap; max-height: 120px; overflow-y: auto; padding: 8px 10px; background: var(--bg-surface); border-radius: var(--r-sm); border: 1px solid var(--border-subtle); line-height: 1.45;">${escapeHtml(String(sub.textAnswer))}</div>
-                        ` : ''}
-                        ${hasSubAudio ? `
-                          <div style="margin-top: 8px;">
-                            <audio controls style="width: 100%; max-width: 100%; height: 40px;" src="${escapeHtml(sub.audioData.url)}"></audio>
-                          </div>
-                        ` : ''}
-                        ${hasSubFiles ? `
-                          <div style="margin-top: 10px; width: 100%; min-width: 0;">
-                            <div style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 6px; font-weight: 600;">첨부 파일 (${sub.files.length}개)</div>
-                            <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; width: 100%;">
-                              ${sub.files.map((f) => {
-      const nameEsc = escapeHtml(f.name);
-      const titleEsc = escapeAttr(f.name);
-      return `<li style="display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--r-sm); min-width: 0;">
-                                  <span style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.82rem; text-align: left;" title="${titleEsc}">📎 ${nameEsc}</span>
-                                  <button type="button" class="btn btn-secondary btn-sm" style="flex-shrink: 0; font-size: 0.72rem; padding: 5px 12px;" onclick='window.downloadFile(${JSON.stringify(f.id)})'>다운로드</button>
-                                </li>`;
-    }).join('')}
-                            </ul>
-                          </div>
-                        ` : ''}
-                        ${!hasSubText && !hasSubAudio && !hasSubFiles ? '<p style="font-size: 0.8rem; color: var(--text-dim); margin: 4px 0 0;">제출 내용 없음</p>' : ''}
-                        </div>
-                      </details>
-                      `}
-                    </div>
-                  `;
-                }).join('')}
+                    const sub = subsOnRoster.find(s => String(s.studentId) === String(st.id));
+                    const hasSubText = sub && sub.textAnswer && String(sub.textAnswer).trim();
+                    const hasSubAudio = !!(sub && sub.audioData && sub.audioData.url);
+                    const hasSubFiles = !!(sub && sub.files && sub.files.length > 0);
+                    const nameAttr = escapeAttr(st.name || '');
+                    const nameHtml = escapeHtml(st.name || '(이름 없음)');
+                    const statusBadge = sub
+                      ? '<span class="badge badge-green" style="flex-shrink:0;">' + formatDate(sub.createdAt) + ' 제출</span>'
+                      : '<span class="badge badge-purple" style="flex-shrink:0;">미제출</span>';
+                    const filesHtml = hasSubFiles
+                      ? sub.files.map(function(f) {
+                          return '<li style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:var(--r-sm);min-width:0;">'
+                            + '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:0.82rem;" title="' + escapeAttr(f.name || '') + '">📎 ' + escapeHtml(f.name || '') + '</span>'
+                            + '<button type="button" class="btn btn-secondary btn-sm" style="flex-shrink:0;font-size:0.72rem;padding:5px 12px;" data-file-id="' + escapeAttr(String(f.id)) + '">다운로드</button>'
+                            + '</li>';
+                        }).join('')
+                      : '';
+                    return '<div class="assign-submission-row" data-student-name="' + nameAttr + '" style="padding:10px 12px;background:var(--bg-surface);border-radius:var(--r-sm);border:1px solid var(--border-main);min-width:0;">'
+                      + '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:' + (sub ? '8px' : '0') + ';">'
+                      + '<span style="font-size:0.95rem;font-weight:600;color:var(--text-main);">' + nameHtml + '</span>'
+                      + statusBadge
+                      + '</div>'
+                      + (hasSubText ? '<div style="font-size:0.82rem;color:var(--text-main);white-space:pre-wrap;max-height:100px;overflow-y:auto;padding:8px 10px;background:var(--bg-main);border-radius:var(--r-sm);border:1px solid var(--border-subtle);line-height:1.45;">' + escapeHtml(String(sub.textAnswer)) + '</div>' : '')
+                      + (hasSubAudio ? '<div style="margin-top:8px;"><audio controls style="width:100%;height:40px;" src="' + escapeHtml(sub.audioData.url) + '"></audio></div>' : '')
+                      + (hasSubFiles ? '<ul style="list-style:none;padding:0;margin:8px 0 0;display:flex;flex-direction:column;gap:6px;">' + filesHtml + '</ul>' : '')
+                      + (sub && !hasSubText && !hasSubAudio && !hasSubFiles ? '<p style="font-size:0.8rem;color:var(--text-dim);margin:4px 0 0;">제출 내용 없음</p>' : '')
+                      + '</div>';
+                  }).join('')}
                 </div>
               </div>
             </details>
@@ -771,6 +749,14 @@ export function renderAssignMode(container, params) {
       };
       input.addEventListener('input', apply);
       input.addEventListener('search', apply);
+    });
+
+    // 학생 제출 파일 다운로드 버튼 (data-file-id 방식)
+    document.querySelectorAll('[data-file-id]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const fid = btn.getAttribute('data-file-id');
+        if (fid) window.downloadFile(fid);
+      });
     });
 
     document.getElementById('btn-new-announcement')?.addEventListener('click', () => {
