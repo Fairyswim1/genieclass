@@ -20,6 +20,7 @@ export function renderLessonMode(container, params) {
   if (!teacher) { window.location.hash = '/teacher/login'; return; }
 
   const classId = params.id;
+  let isActive = true; // 페이지가 활성화 상태인지 추적 — false이면 stale render가 DOM을 덮어쓰지 않음
   let cls = null;
   let students = [];
   let selectedStudent = null;
@@ -60,12 +61,14 @@ export function renderLessonMode(container, params) {
 
   async function init() {
     cls = await getClassById(classId);
+    if (!isActive) return;
     if (!cls) { window.location.hash = '/teacher/dashboard'; return; }
     await render();
   }
 
   async function render() {
     students = await getStudentsByClass(classId);
+    if (!isActive) return; // 다른 페이지로 이동 후 완료된 stale render 차단
 
     if (activeView === 'whiteboard') {
       renderWhiteboardMode();
@@ -1509,4 +1512,24 @@ export function renderLessonMode(container, params) {
   }
 
   init();
+
+  return function cleanup() {
+    isActive = false;
+    if (unsubscribeSubmissions) {
+      unsubscribeSubmissions();
+      unsubscribeSubmissions = null;
+    }
+    if (recordingReqId) {
+      cancelAnimationFrame(recordingReqId);
+      recordingReqId = null;
+    }
+    if (obsRecordingTimer) {
+      clearInterval(obsRecordingTimer);
+      obsRecordingTimer = null;
+    }
+    if (recordingTimer) {
+      clearInterval(recordingTimer);
+      recordingTimer = null;
+    }
+  };
 }

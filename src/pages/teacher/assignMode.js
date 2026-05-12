@@ -25,6 +25,7 @@ export function renderAssignMode(container, params) {
   if (!teacher) { window.location.hash = '/teacher/login'; return; }
 
   const classId = params.id;
+  let isActive = true; // 페이지 활성 상태 추적 — false이면 stale render가 DOM을 덮어쓰지 않음
   let cls = null;
   let activeTab = 'announcements'; // + 'oneproblem'
   let editingAssignmentId = null;
@@ -40,11 +41,13 @@ export function renderAssignMode(container, params) {
 
   async function init() {
     cls = await getClassById(classId);
+    if (!isActive) return;
     if (!cls) { window.location.hash = '/teacher/dashboard'; return; }
     
     // Get all classes for cross-posting
     const { getClassesByTeacher } = await import('../../store.js');
     otherClasses = await getClassesByTeacher(teacher.uid);
+    if (!isActive) return;
     
     await render();
   }
@@ -55,9 +58,12 @@ export function renderAssignMode(container, params) {
     const resources = await getResourcesByClass(classId);
     const students = await getStudentsByClass(classId);
     const observations = await getObservationsByClass(classId);
-    currentObservations = observations;
     const selfRecords = await getStudentSelfRecordsByClass(classId);
     const problemPrompts = await getProblemPromptsByClass(classId);
+
+    if (!isActive) return; // 다른 페이지로 이동 후 완료된 stale render 차단
+
+    currentObservations = observations;
 
     const recordsByStudent = selfRecords.reduce((acc, record) => {
       if (!record.studentId) return acc;
@@ -1118,4 +1124,8 @@ export function renderAssignMode(container, params) {
   };
 
   init();
+
+  return function cleanup() {
+    isActive = false;
+  };
 }
