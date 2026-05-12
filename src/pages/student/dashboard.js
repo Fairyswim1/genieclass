@@ -160,10 +160,10 @@ export function renderStudentDashboard(container) {
         ...sameClassShared,
         ...crossClassShared.filter(p => !seenIds.has(p.id)),
       ];
-      // 학생 이름 필드를 각 발표에 주입
+      // 학생 이름 필드를 각 발표에 주입 (저장된 studentName → 같은반 맵 → null 순 fallback)
       sharedPresentations = mergedShared.map(p => ({
         ...p,
-        _studentName: studentNameMap[p.studentId] || null,
+        _studentName: p.studentName || studentNameMap[p.studentId] || null,
       }));
 
       quizListenClassId = freshStudent.classId || '';

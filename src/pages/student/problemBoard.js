@@ -589,6 +589,7 @@ export function renderStudentProblemBoard(container, params) {
         type: 'problem_solution',
         problemPromptId: problemPrompt.id,
         title: problemPrompt.title || '한 문제 풀이',
+        studentName: student.name,
       });
 
       showToast('✨ 풀이가 저장되었습니다!');

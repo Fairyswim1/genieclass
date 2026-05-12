@@ -6,7 +6,7 @@ import {
   praiseStudent, showToast, getStudentById, addPresentation,
   toggleSharePresentation, startQuiz, stopQuiz, listenToQuizSubmissions,
   saveFile, getPresentationsByStudent, formatDate, addStudentPoints,
-  deletePresentationById, getClassesByTeacher
+  subtractStudentPoints, deletePresentationById, getClassesByTeacher
 } from '../../store.js';
 import { escapeHtml, renderQuizMath } from '../../utils/quizMath.js';
 import { renderQuizLatexKeyboardHtml } from '../../utils/quizLatexKeyboard.js';
@@ -154,6 +154,9 @@ export function renderLessonMode(container, params) {
                    <span>관찰 기록</span>
                  </button>
                </div>
+               <button class="btn btn-ghost btn-sm w-full" id="btn-subtract-point" style="margin-top: 8px; color: var(--text-muted); border: 1px dashed var(--border-main); font-size: 0.82rem;">
+                 ↩ 포인트 취소 (-1P)
+               </button>
             </div>
           `;
           })() : ''}
@@ -232,14 +235,6 @@ export function renderLessonMode(container, params) {
 
     document.getElementById('btn-present')?.addEventListener('click', async () => {
       activeView = 'whiteboard';
-      
-      // 발표하기 클릭 시 1포인트 축적
-      const updated = await addStudentPoints(selectedStudent.id, 1);
-      if (updated) {
-        selectedStudent = updated;
-        showToast('🎙️ 발표가 시작되어 1P가 지급되었습니다!');
-      }
-
       render();
     });
 
@@ -248,6 +243,20 @@ export function renderLessonMode(container, params) {
       studentPresentations = await getPresentationsByStudent(selectedStudent.id);
       activeView = 'presentations';
       render();
+    });
+
+    document.getElementById('btn-subtract-point')?.addEventListener('click', async () => {
+      if ((selectedStudent.totalPoints ?? 0) === 0) {
+        showToast('이미 0P입니다.', 'error');
+        return;
+      }
+      if (!confirm(`${selectedStudent.name} 학생의 포인트를 1P 취소하겠습니까?`)) return;
+      const updated = await subtractStudentPoints(selectedStudent.id, 1);
+      if (updated) {
+        selectedStudent = updated;
+        showToast(`${updated.name}의 포인트를 1P 취소했습니다.`);
+        render();
+      }
     });
 
     // --- Observation Events ---
@@ -1327,10 +1336,15 @@ export function renderLessonMode(container, params) {
       await addPresentation(selectedStudent.id, classId, {
         whiteboardImage: savedImage,
         audioData: savedMedia,
-        recordingMode: recordingMode // Explicitly track mode
+        recordingMode: recordingMode,
+        studentName: selectedStudent.name,
       });
 
-      showToast('✨ 발표 자료가 성공적으로 저장되었습니다!');
+      // 발표 저장 완료 시에만 포인트 지급 (발표하기 클릭만으로는 포인트 안 줌)
+      const updated = await addStudentPoints(selectedStudent.id, 1);
+      if (updated) selectedStudent = updated;
+
+      showToast('✨ 발표 자료 저장 완료! (1P 획득)');
       activeView = 'lesson';
       render();
     } catch (err) {

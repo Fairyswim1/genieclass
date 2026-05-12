@@ -128,12 +128,9 @@ export function getCurrentStudent() {
  */
 export async function ensureStudentFirestoreAuth() {
     const u = auth.currentUser;
-    if (u?.isAnonymous) return;
-
-    if (u && !u.isAnonymous) {
-        console.warn('[Genie] 학생 세션을 위해 기존 Firebase 로그인을 종료하고 익명 로그인으로 전환합니다.');
-        await signOut(auth);
-    }
+    // 이미 로그인(익명 또는 실계정)된 사용자는 Firestore 규칙(request.auth != null)을 통과하므로 그대로 사용
+    // 이전에는 Google 로그인 사용자를 강제 로그아웃시켜 교사 세션이 끊기는 버그가 있었음
+    if (u) return;
 
     await signInAnonymously(auth);
 }
@@ -346,6 +343,23 @@ export async function addStudentPoints(studentId, pointsToAdd) {
     return null;
 }
 
+/** 포인트 감점 (잘못 부여한 경우 취소용) — 0 미만으로 내려가지 않음 */
+export async function subtractStudentPoints(studentId, pointsToRemove) {
+    const studentRef = doc(db, COLLECTIONS.STUDENTS, studentId);
+    const snap = await getDoc(studentRef);
+    if (snap.exists()) {
+        const data = snap.data();
+        const newPoints = Math.max(0, (data.totalPoints ?? 0) - pointsToRemove);
+        const newLevel = deriveCharacterLevelFromPoints(newPoints);
+        await updateDoc(studentRef, {
+            totalPoints: newPoints,
+            characterLevel: newLevel
+        });
+        return { ...data, totalPoints: newPoints, characterLevel: newLevel };
+    }
+    return null;
+}
+
 export async function updateStudentCharacterType(studentId, type) {
     const ref = doc(db, COLLECTIONS.STUDENTS, studentId);
     await updateDoc(ref, { characterType: type });
@@ -397,6 +411,7 @@ export async function addPresentation(studentId, classId, data) {
         presentation.problemPromptId = String(data.problemPromptId);
     }
     if (data.title) presentation.title = data.title;
+    if (data.studentName) presentation.studentName = data.studentName;
     await setDoc(doc(db, COLLECTIONS.PRESENTATIONS, id), presentation);
 
     return presentation;
