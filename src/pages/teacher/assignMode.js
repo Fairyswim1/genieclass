@@ -119,7 +119,6 @@ export function renderAssignMode(container, params) {
         const subs = await getSubmissionsByAssignment(a.id);
         const rosterIdSet = new Set(students.map((st) => String(st.id)));
         const subsOnRoster = subs.filter((s) => s.studentId != null && rosterIdSet.has(String(s.studentId)));
-        const orphanSubCount = subs.length - subsOnRoster.length;
         const isDuePast = a.dueDate && new Date(a.dueDate) < new Date();
         return `
           <div class="card homework-item" style="padding: var(--s-6); display: flex; flex-direction: column; border-top: 4px solid var(--primary);">
@@ -151,11 +150,6 @@ export function renderAssignMode(container, params) {
               <div style="width: 100%; height: 6px; background: var(--border-subtle); border-radius: 3px; overflow: hidden;">
                 <div style="width: ${students.length ? (subsOnRoster.length / students.length) * 100 : 0}%; height: 100%; background: var(--primary);"></div>
               </div>
-              ${orphanSubCount > 0 ? `
-              <p style="font-size: 0.78rem; color: var(--error); margin-top: 8px; line-height: 1.4;">
-                현재 반 명단과 맞지 않는 제출 ${orphanSubCount}건이 있어 위 숫자에는 포함하지 않았습니다. (삭제된 학생·다른 반 제출 등) Firestore <code style="font-size:0.75em;">submissions</code>에서 assignmentId를 확인해 보세요.
-              </p>
-              ` : ''}
             </div>
 
             <details class="assign-submission-details" style="margin-bottom: var(--s-4); border: 1px solid var(--border-subtle); border-radius: var(--r-sm); background: var(--bg-surface);">
