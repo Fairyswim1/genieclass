@@ -12,7 +12,8 @@ import {
   getPresentationsByClass, toggleSharePresentation,
   createStudentSelfRecord, getStudentSelfRecords,
   createStudentNote, getStudentNotesByStudent,
-  getFileById, getProblemPromptsByClass
+  getFileById, getProblemPromptsByClass,
+  getSharedPresentationsByClassId, getStudentsByClass
 } from '../../store.js';
 import { escapeHtml, renderQuizMath } from '../../utils/quizMath.js';
 import { renderCharacter, getLevelConfig, PLANT_TYPES, getLevelProgress } from '../../components/characterAvatar.js';
@@ -123,7 +124,10 @@ export function renderStudentDashboard(container) {
         else assignmentsLoadError = 'unknown';
       }
 
-      [submissions, announcements, resources, allPresentations, selfRecords, studentNotes, problemPrompts] = await Promise.all([
+      const [
+        subRes, annRes, resRes, presRes, selfRes, noteRes, promptRes,
+        crossPresRes, classStudentsRes,
+      ] = await Promise.all([
         loadOr('제출물', getSubmissionsByStudent(freshStudent.id), []),
         loadOr('공지', cls ? getAnnouncementsByClass(cls.id) : Promise.resolve([]), []),
         loadOr('자료', cls ? getResourcesByClass(cls.id) : Promise.resolve([]), []),
@@ -131,15 +135,36 @@ export function renderStudentDashboard(container) {
         loadOr('자기기록', getStudentSelfRecords(freshStudent.id), []),
         loadOr('쪽지', getStudentNotesByStudent(freshStudent.id), []),
         loadOr('한문제', cls ? getProblemPromptsByClass(cls.id) : Promise.resolve([]), []),
+        loadOr('크로스공유발표', cls ? getSharedPresentationsByClassId(cls.id) : Promise.resolve([]), []),
+        loadOr('반학생목록', cls ? getStudentsByClass(cls.id) : Promise.resolve([]), []),
       ]);
+      [submissions, announcements, resources, allPresentations, selfRecords, studentNotes, problemPrompts] =
+        [subRes, annRes, resRes, presRes, selfRes, noteRes, promptRes];
+
+      // 반 학생 이름 맵 (studentId → name)
+      const studentNameMap = Object.fromEntries(classStudentsRes.map(s => [s.id, s.name]));
+
       presentations = allPresentations.filter((p) =>
         p.studentId === freshStudent.id
         && p.type !== 'observation'
         && p.type !== 'problem_solution');
-      sharedPresentations = allPresentations.filter((p) =>
+
+      // 같은 반 공유 발표 + 다른 클래스에서 이 반으로 공유된 발표 합산 (중복 제거)
+      const sameClassShared = allPresentations.filter((p) =>
         p.studentId !== freshStudent.id
         && p.shared === true
         && p.type !== 'observation');
+      const crossClassShared = crossPresRes.filter(p => p.studentId !== freshStudent.id);
+      const seenIds = new Set(sameClassShared.map(p => p.id));
+      const mergedShared = [
+        ...sameClassShared,
+        ...crossClassShared.filter(p => !seenIds.has(p.id)),
+      ];
+      // 학생 이름 필드를 각 발표에 주입
+      sharedPresentations = mergedShared.map(p => ({
+        ...p,
+        _studentName: studentNameMap[p.studentId] || null,
+      }));
 
       quizListenClassId = freshStudent.classId || '';
       try {
@@ -307,10 +332,13 @@ export function renderStudentDashboard(container) {
       const title = escapeHtml(p.title || '제목 없는 발표');
       const vidUrl = typeof p.audioData?.url === 'string' && p.audioData.url.trim() ? p.audioData.url.trim() : '';
       const wbUrl = typeof p.whiteboardImage?.url === 'string' && p.whiteboardImage.url.trim() ? p.whiteboardImage.url.trim() : '';
+      const friendName = p._studentName ? escapeHtml(p._studentName) : null;
       return `
                   <div class="student-pres-row student-pres-row--compact">
                     <div class="student-pres-row-meta">
-                      <span class="badge badge-purple">친구</span>
+                      ${friendName
+                        ? `<span class="badge badge-purple">${friendName}</span>`
+                        : `<span class="badge badge-purple">친구</span>`}
                       <span class="student-pres-friend-title">${title}</span>
                     </div>
                     <div class="student-pres-tail">

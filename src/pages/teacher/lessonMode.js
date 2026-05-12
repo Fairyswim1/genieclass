@@ -6,7 +6,7 @@ import {
   praiseStudent, showToast, getStudentById, addPresentation,
   toggleSharePresentation, startQuiz, stopQuiz, listenToQuizSubmissions,
   saveFile, getPresentationsByStudent, formatDate, addStudentPoints,
-  deletePresentationById
+  deletePresentationById, getClassesByTeacher
 } from '../../store.js';
 import { escapeHtml, renderQuizMath } from '../../utils/quizMath.js';
 import { renderQuizLatexKeyboardHtml } from '../../utils/quizLatexKeyboard.js';
@@ -22,6 +22,7 @@ export function renderLessonMode(container, params) {
   const classId = params.id;
   let isActive = true; // 페이지가 활성화 상태인지 추적 — false이면 stale render가 DOM을 덮어쓰지 않음
   let cls = null;
+  let teacherClasses = []; // 선생님의 전체 클래스 목록 (다른 클래스로 공유할 때 사용)
   let students = [];
   let selectedStudent = null;
   let activeView = 'lesson'; // 'lesson', 'whiteboard', 'quiz', 'presentations'
@@ -60,7 +61,10 @@ export function renderLessonMode(container, params) {
   let obsRecordingTimer = null;
 
   async function init() {
-    cls = await getClassById(classId);
+    [cls, teacherClasses] = await Promise.all([
+      getClassById(classId),
+      getClassesByTeacher(teacher.uid),
+    ]);
     if (!isActive) return;
     if (!cls) { window.location.hash = '/teacher/dashboard'; return; }
     await render();
@@ -1445,33 +1449,80 @@ export function renderLessonMode(container, params) {
       btn.addEventListener('click', async () => {
         const presentationId = btn.dataset.id;
         const isShared = btn.dataset.shared === 'true';
-        
-        let title = null;
-        if (!isShared) {
-            title = prompt('반 전체에 공유할 제목을 입력하세요 (예: 1번 문제 풀이):');
-            if (title === null || title.trim() === '') {
-                showToast('제목이 필요합니다.', 'error');
-                return;
-            }
-        }
-        
-        try {
-          await toggleSharePresentation(presentationId, title);
-          if (isShared) {
+
+        if (isShared) {
+          // 공유 끄기
+          try {
+            await toggleSharePresentation(presentationId, null, []);
             showToast('공유가 중지되었습니다.');
-          } else {
-            showToast('✨ 반 전체 공유 완료! (2P 획득)');
-            // 공유하기 누르면 2포인트 축적
-            const updated = await addStudentPoints(selectedStudent.id, 2);
-            if (updated) {
-              selectedStudent = updated;
-            }
+            studentPresentations = await getPresentationsByStudent(selectedStudent.id);
+            render();
+          } catch (err) {
+            showToast('오류가 발생했습니다.', 'error');
           }
-          studentPresentations = await getPresentationsByStudent(selectedStudent.id);
-          render();
-        } catch (err) {
-          showToast('오류가 발생했습니다.', 'error');
+          return;
         }
+
+        // 공유 켜기 — 모달로 제목 + 다른 클래스 선택
+        const otherClasses = teacherClasses.filter(c => c.id !== classId);
+        const modalId = 'share-modal-' + Date.now();
+        const modal = document.createElement('div');
+        modal.className = 'modal-backdrop active';
+        modal.id = modalId;
+        modal.innerHTML = `
+          <div class="modal-content" style="max-width: 480px;">
+            <div class="modal-header">
+              <h3 class="modal-title">📤 발표 공유 설정</h3>
+              <button class="modal-close" id="${modalId}-close">✕</button>
+            </div>
+            <div class="form-group" style="margin-bottom: var(--s-4);">
+              <label class="input-label">공유 제목 <span style="color:var(--error)">*</span></label>
+              <input type="text" class="input-field" id="${modalId}-title" placeholder="예: 1번 문제 풀이" />
+            </div>
+            ${otherClasses.length > 0 ? `
+            <div class="form-group" style="margin-bottom: var(--s-6);">
+              <label class="input-label" style="margin-bottom: var(--s-2);">다른 클래스에도 공유 (선택)</label>
+              <div style="display: flex; flex-direction: column; gap: 8px; background: var(--bg-main); border-radius: var(--r-sm); padding: var(--s-3);">
+                ${otherClasses.map(c => `
+                  <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 0.9rem;">
+                    <input type="checkbox" class="share-class-check" value="${c.id}" style="width:16px; height:16px; cursor:pointer;" />
+                    <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${c.color || 'var(--primary)'}; flex-shrink:0;"></span>
+                    ${c.name}
+                  </label>
+                `).join('')}
+              </div>
+            </div>
+            ` : ''}
+            <div class="flex gap-sm">
+              <button class="btn btn-primary flex-1" id="${modalId}-confirm">✨ 공유하기</button>
+              <button class="btn btn-ghost" id="${modalId}-cancel">취소</button>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(modal);
+
+        const closeModal = () => modal.remove();
+        document.getElementById(`${modalId}-close`).addEventListener('click', closeModal);
+        document.getElementById(`${modalId}-cancel`).addEventListener('click', closeModal);
+        modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+        document.getElementById(`${modalId}-confirm`).addEventListener('click', async () => {
+          const title = document.getElementById(`${modalId}-title`).value.trim();
+          if (!title) { showToast('제목을 입력해 주세요.', 'error'); return; }
+          const selectedClassIds = [...document.querySelectorAll(`#${modalId} .share-class-check:checked`)]
+            .map(cb => cb.value);
+          closeModal();
+          try {
+            await toggleSharePresentation(presentationId, title, selectedClassIds);
+            showToast(`✨ 공유 완료! (2P 획득)${selectedClassIds.length > 0 ? ` — ${selectedClassIds.length}개 클래스 추가 공유` : ''}`);
+            const updated = await addStudentPoints(selectedStudent.id, 2);
+            if (updated) selectedStudent = updated;
+            studentPresentations = await getPresentationsByStudent(selectedStudent.id);
+            render();
+          } catch (err) {
+            showToast('오류가 발생했습니다.', 'error');
+          }
+        });
       });
     });
 

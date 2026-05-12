@@ -419,21 +419,38 @@ export async function getPresentationsByClass(classId) {
     return snapshot.docs.map(normalizePresentationDoc);
 }
 
-export async function toggleSharePresentation(presentationId, title = null) {
+export async function toggleSharePresentation(presentationId, title = null, additionalClassIds = []) {
     const ref = doc(db, COLLECTIONS.PRESENTATIONS, presentationId);
     const snap = await getDoc(ref);
     if (snap.exists()) {
         const data = snap.data();
         const currentShared = data.shared;
         const updates = { shared: !currentShared };
-        // 공유를 켜는 상태이면서 title이 전달된 경우만 제목 지정
         if (!currentShared && title) {
             updates.title = title;
+        }
+        // 공유 켤 때 추가 클래스 저장, 끌 때 초기화
+        if (!currentShared) {
+            updates.sharedClassIds = additionalClassIds.length > 0 ? additionalClassIds : [];
+        } else {
+            updates.sharedClassIds = [];
         }
         await updateDoc(ref, updates);
         return { ...data, ...updates };
     }
     return null;
+}
+
+/** 다른 클래스에서 이 classId로 공유된 발표(크로스클래스 공유) 조회 */
+export async function getSharedPresentationsByClassId(classId) {
+    const q = query(
+        collection(db, COLLECTIONS.PRESENTATIONS),
+        where('sharedClassIds', 'array-contains', classId)
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs
+        .map(normalizePresentationDoc)
+        .filter(p => p.shared === true && p.type !== 'observation');
 }
 
 async function deleteFileByIdMaybe(fileLike) {
