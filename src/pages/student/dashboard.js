@@ -13,7 +13,8 @@ import {
   createStudentSelfRecord, getStudentSelfRecords,
   createStudentNote, getStudentNotesByStudent,
   getFileById, getProblemPromptsByClass,
-  getSharedPresentationsByClassId, getStudentsByClass
+  getSharedPresentationsByClassId, getStudentsByClass,
+  deletePresentationById,
 } from '../../store.js';
 import { escapeHtml, renderQuizMath } from '../../utils/quizMath.js';
 import { renderCharacter, getLevelConfig, PLANT_TYPES, getLevelProgress } from '../../components/characterAvatar.js';
@@ -333,6 +334,7 @@ export function renderStudentDashboard(container) {
                       </div>
                       <div class="flex flex-wrap gap-sm items-center justify-end">
                         ${hasSol ? `<span class="badge badge-green">풀이 저장됨</span>
+                          <button type="button" class="btn btn-ghost btn-sm btn-delete-my-problem-sol" data-id="${sol.id}" style="color: var(--error);">🗑️ 내 풀이 삭제</button>
                           <button type="button" class="btn btn-ghost btn-sm btn-toggle-share" data-id="${sol.id}" data-shared="${sol.shared ? 'true' : 'false'}">${sol.shared ? '🔒 공유 끄기' : '🌐 공유하기'}</button>` : ''}
                         <button type="button" class="btn btn-primary btn-sm btn-open-problem-board" data-prompt-id="${pr.id}">
                           ${hasSol ? '📝 풀이 다시 올리기' : '✍️ 풀이 올리기'}
@@ -1014,6 +1016,28 @@ export function renderStudentDashboard(container) {
       btn.addEventListener('click', () => {
         const u = btn.dataset.imgUrl;
         if (u) window.open(u, '_blank');
+      });
+    });
+
+    // 삭제: 한 문제 풀이 (내 제출만)
+    document.querySelectorAll('.btn-delete-my-problem-sol').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.id;
+        if (!id) return;
+        if (!confirm('이 문제에 올린 내 풀이를 삭제할까요?\n(칠판·사진·음성 모두 삭제됩니다)')) return;
+        try {
+          showToast('삭제 중…', 'info', 2500);
+          const ok = await deletePresentationById(id);
+          if (ok) {
+            showToast('내 풀이가 삭제되었습니다.', 'success');
+            render();
+          } else {
+            showToast('삭제할 풀이를 찾지 못했습니다.', 'error');
+          }
+        } catch (err) {
+          console.error(err);
+          showToast('삭제 중 오류가 발생했습니다.', 'error');
+        }
       });
     });
 

@@ -366,18 +366,35 @@ body {
   position: fixed;
   bottom: 2rem;
   right: 2rem;
+  max-width: min(92vw, 420px);
   padding: 1rem 2rem;
   background: var(--bg-surface);
   border: 1px solid var(--border-light);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-xl);
-  z-index: 1000;
+  z-index: 10000;
   transform: translateY(150%);
   transition: transform 0.4s var(--ease-out);
+  font-weight: 600;
+  line-height: 1.45;
 }
 
-.toast.active {
+.toast.active,
+.toast.show {
   transform: translateY(0);
+}
+
+.toast-success {
+  border-color: var(--success, #22c55e);
+}
+
+.toast-info {
+  border-color: var(--primary);
+  background: linear-gradient(135deg, var(--bg-surface), rgba(99, 102, 241, 0.08));
+}
+
+.toast-error {
+  border-color: var(--error);
 }
 
 /* ========================================

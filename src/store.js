@@ -1071,7 +1071,7 @@ export function formatDateShort(dateStr) {
     return `${d.getMonth() + 1}월 ${d.getDate()}일`;
 }
 
-export function showToast(message, type = 'success') {
+export function showToast(message, type = 'success', durationMs = 3000) {
     const existing = document.querySelector('.toast');
     if (existing) existing.remove();
 
@@ -1084,10 +1084,11 @@ export function showToast(message, type = 'success') {
         toast.classList.add('show');
     });
 
+    const hideAfter = Math.max(800, Number(durationMs) || 3000);
     setTimeout(() => {
         toast.classList.remove('show');
         setTimeout(() => toast.remove(), 300);
-    }, 3000);
+    }, hideAfter);
 }
 
 export async function saveObservation(studentId, classId, data) {

@@ -114,6 +114,10 @@ export function renderStudentProblemBoard(container, params) {
             </p>
           </div>
         </div>
+
+        <div id="prob-saving-overlay" class="hidden" style="position: fixed; bottom: 0; left: 0; right: 0; padding: 14px 16px; background: rgba(0,0,0,0.88); color: #fff; text-align: center; z-index: 9998; font-size: 0.88rem; font-weight: 700; line-height: 1.5; box-shadow: 0 -4px 24px rgba(0,0,0,0.35);">
+          ⏳ <span id="prob-saving-overlay-msg">저장 중…</span>
+        </div>
       </div>
     `;
   }
@@ -777,15 +781,46 @@ export function renderStudentProblemBoard(container, params) {
       return;
     }
     if (!problemPrompt) return;
+    if (submitMode === 'photo' && !attachedPhotoFile) {
+      showToast('풀이 사진을 선택하거나 촬영해 주세요.', 'error');
+      return;
+    }
 
-    showToast('💾 풀이 저장 중…', 'info');
+    const saveBtn = document.getElementById('wb-save');
+    const recBtn = document.getElementById('wb-record');
+    const overlay = document.getElementById('prob-saving-overlay');
+    const overlayMsg = document.getElementById('prob-saving-overlay-msg');
+    const prevSaveText = saveBtn?.textContent || '💾 풀이 저장';
+
+    const setSaving = (on) => {
+      if (saveBtn) {
+        saveBtn.disabled = on;
+        saveBtn.textContent = on ? '⏳ 저장 중…' : prevSaveText;
+      }
+      if (recBtn) recBtn.disabled = on;
+      document.getElementById('wb-back')?.toggleAttribute('disabled', on);
+      document.querySelectorAll('.prob-mode-tab').forEach((el) => {
+        el.disabled = on;
+      });
+      if (overlay) overlay.classList.toggle('hidden', !on);
+      if (overlayMsg && on) {
+        overlayMsg.textContent = '풀이 이미지와 음성 파일을 서버에 올리는 중이에요. 잠시만 기다려 주세요…';
+      }
+      try {
+        document.body.style.cursor = on ? 'wait' : '';
+      } catch (_) {}
+    };
+
+    showToast(
+      '저장을 시작했어요. 업로드가 끝날 때까지 이 화면을 유지해 주세요.',
+      'info',
+      14000
+    );
+    setSaving(true);
+
     try {
       let savedImage;
       if (submitMode === 'photo') {
-        if (!attachedPhotoFile) {
-          showToast('풀이 사진을 선택하거나 촬영해 주세요.', 'error');
-          return;
-        }
         savedImage = await saveFile(attachedPhotoFile);
       } else {
         const canvasBlob = await new Promise((resolve) => wbCanvas.toBlob(resolve, 'image/png'));
@@ -793,6 +828,8 @@ export function renderStudentProblemBoard(container, params) {
         const imageFile = new File([canvasBlob], `problem_wb_${Date.now()}.png`, { type: 'image/png' });
         savedImage = await saveFile(imageFile);
       }
+
+      if (overlayMsg) overlayMsg.textContent = '이전 풀이 정리 및 새 풀이 등록 중…';
 
       let savedMedia = null;
       if (recordedBlob && recordedBlob.size > 0) {
@@ -825,11 +862,13 @@ export function renderStudentProblemBoard(container, params) {
         solutionSource: submitMode === 'photo' ? 'photo' : 'whiteboard',
       });
 
-      showToast('✨ 풀이가 저장되었습니다!');
+      showToast('✨ 풀이가 저장되었습니다!', 'success', 4000);
       window.location.hash = '/student/dashboard';
     } catch (err) {
       console.error(err);
-      showToast(`저장 실패: ${err.message}`, 'error');
+      showToast(`저장 실패: ${err.message}`, 'error', 5000);
+    } finally {
+      setSaving(false);
     }
   }
 
