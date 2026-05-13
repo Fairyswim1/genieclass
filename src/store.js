@@ -412,6 +412,7 @@ export async function addPresentation(studentId, classId, data) {
     }
     if (data.title) presentation.title = data.title;
     if (data.studentName) presentation.studentName = data.studentName;
+    if (data.solutionSource) presentation.solutionSource = data.solutionSource;
     await setDoc(doc(db, COLLECTIONS.PRESENTATIONS, id), presentation);
 
     return presentation;

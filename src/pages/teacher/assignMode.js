@@ -445,6 +445,7 @@ export function renderAssignMode(container, params) {
                                 <span style="font-weight:700;font-size:0.88rem;color:var(--primary);min-width:72px;">${escapeHtml(sol.studentName || '—')}</span>
                                 <span style="font-size:0.72rem;color:var(--text-dim);">${formatDate(sol.createdAt)}</span>
                                 <span class="badge ${sol.shared ? 'badge-green' : 'badge-main'}" style="font-size:0.62rem;">${sol.shared ? '공개' : '비공개'}</span>
+                                ${sol.solutionSource === 'photo' ? '<span class="badge badge-blue" style="font-size:0.62rem;">📷사진</span>' : ''}
                                 ${wbUrl ? `<button type="button" class="btn btn-ghost btn-sm" style="font-size:0.72rem;" onclick="window.open('${wbUrl}','_blank')">🖼️ 칠판 보기</button>` : ''}
                                 ${avUrl ? `<button type="button" class="btn btn-secondary btn-sm prob-play-btn" style="font-size:0.72rem;" data-url="${avUrl}" data-mode="${sol.recordingMode || ''}">${isVideo ? '🎬 영상' : '🔊 음성'}</button>` : ''}
                               </div>

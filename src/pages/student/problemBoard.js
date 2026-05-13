@@ -39,39 +39,80 @@ export function renderStudentProblemBoard(container, params) {
   let recordingReqId = null;
   let recordingMode = null;
 
+  /** 'board' = 칠판 필기, 'photo' = 종이 풀이 사진 첨부 */
+  let submitMode = 'board';
+  let attachedPhotoFile = null;
+  let photoPreviewUrl = null;
+
   function renderBoardShell() {
     const head = escapeHtml(problemPrompt?.title || '한 문제 풀이');
     container.innerHTML = `
       <div class="whiteboard-container page-enter" style="background: var(--bg-deep);">
-        <div class="whiteboard-toolbar card" style="border-radius: 0; border-top: 0; border-left: 0; border-right: 0;">
+        <div class="whiteboard-toolbar card" style="border-radius: 0; border-top: 0; border-left: 0; border-right: 0; flex-wrap: wrap; align-items: center; gap: 8px;">
           <button class="btn btn-ghost btn-sm" id="wb-back">← 대시보드</button>
-          <div style="flex:1; text-align:center; font-weight:800; font-size:0.92rem; color: var(--primary-light); padding:0 6px;">
+          <div style="flex:1; text-align:center; font-weight:800; font-size:0.92rem; color: var(--primary-light); padding:0 6px; min-width:100px;">
             ✏️ ${head}
           </div>
-          <div class="whiteboard-tools">
-            <button class="whiteboard-tool ${currentTool === 'pen' ? 'active' : ''}" data-tool="pen">✏️</button>
-            <button class="whiteboard-tool ${currentTool === 'eraser' ? 'active' : ''}" data-tool="eraser">🧹</button>
-            <button class="whiteboard-tool" data-tool="clear">🗑️</button>
+          <div style="width:100%; display:flex; justify-content:center; gap:8px; flex-wrap:wrap; padding:4px 0;">
+            <button type="button" class="btn btn-primary btn-sm prob-mode-tab" data-mode="board" id="tab-mode-board">✏️ 칠판에 풀기</button>
+            <button type="button" class="btn btn-secondary btn-sm prob-mode-tab" data-mode="photo" id="tab-mode-photo">📷 풀이 사진 올리기</button>
           </div>
-          <div class="color-picker-group">
-            <div class="color-dot active" data-color="#FFFFFF" style="background:#FFFFFF"></div>
-            <div class="color-dot" data-color="#FF6B6B" style="background:#FF6B6B"></div>
-            <div class="color-dot" data-color="#FFD93D" style="background:#FFD93D"></div>
-            <div class="color-dot" data-color="#6BCB77" style="background:#6BCB77"></div>
-            <div class="color-dot" data-color="#4F46E5" style="background:#4F46E5"></div>
-          </div>
-          <div class="pen-size-control flex items-center gap-sm" style="margin: 0 10px;">
-            <label for="pen-size-slider" style="color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">두께:</label>
-            <input type="range" id="pen-size-slider" min="1" max="10" value="${penSize}" style="width: 80px; accent-color: var(--primary);">
+
+          <div id="board-only-tools" style="width:100%; display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:8px;">
+            <div class="whiteboard-tools">
+              <button class="whiteboard-tool ${currentTool === 'pen' ? 'active' : ''}" data-tool="pen">✏️</button>
+              <button class="whiteboard-tool ${currentTool === 'eraser' ? 'active' : ''}" data-tool="eraser">🧹</button>
+              <button class="whiteboard-tool" data-tool="clear">🗑️</button>
+            </div>
+            <div class="color-picker-group">
+              <div class="color-dot active" data-color="#FFFFFF" style="background:#FFFFFF"></div>
+              <div class="color-dot" data-color="#FF6B6B" style="background:#FF6B6B"></div>
+              <div class="color-dot" data-color="#FFD93D" style="background:#FFD93D"></div>
+              <div class="color-dot" data-color="#6BCB77" style="background:#6BCB77"></div>
+              <div class="color-dot" data-color="#4F46E5" style="background:#4F46E5"></div>
+            </div>
+            <div class="pen-size-control flex items-center gap-sm" style="margin: 0 10px;">
+              <label for="pen-size-slider" style="color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">두께:</label>
+              <input type="range" id="pen-size-slider" min="1" max="10" value="${penSize}" style="width: 80px; accent-color: var(--primary);">
+            </div>
           </div>
           <button class="btn ${isRecording ? 'btn-danger' : 'btn-primary'} btn-sm" id="wb-record">
             ${isRecording ? '⏹ 중지' : '📽️ 풀이 녹화'}
           </button>
           <button class="btn btn-secondary btn-sm" id="wb-save">💾 풀이 저장</button>
         </div>
-        <div class="whiteboard-canvas-wrap" style="background: #000; position: relative;">
-          <canvas id="whiteboard-canvas" style="position: absolute; top: 0; left: 0; z-index: 1; touch-action: none;"></canvas>
-          <canvas id="whiteboard-draft" style="position: absolute; top: 0; left: 0; z-index: 2; pointer-events: none; touch-action: none;"></canvas>
+
+        <div id="prob-panel-board">
+          <div class="whiteboard-canvas-wrap" style="background: #000; position: relative;">
+            <canvas id="whiteboard-canvas" style="position: absolute; top: 0; left: 0; z-index: 1; touch-action: none;"></canvas>
+            <canvas id="whiteboard-draft" style="position: absolute; top: 0; left: 0; z-index: 2; pointer-events: none; touch-action: none;"></canvas>
+          </div>
+        </div>
+
+        <div id="prob-panel-photo" class="hidden" style="padding: 12px 16px 24px;">
+          <div class="card" style="padding: var(--s-5); max-width: 560px; margin: 0 auto;">
+            <p style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.55; margin: 0 0 var(--s-3);">
+              패드 없이 <strong>종이에 푼 풀이</strong>를 사진으로 찍거나, 갤러리에서 선택해 올릴 수 있어요. 드래그 앤 드롭도 됩니다.
+            </p>
+            <div class="drop-zone" id="prob-photo-dropzone" style="min-height: 120px; cursor: pointer;">
+              <span style="font-size: 2rem;">🖼️</span>
+              <p id="prob-photo-status" style="font-weight: 600; margin: 6px 0 4px;">이미지를 드래그하거나 아래 버튼을 누르세요</p>
+              <p style="font-size: 0.78rem; opacity: 0.7; margin: 0;">JPG, PNG 등 이미지 한 장</p>
+            </div>
+            <div class="flex flex-wrap gap-sm justify-center" style="margin-top: var(--s-3);">
+              <button type="button" class="btn btn-primary btn-sm" id="prob-photo-camera">📷 카메라로 촬영</button>
+              <button type="button" class="btn btn-secondary btn-sm" id="prob-photo-gallery">🖼 앨범에서 선택</button>
+              <button type="button" class="btn btn-ghost btn-sm hidden" id="prob-photo-clear">✕ 사진 제거</button>
+            </div>
+            <input type="file" id="prob-photo-input-cam" accept="image/*" capture="environment" class="hidden" />
+            <input type="file" id="prob-photo-input-gal" accept="image/*" class="hidden" />
+            <div id="prob-photo-preview-wrap" class="hidden" style="margin-top: var(--s-4); text-align: center;">
+              <img id="prob-photo-preview" alt="미리보기" style="max-width: 100%; max-height: 42vh; border-radius: var(--r-sm); border: 1px solid var(--border-subtle); object-fit: contain;" />
+            </div>
+            <p style="font-size: 0.78rem; color: var(--text-dim); margin: var(--s-3) 0 0; line-height: 1.45;">
+              이 모드에서는 칠판 화면 대신 <strong>사진 한 장</strong>이 풀이로 저장됩니다. 필요하면 위에서 <strong>음성으로 설명</strong>을 덧붙일 수 있어요.
+            </p>
+          </div>
         </div>
       </div>
     `;
@@ -353,6 +394,99 @@ export function renderStudentProblemBoard(container, params) {
     document.getElementById('wb-save')?.addEventListener('click', handleSaveProblem);
   }
 
+  function applySubmitMode() {
+    const boardPanel = document.getElementById('prob-panel-board');
+    const photoPanel = document.getElementById('prob-panel-photo');
+    const boardTools = document.getElementById('board-only-tools');
+    document.querySelectorAll('.prob-mode-tab').forEach((btn) => {
+      const on = btn.dataset.mode === submitMode;
+      btn.classList.toggle('btn-primary', on);
+      btn.classList.toggle('btn-secondary', !on);
+    });
+    if (boardPanel) boardPanel.classList.toggle('hidden', submitMode !== 'board');
+    if (photoPanel) photoPanel.classList.toggle('hidden', submitMode !== 'photo');
+    if (boardTools) boardTools.style.display = submitMode === 'board' ? '' : 'none';
+    updateWhiteboardUI();
+  }
+
+  function clearPhotoAttachment() {
+    attachedPhotoFile = null;
+    if (photoPreviewUrl) {
+      URL.revokeObjectURL(photoPreviewUrl);
+      photoPreviewUrl = null;
+    }
+    const prev = document.getElementById('prob-photo-preview');
+    if (prev) prev.removeAttribute('src');
+    document.getElementById('prob-photo-preview-wrap')?.classList.add('hidden');
+    const st = document.getElementById('prob-photo-status');
+    if (st) st.textContent = '이미지를 드래그하거나 아래 버튼을 누르세요';
+    document.getElementById('prob-photo-clear')?.classList.add('hidden');
+  }
+
+  function bindPhotoMode() {
+    const dz = document.getElementById('prob-photo-dropzone');
+    const inCam = document.getElementById('prob-photo-input-cam');
+    const inGal = document.getElementById('prob-photo-input-gal');
+
+    const onFile = (file) => {
+      if (!file || !file.type.startsWith('image/')) {
+        showToast('이미지 파일만 올릴 수 있습니다.', 'error');
+        return;
+      }
+      attachedPhotoFile = file;
+      if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
+      photoPreviewUrl = URL.createObjectURL(file);
+      const imgEl = document.getElementById('prob-photo-preview');
+      if (imgEl) imgEl.src = photoPreviewUrl;
+      document.getElementById('prob-photo-preview-wrap')?.classList.remove('hidden');
+      const st = document.getElementById('prob-photo-status');
+      if (st) st.textContent = `선택됨: ${file.name}`;
+      document.getElementById('prob-photo-clear')?.classList.remove('hidden');
+    };
+
+    document.getElementById('prob-photo-camera')?.addEventListener('click', () => inCam?.click());
+    document.getElementById('prob-photo-gallery')?.addEventListener('click', () => inGal?.click());
+    inCam?.addEventListener('change', () => {
+      if (inCam.files?.[0]) onFile(inCam.files[0]);
+      inCam.value = '';
+    });
+    inGal?.addEventListener('change', () => {
+      if (inGal.files?.[0]) onFile(inGal.files[0]);
+      inGal.value = '';
+    });
+    document.getElementById('prob-photo-clear')?.addEventListener('click', () => clearPhotoAttachment());
+
+    dz?.addEventListener('click', (e) => {
+      if (e.target.closest('#prob-photo-clear')) return;
+      inGal?.click();
+    });
+    dz?.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dz.classList.add('dragover');
+    });
+    dz?.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+    dz?.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dz.classList.remove('dragover');
+      const f = e.dataTransfer?.files?.[0];
+      if (f) onFile(f);
+    });
+
+    document.querySelectorAll('.prob-mode-tab').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const mode = btn.dataset.mode;
+        if (!mode || mode === submitMode) return;
+        if (isRecording) {
+          showToast('모드를 바꾸려면 녹음·녹화를 먼저 중지해 주세요.', 'error');
+          return;
+        }
+        if (submitMode === 'photo' && mode === 'board') clearPhotoAttachment();
+        submitMode = mode;
+        applySubmitMode();
+      });
+    });
+  }
+
   function renderRecordingFrame() {
     if (!isRecording || !recordingCtx) return;
 
@@ -404,8 +538,41 @@ export function renderStudentProblemBoard(container, params) {
         const hasMediaDevices = !!(navigator.mediaDevices?.getUserMedia);
         const hasMediaRecorder = typeof MediaRecorder !== 'undefined';
 
-        /** 수업 칠판(lessonMode)과 동일하게: 가능하면 캔버스+captureStream(+마이크)로 비디오 녹화, 불가 시 오디오만 */
-        if (hasMediaDevices && hasMediaRecorder) {
+        /** 사진 모드: 음성 설명만 녹음. 칠판 모드: 캔버스+마이크 비디오 가능 시 우선 */
+        if (submitMode === 'photo' && hasMediaDevices && hasMediaRecorder) {
+          try {
+            const rawAudioStream = await navigator.mediaDevices.getUserMedia({
+              audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+                channelCount: 1,
+                sampleRate: 44100,
+              },
+            });
+            let audioStream = rawAudioStream;
+            try {
+              const AudioCtx = window.AudioContext || window.webkitAudioContext;
+              const audioContext = new AudioCtx();
+              const source = audioContext.createMediaStreamSource(rawAudioStream);
+              const gainNode = audioContext.createGain();
+              gainNode.gain.value = 3.0;
+              const dest = audioContext.createMediaStreamDestination();
+              source.connect(gainNode);
+              gainNode.connect(dest);
+              audioStream = dest.stream;
+            } catch (gainErr) {
+              console.warn('[풀이 녹음] Web Audio 증폭 실패:', gainErr);
+            }
+            const audioMimeTypes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
+            const audioMime = audioMimeTypes.find((m) => MediaRecorder.isTypeSupported(m)) || '';
+            mediaRecorder = new MediaRecorder(audioStream, audioMime ? { mimeType: audioMime } : undefined);
+            recordingMode = 'audio';
+          } catch (e) {
+            console.warn('[풀이 녹음] 사진 모드 음성 녹음 실패:', e);
+            mediaRecorder = null;
+          }
+        } else if (submitMode === 'board' && hasMediaDevices && hasMediaRecorder) {
           let rawAudioStream = null;
           let audioStream = null;
           let combinedAttempt = null;
@@ -554,6 +721,8 @@ export function renderStudentProblemBoard(container, params) {
           if (recordingMode === 'video') {
             renderRecordingFrame();
             showToast('📹 보드+음성 녹화를 시작합니다.');
+          } else if (submitMode === 'photo') {
+            showToast('🎙 풀이 설명 음성 녹음을 시작합니다.');
           } else {
             showToast('🎙 오디오 녹음을 시작합니다.');
           }
@@ -611,10 +780,19 @@ export function renderStudentProblemBoard(container, params) {
 
     showToast('💾 풀이 저장 중…', 'info');
     try {
-      const canvasBlob = await new Promise((resolve) => wbCanvas.toBlob(resolve, 'image/png'));
-      if (!canvasBlob) throw new Error('캔버스 캡처 실패');
-      const imageFile = new File([canvasBlob], `problem_wb_${Date.now()}.png`, { type: 'image/png' });
-      const savedImage = await saveFile(imageFile);
+      let savedImage;
+      if (submitMode === 'photo') {
+        if (!attachedPhotoFile) {
+          showToast('풀이 사진을 선택하거나 촬영해 주세요.', 'error');
+          return;
+        }
+        savedImage = await saveFile(attachedPhotoFile);
+      } else {
+        const canvasBlob = await new Promise((resolve) => wbCanvas.toBlob(resolve, 'image/png'));
+        if (!canvasBlob) throw new Error('캔버스 캡처 실패');
+        const imageFile = new File([canvasBlob], `problem_wb_${Date.now()}.png`, { type: 'image/png' });
+        savedImage = await saveFile(imageFile);
+      }
 
       let savedMedia = null;
       if (recordedBlob && recordedBlob.size > 0) {
@@ -639,11 +817,12 @@ export function renderStudentProblemBoard(container, params) {
       await addPresentation(student.id, student.classId, {
         whiteboardImage: savedImage,
         audioData: savedMedia,
-        recordingMode,
+        recordingMode: savedMedia ? recordingMode : undefined,
         type: 'problem_solution',
         problemPromptId: problemPrompt.id,
         title: problemPrompt.title || '한 문제 풀이',
         studentName: student.name,
+        solutionSource: submitMode === 'photo' ? 'photo' : 'whiteboard',
       });
 
       showToast('✨ 풀이가 저장되었습니다!');
@@ -657,7 +836,11 @@ export function renderStudentProblemBoard(container, params) {
   function updateWhiteboardUI() {
     const recordBtn = document.getElementById('wb-record');
     if (recordBtn) {
-      recordBtn.innerHTML = isRecording ? '⏹ 중지' : '📽️ 풀이 녹화';
+      if (isRecording) {
+        recordBtn.textContent = '⏹ 중지';
+      } else {
+        recordBtn.textContent = submitMode === 'photo' ? '🎙 풀이 녹음' : '📽️ 풀이 녹화';
+      }
       recordBtn.className = `btn ${isRecording ? 'btn-danger' : 'btn-primary'} btn-sm`;
     }
     document.querySelectorAll('.whiteboard-tool').forEach((btn) => {
@@ -675,6 +858,8 @@ export function renderStudentProblemBoard(container, params) {
     renderBoardShell();
     initWhiteboard();
     bindWhiteboardEvents();
+    bindPhotoMode();
+    applySubmitMode();
   }
 
   void init();

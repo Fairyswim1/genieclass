@@ -299,7 +299,7 @@ export function renderStudentDashboard(container) {
               <h2 class="section-card-title">한 문제 풀이</h2>
             </div>
             <p style="font-size: 0.82rem; color: var(--text-muted); margin: 0 0 var(--s-3); line-height: 1.45;">
-              선생님이 올린 문제에 칠판·녹화로 풀이를 남길 수 있어요.
+              선생님이 올린 문제에 <strong>칠판</strong>으로 쓰거나, <strong>종이 풀이 사진</strong>을 올리고 필요하면 <strong>음성</strong>도 덧붙일 수 있어요.
             </p>
             <div class="flex flex-col gap-sm">
               ${problemPrompts.length === 0
