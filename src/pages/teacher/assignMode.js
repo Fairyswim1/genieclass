@@ -7,6 +7,7 @@ import {
   getStudentById, downloadFile as storeDownloadFile, getObservationsByClass,
   getStudentSelfRecordsByClass,
   createProblemPrompt, getProblemPromptsByClass, deleteProblemPrompt,
+  getPresentationsByClass,
 } from '../../store.js';
 import { escapeHtml } from '../../utils/quizMath.js';
 import * as XLSX from 'xlsx';
@@ -60,8 +61,18 @@ export function renderAssignMode(container, params) {
     const observations = await getObservationsByClass(classId);
     const selfRecords = await getStudentSelfRecordsByClass(classId);
     const problemPrompts = await getProblemPromptsByClass(classId);
+    const allPresentations = await getPresentationsByClass(classId);
 
     if (!isActive) return; // 다른 페이지로 이동 후 완료된 stale render 차단
+
+    // 한 문제 풀이 타입 필터링 및 문제별 그룹화
+    const problemSolutions = allPresentations.filter(p => p.type === 'problem_solution');
+    const solutionsByProblem = {};
+    problemSolutions.forEach(sol => {
+      const pid = String(sol.problemPromptId || '');
+      if (!solutionsByProblem[pid]) solutionsByProblem[pid] = [];
+      solutionsByProblem[pid].push(sol);
+    });
 
     currentObservations = observations;
 
@@ -393,18 +404,24 @@ export function renderAssignMode(container, params) {
               </div>
             </div>
 
-            <div class="grid" style="grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--s-6);">
+            <div class="flex flex-col gap-lg">
               ${problemPrompts.length === 0 ? `
-                <div class="empty-board w-full" style="grid-column: 1 / -1;">
+                <div class="empty-board">
                   <div class="empty-board-icon">✏️</div>
                   <p style="font-size: 1.05rem; font-weight: 600; color: var(--text-main); margin-bottom: 8px;">등록된 한 문제가 없습니다.</p>
                   <p style="font-size: 0.9rem;">학생이 칠판에 풀이·녹화를 올릴 수 있도록 문제를 게시해 보세요.</p>
                 </div>
-              ` : problemPrompts.map((pr) => `
-                <div class="card" style="padding: var(--s-6); display: flex; flex-direction: column; gap: var(--s-3); border-top: 4px solid var(--accent-amber);">
+              ` : problemPrompts.map((pr) => {
+                const sols = (solutionsByProblem[String(pr.id)] || [])
+                  .slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+                return `
+                <div class="card" style="padding: var(--s-6); display: flex; flex-direction: column; gap: var(--s-4); border-top: 4px solid var(--accent-amber);">
                   <div class="flex justify-between items-start gap-sm">
                     <h3 style="font-size: 1.1rem; font-weight: 700; line-height: 1.35;">${escapeHtml(pr.title)}</h3>
-                    <button class="btn btn-ghost btn-sm delete-btn" data-type="prob" data-id="${pr.id}" style="color: var(--error);">삭제</button>
+                    <div class="flex gap-sm items-center">
+                      <span class="badge badge-purple" style="font-size: 0.7rem;">${sols.length}명 제출</span>
+                      <button class="btn btn-ghost btn-sm delete-btn" data-type="prob" data-id="${pr.id}" style="color: var(--error);">삭제</button>
+                    </div>
                   </div>
                   ${pr.description ? `<p style="font-size: 0.9rem; color: var(--text-muted); white-space: pre-line;">${escapeHtml(pr.description)}</p>` : ''}
                   <div class="flex flex-wrap gap-sm">
@@ -412,9 +429,33 @@ export function renderAssignMode(container, params) {
                       <button type="button" class="btn btn-secondary btn-sm" style="font-size: 0.75rem;" onclick="window.downloadFile('${f.id}')">📎 ${escapeHtml(f.name)}</button>
                     `).join('') : '<span style="font-size: 0.85rem; color: var(--text-dim);">첨부 없음</span>'}
                   </div>
-                  <div style="font-size: 0.78rem; color: var(--text-dim); margin-top: auto;">등록: ${formatDate(pr.createdAt)}</div>
-                </div>
-              `).join('')}
+
+                  <!-- 학생 풀이 목록 -->
+                  <div style="border-top: 1px solid var(--border-subtle); padding-top: var(--s-3);">
+                    <div style="font-size: 0.82rem; font-weight: 700; color: var(--text-muted); margin-bottom: var(--s-2);">학생 풀이 (${sols.length}명)</div>
+                    ${sols.length === 0
+                      ? '<p style="font-size:0.82rem;color:var(--text-dim);">아직 제출한 학생이 없습니다.</p>'
+                      : `<div style="display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto;padding-right:4px;">
+                          ${sols.map(sol => {
+                            const wbUrl = typeof sol.whiteboardImage?.url === 'string' ? escapeAttr(sol.whiteboardImage.url) : '';
+                            const avUrl = typeof sol.audioData?.url === 'string' ? escapeAttr(sol.audioData.url) : '';
+                            const isVideo = sol.recordingMode === 'video';
+                            return `
+                              <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:8px 12px;background:var(--bg-main);border-radius:var(--r-sm);border:1px solid var(--border-subtle);">
+                                <span style="font-weight:700;font-size:0.88rem;color:var(--primary);min-width:72px;">${escapeHtml(sol.studentName || '—')}</span>
+                                <span style="font-size:0.72rem;color:var(--text-dim);">${formatDate(sol.createdAt)}</span>
+                                <span class="badge ${sol.shared ? 'badge-green' : 'badge-main'}" style="font-size:0.62rem;">${sol.shared ? '공개' : '비공개'}</span>
+                                ${wbUrl ? `<button type="button" class="btn btn-ghost btn-sm" style="font-size:0.72rem;" onclick="window.open('${wbUrl}','_blank')">🖼️ 칠판 보기</button>` : ''}
+                                ${avUrl ? `<button type="button" class="btn btn-secondary btn-sm prob-play-btn" style="font-size:0.72rem;" data-url="${avUrl}" data-mode="${sol.recordingMode || ''}">${isVideo ? '🎬 영상' : '🔊 음성'}</button>` : ''}
+                              </div>
+                            `;
+                          }).join('')}
+                        </div>`}
+                  </div>
+
+                  <div style="font-size: 0.78rem; color: var(--text-dim);">등록: ${formatDate(pr.createdAt)}</div>
+                </div>`;
+              }).join('')}
             </div>
           </div>
 
@@ -750,6 +791,28 @@ export function renderAssignMode(container, params) {
       btn.addEventListener('click', () => {
         const fid = btn.getAttribute('data-file-id');
         if (fid) window.downloadFile(fid);
+      });
+    });
+
+    // 한 문제 풀이 학생 음성·영상 재생
+    document.querySelectorAll('.prob-play-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const url = btn.getAttribute('data-url');
+        const mode = btn.getAttribute('data-mode');
+        if (!url) return;
+        if (mode === 'video') {
+          const win = window.open('', '_blank');
+          if (win) {
+            win.document.write(`<video src="${url}" controls autoplay style="max-width:100%;max-height:100vh;"></video>`);
+            win.document.close();
+          }
+        } else {
+          const win = window.open('', '_blank');
+          if (win) {
+            win.document.write(`<audio src="${url}" controls autoplay></audio>`);
+            win.document.close();
+          }
+        }
       });
     });
 

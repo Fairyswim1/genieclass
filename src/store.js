@@ -873,6 +873,13 @@ export async function revealQuizGallery(quizId) {
     await updateDoc(doc(db, COLLECTIONS.QUIZZES, quizId), { galleryRevealed: true });
 }
 
+export async function getQuizById(quizId) {
+    const snap = await getDoc(doc(db, COLLECTIONS.QUIZZES, quizId));
+    if (!snap.exists()) return null;
+    const data = snap.data();
+    return { ...data, id: data.id || snap.id };
+}
+
 export async function submitQuizSolution(quizId, studentId, studentName, solutionImageFile, solutionText = '') {
     const id = generateId();
     const sub = {

@@ -150,10 +150,12 @@ export function renderStudentDashboard(container) {
         && p.type !== 'problem_solution');
 
       // 같은 반 공유 발표 + 다른 클래스에서 이 반으로 공유된 발표 합산 (중복 제거)
+      // problem_solution 타입은 '한 문제 풀이' 탭에서 별도 표시하므로 여기서 제외
       const sameClassShared = allPresentations.filter((p) =>
         p.studentId !== freshStudent.id
         && p.shared === true
-        && p.type !== 'observation');
+        && p.type !== 'observation'
+        && p.type !== 'problem_solution');
       const crossClassShared = crossPresRes.filter(p => p.studentId !== freshStudent.id);
       const seenIds = new Set(sameClassShared.map(p => p.id));
       const mergedShared = [
@@ -310,6 +312,15 @@ export function renderStudentDashboard(container) {
         ? sols.slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))[0]
         : null;
       const hasSol = !!sol;
+
+      // 친구들의 공유된 풀이 (problem_solution 타입, 같은 problemPromptId)
+      const friendSols = allPresentations.filter((p) =>
+        p.type === 'problem_solution'
+        && String(p.problemPromptId || '') === String(pr.id)
+        && p.studentId !== freshStudent.id
+        && p.shared === true
+      ).slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
       return `
                     <div class="interactive-item" style="flex-direction: column; align-items: stretch; gap: 10px;">
                       <div>
@@ -327,6 +338,24 @@ export function renderStudentDashboard(container) {
                           ${hasSol ? '📝 풀이 다시 올리기' : '✍️ 풀이 올리기'}
                         </button>
                       </div>
+                      ${friendSols.length > 0 ? `
+                      <div style="border-top: 1px solid var(--border-subtle); padding-top: 8px; margin-top: 2px;">
+                        <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); margin-bottom: 6px;">친구들의 풀이 (${friendSols.length})</div>
+                        <div style="display:flex;flex-direction:column;gap:5px;max-height:180px;overflow-y:auto;padding-right:4px;">
+                          ${friendSols.map(fs => {
+                            const fname = escapeHtml(fs.studentName || '친구');
+                            const imgUrl = typeof fs.whiteboardImage?.url === 'string' ? escapeHtml(fs.whiteboardImage.url) : '';
+                            const avUrl = typeof fs.audioData?.url === 'string' ? escapeHtml(fs.audioData.url) : '';
+                            return `
+                              <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:6px 10px;background:var(--bg-main);border-radius:var(--r-sm);border:1px solid var(--border-subtle);">
+                                <span style="font-size:0.82rem;font-weight:700;color:var(--primary);">${fname}</span>
+                                <span style="font-size:0.7rem;color:var(--text-dim);">${formatDate(fs.createdAt)}</span>
+                                ${imgUrl ? `<button type="button" class="btn btn-ghost btn-sm btn-open-pres-img" data-img-url="${imgUrl}" style="font-size:0.7rem;">🖼️ 칠판</button>` : ''}
+                                ${avUrl ? `<button type="button" class="btn btn-secondary btn-sm btn-play-video" data-url="${avUrl}" style="font-size:0.7rem;">${fs.recordingMode === 'video' ? '🎬 영상' : '🔊 음성'}</button>` : ''}
+                              </div>`;
+                          }).join('')}
+                        </div>
+                      </div>` : ''}
                     </div>`;
     }).join('')}
             </div>
@@ -781,7 +810,8 @@ export function renderStudentDashboard(container) {
                 <label class="input-label">사진 제출 (선택)</label>
                 <div class="drop-zone" id="quiz-solve-dropzone" style="padding: 20px; min-height: 100px;">
                   <span style="font-size: 1.5rem;">📷</span>
-                  <p id="quiz-solve-status">풀이 사진을 업로드하세요</p>
+                  <p id="quiz-solve-status" style="font-weight: 600; margin-bottom: 4px;">사진을 여기에 드래그하거나 클릭하여 업로드</p>
+                  <p style="font-size: 0.75rem; opacity: 0.65; margin: 0;">JPG, PNG 등 이미지 파일 지원</p>
                   <input type="file" id="quiz-solve-input" class="hidden" accept="image/*" />
                 </div>
               </div>
@@ -892,7 +922,7 @@ export function renderStudentDashboard(container) {
         showToast('풀이가 제출되었습니다! 잘했어요! 🎉');
         solveText.value = '';
         solveInput.value = '';
-        solveStatus.textContent = '풀이 사진을 업로드하세요';
+        solveStatus.textContent = '사진을 여기에 드래그하거나 클릭하여 업로드';
       } catch (err) { showToast('제출 중 오류 발생', 'error'); }
       finally {
         submitBtn.disabled = false;

@@ -7,7 +7,7 @@ import {
   toggleSharePresentation, startQuiz, stopQuiz, listenToQuizSubmissions,
   saveFile, getPresentationsByStudent, formatDate, addStudentPoints,
   subtractStudentPoints, deletePresentationById, getClassesByTeacher,
-  revealQuizGallery
+  revealQuizGallery, getQuizById
 } from '../../store.js';
 import { escapeHtml, renderQuizMath } from '../../utils/quizMath.js';
 import { renderQuizLatexKeyboardHtml } from '../../utils/quizLatexKeyboard.js';
@@ -81,6 +81,20 @@ export function renderLessonMode(container, params) {
     }
 
     if (activeView === 'quiz') {
+      // 클래스 최신 상태 가져와서 활성 퀴즈 복원
+      const freshCls = await getClassById(classId);
+      if (freshCls) cls = freshCls;
+      if (!activeQuiz && cls?.activeQuizId) {
+        try {
+          const quiz = await getQuizById(cls.activeQuizId);
+          if (quiz?.active) {
+            activeQuiz = quiz;
+            startSubmissionsListener(quiz.id);
+          }
+        } catch (e) {
+          console.error('[Quiz] 퀴즈 복원 실패:', e);
+        }
+      }
       renderQuizMode();
       return;
     }
@@ -532,8 +546,9 @@ export function renderLessonMode(container, params) {
                   <div class="form-group" style="margin-bottom: var(--s-6);">
                     <label class="input-label">이미지 첨부 (선택)</label>
                     <div class="drop-zone" id="quiz-img-dropzone" style="height: 150px; display: flex; flex-direction: column; justify-content: center;">
-                      <span style="font-size: 2rem; margin-bottom: 10px;">🖼️</span>
-                      <p id="quiz-img-status">문제 이미지를 업로드하세요</p>
+                      <span style="font-size: 2rem; margin-bottom: 8px;">🖼️</span>
+                      <p id="quiz-img-status" style="font-weight: 600; margin-bottom: 4px;">이미지를 여기에 드래그하거나 클릭하여 업로드</p>
+                      <p style="font-size: 0.8rem; opacity: 0.65; margin: 0;">JPG, PNG 등 이미지 파일 지원</p>
                       <input type="file" id="quiz-img-input" class="hidden" accept="image/*" />
                     </div>
                   </div>
