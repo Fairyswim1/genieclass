@@ -1118,12 +1118,19 @@ export function renderLessonMode(container, params) {
     recordingReqId = requestAnimationFrame(renderRecordingFrame);
   }
 
+  function releaseMediaStreamLesson(ms) {
+    try {
+      ms?.getTracks?.()?.forEach((t) => t.stop());
+    } catch (_) {}
+  }
+
   async function handleRecordToggle() {
     if (!isRecording) {
       // 0. Reset State
       mediaChunks = [];
       recordedBlob = null;
       recordingMode = null;
+      mediaRecorder = null;
 
       try {
         console.log('[녹음] 환경 확인...');
@@ -1145,91 +1152,104 @@ export function renderLessonMode(container, params) {
         const hasMediaDevices = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
         const hasMediaRecorder = typeof MediaRecorder !== 'undefined';
 
-        // 데스크톱: 보드+음성(캔버스 캡처) / 네이티브 앱: WebView에서 결합 인코더가 불안정한 경우가 많아 오디오 전용 MR을 먼저 씀
+        // 브라우저·네이티브 WebView 공통: 가능하면 칠판(canvas)+마이크를 비디오로 녹화, 실패 시 오디오만
         if (hasMediaDevices && hasMediaRecorder) {
-          if (isNativeMode) {
+          let rawAudioStream = null;
+          let audioStream = null;
+          let combinedAttempt = null;
+          try {
+            rawAudioStream = await navigator.mediaDevices.getUserMedia({
+              audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+                channelCount: 1,
+                sampleRate: 44100
+              }
+            });
+
+            audioStream = rawAudioStream;
             try {
-              console.log('[녹음] 네이티브: 오디오 전용 MediaRecorder 우선');
-              const rawAudioStream = await navigator.mediaDevices.getUserMedia({
-                audio: {
-                  echoCancellation: true,
-                  noiseSuppression: true,
-                  autoGainControl: true,
-                  channelCount: 1,
-                },
-              });
-              const audioMimeTypes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
-              const audioMime = audioMimeTypes.find((m) => MediaRecorder.isTypeSupported(m)) || '';
-              mediaRecorder = new MediaRecorder(
-                rawAudioStream,
-                audioMime ? { mimeType: audioMime } : undefined
-              );
-              recordingMode = 'audio';
-            } catch (nativeAudErr) {
-              console.warn('[녹음] 네이티브 오디오 MR 실패:', nativeAudErr);
+              const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+              const source = audioContext.createMediaStreamSource(rawAudioStream);
+              const gainNode = audioContext.createGain();
+              gainNode.gain.value = 3.0;
+              const dest = audioContext.createMediaStreamDestination();
+              source.connect(gainNode);
+              gainNode.connect(dest);
+              audioStream = dest.stream;
+              console.log('[녹음] 오디오 볼륨 증폭 적용 (3x)');
+            } catch (gainErr) {
+              console.warn('[녹음] Web Audio API 증폭 실패, 원본 오디오 사용:', gainErr);
             }
-          } else {
-            try {
-              console.log('[녹음] 오디오 스트림 요청...');
-              const rawAudioStream = await navigator.mediaDevices.getUserMedia({
-                audio: {
-                  echoCancellation: true,
-                  noiseSuppression: true,
-                  autoGainControl: true,
-                  channelCount: 1,
-                  sampleRate: 44100
-                }
-              });
 
-              let audioStream = rawAudioStream;
+            recordingCanvas = document.createElement('canvas');
+
+            const MAX_REC_WIDTH = 1280;
+            const MAX_REC_HEIGHT = 720;
+            let ratio = 1;
+            if (wbCanvas.width > MAX_REC_WIDTH || wbCanvas.height > MAX_REC_HEIGHT) {
+              ratio = Math.min(MAX_REC_WIDTH / wbCanvas.width, MAX_REC_HEIGHT / wbCanvas.height);
+            }
+            recordingCanvas.width = Math.floor(wbCanvas.width * ratio);
+            recordingCanvas.height = Math.floor(wbCanvas.height * ratio);
+            recordingCtx = recordingCanvas.getContext('2d');
+            recordingCtx.scale(ratio, ratio);
+
+            if (typeof recordingCanvas.captureStream === 'function') {
+              console.log('[녹음] 캔버스 캡처 시도 → 화면+음성 결합');
+              const canvasStream = recordingCanvas.captureStream(30);
+              combinedAttempt = new MediaStream([
+                ...canvasStream.getVideoTracks(),
+                ...audioStream.getAudioTracks()
+              ]);
+
+              const mimeTypes = ['video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9,opus', 'video/webm', 'video/mp4'];
+              const selectedMime = mimeTypes.find(m => MediaRecorder.isTypeSupported(m)) || '';
+
               try {
-                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                const source = audioContext.createMediaStreamSource(rawAudioStream);
-                const gainNode = audioContext.createGain();
-                gainNode.gain.value = 3.0;
-                const dest = audioContext.createMediaStreamDestination();
-                source.connect(gainNode);
-                gainNode.connect(dest);
-                audioStream = dest.stream;
-                console.log('[녹음] 오디오 볼륨 증폭 적용 (3x)');
-              } catch (gainErr) {
-                console.warn('[녹음] Web Audio API 증폭 실패, 원본 오디오 사용:', gainErr);
+                if (combinedAttempt && selectedMime) {
+                  mediaRecorder = new MediaRecorder(combinedAttempt, { mimeType: selectedMime });
+                  recordingMode = 'video';
+                }
+              } catch (mrVidErr) {
+                console.warn('[녹음] 비디오 MediaRecorder 생성 실패:', mrVidErr);
+                mediaRecorder = null;
               }
 
-              recordingCanvas = document.createElement('canvas');
-
-              const MAX_REC_WIDTH = 1280;
-              const MAX_REC_HEIGHT = 720;
-              let ratio = 1;
-              if (wbCanvas.width > MAX_REC_WIDTH || wbCanvas.height > MAX_REC_HEIGHT) {
-                ratio = Math.min(MAX_REC_WIDTH / wbCanvas.width, MAX_REC_HEIGHT / wbCanvas.height);
+              if (!mediaRecorder) {
+                releaseMediaStreamLesson(combinedAttempt);
+                combinedAttempt = null;
+                try {
+                  const audioMimeTypes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
+                  const audioMime = audioMimeTypes.find((m) => MediaRecorder.isTypeSupported(m)) || '';
+                  mediaRecorder = new MediaRecorder(audioStream, audioMime ? { mimeType: audioMime } : undefined);
+                  recordingMode = 'audio';
+                  console.log('[녹음] 비디오 실패로 오디오 전용 녹음');
+                } catch (audErr) {
+                  console.warn('[녹음] 오디오 MediaRecorder 생성 실패:', audErr);
+                  mediaRecorder = null;
+                }
               }
-              recordingCanvas.width = Math.floor(wbCanvas.width * ratio);
-              recordingCanvas.height = Math.floor(wbCanvas.height * ratio);
-              recordingCtx = recordingCanvas.getContext('2d');
-              recordingCtx.scale(ratio, ratio);
-
-              if (typeof recordingCanvas.captureStream === 'function') {
-                console.log('[녹음] 캔버스 캡처 지원됨 → 화면+음성 결합');
-                const canvasStream = recordingCanvas.captureStream(30);
-                const combinedStream = new MediaStream([
-                  ...canvasStream.getVideoTracks(),
-                  ...audioStream.getAudioTracks()
-                ]);
-
-                const mimeTypes = ['video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9,opus', 'video/webm', 'video/mp4'];
-                const selectedMime = mimeTypes.find(m => MediaRecorder.isTypeSupported(m)) || '';
-
-                mediaRecorder = new MediaRecorder(combinedStream, selectedMime ? { mimeType: selectedMime } : {});
-                recordingMode = 'video';
-              } else {
-                console.log('[녹음] 캔버스 캡처 미지원 → 음성만 녹음');
+            } else {
+              console.log('[녹음] 캔버스 캡처 미지원 → 음성만 녹음');
+              try {
                 mediaRecorder = new MediaRecorder(audioStream);
                 recordingMode = 'audio';
+              } catch (audOnlyErr) {
+                console.warn('[녹음] 오디오 MR 실패:', audOnlyErr);
+                mediaRecorder = null;
               }
-            } catch (webErr) {
-              console.error('[녹음] 브라우저 녹음 초기화 실패:', webErr);
             }
+          } catch (setupErr) {
+            console.error('[녹음] 녹음 초기화 실패:', setupErr);
+            releaseMediaStreamLesson(combinedAttempt);
+            combinedAttempt = null;
+            releaseMediaStreamLesson(audioStream);
+            audioStream = null;
+            releaseMediaStreamLesson(rawAudioStream);
+            rawAudioStream = null;
+            mediaRecorder = null;
           }
         }
 

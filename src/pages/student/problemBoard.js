@@ -8,6 +8,8 @@ import {
   getCurrentStudent,
   getProblemPromptById,
   addPresentation,
+  deletePresentationById,
+  getPresentationsByStudent,
   saveFile,
   showToast,
 } from '../../store.js';
@@ -353,15 +355,28 @@ export function renderStudentProblemBoard(container, params) {
 
   function renderRecordingFrame() {
     if (!isRecording || !recordingCtx) return;
+
     const draftCanvas = document.getElementById('whiteboard-draft');
     if (!draftCanvas) return;
+
+    // 수업 발표판(lessonMode)과 동일: 지우개 투명 처리 + 인코더가 빈 프레임을 내지 않도록 배경 채움
     recordingCtx.save();
     recordingCtx.setTransform(1, 0, 0, 1, 0, 0);
     recordingCtx.clearRect(0, 0, recordingCanvas.width, recordingCanvas.height);
+    recordingCtx.fillStyle = '#000000';
+    recordingCtx.fillRect(0, 0, recordingCanvas.width, recordingCanvas.height);
     recordingCtx.restore();
+
     recordingCtx.drawImage(wbCanvas, 0, 0);
     recordingCtx.drawImage(draftCanvas, 0, 0);
+
     recordingReqId = requestAnimationFrame(renderRecordingFrame);
+  }
+
+  function releaseMediaStream(ms) {
+    try {
+      ms?.getTracks?.()?.forEach((t) => t.stop());
+    } catch (_) {}
   }
 
   async function handleRecordToggle() {
@@ -369,9 +384,10 @@ export function renderStudentProblemBoard(container, params) {
       mediaChunks = [];
       recordedBlob = null;
       recordingMode = null;
+      mediaRecorder = null;
 
       try {
-        const isNativeMode = Capacitor.isNativePlatform?.();
+        const isNativeMode = !!(window.Capacitor?.isNativePlatform?.());
 
         if (isNativeMode) {
           try {
@@ -385,72 +401,102 @@ export function renderStudentProblemBoard(container, params) {
           }
         }
 
-        const hasMD = !!(navigator.mediaDevices?.getUserMedia);
-        const hasMR = typeof MediaRecorder !== 'undefined';
+        const hasMediaDevices = !!(navigator.mediaDevices?.getUserMedia);
+        const hasMediaRecorder = typeof MediaRecorder !== 'undefined';
 
-        if (hasMD && hasMR) {
-          if (isNativeMode) {
+        /** 수업 칠판(lessonMode)과 동일하게: 가능하면 캔버스+captureStream(+마이크)로 비디오 녹화, 불가 시 오디오만 */
+        if (hasMediaDevices && hasMediaRecorder) {
+          let rawAudioStream = null;
+          let audioStream = null;
+          let combinedAttempt = null;
+          try {
+            rawAudioStream = await navigator.mediaDevices.getUserMedia({
+              audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+                channelCount: 1,
+                sampleRate: 44100,
+              },
+            });
+
+            audioStream = rawAudioStream;
             try {
-              const rawAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-              const mimes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
-              const mime = mimes.find((m) => MediaRecorder.isTypeSupported(m)) || '';
-              mediaRecorder = new MediaRecorder(rawAudioStream, mime ? { mimeType: mime } : undefined);
-              recordingMode = 'audio';
-            } catch (e) {
-              console.warn('[풀이 녹음] 네이티브 오디오 MR 실패:', e);
+              const AudioCtx = window.AudioContext || window.webkitAudioContext;
+              const audioContext = new AudioCtx();
+              const source = audioContext.createMediaStreamSource(rawAudioStream);
+              const gainNode = audioContext.createGain();
+              gainNode.gain.value = 3.0;
+              const dest = audioContext.createMediaStreamDestination();
+              source.connect(gainNode);
+              gainNode.connect(dest);
+              audioStream = dest.stream;
+            } catch (gainErr) {
+              console.warn('[풀이 녹음] Web Audio 증폭 실패:', gainErr);
             }
-          } else {
-            try {
-              const rawAudioStream = await navigator.mediaDevices.getUserMedia({
-                audio: {
-                  echoCancellation: true,
-                  noiseSuppression: true,
-                  autoGainControl: true,
-                  channelCount: 1,
-                  sampleRate: 44100,
-                },
-              });
-              let audioStream = rawAudioStream;
+
+            recordingCanvas = document.createElement('canvas');
+
+            const MAX_REC_WIDTH = 1280;
+            const MAX_REC_HEIGHT = 720;
+            let ratio = 1;
+            if (wbCanvas.width > MAX_REC_WIDTH || wbCanvas.height > MAX_REC_HEIGHT) {
+              ratio = Math.min(MAX_REC_WIDTH / wbCanvas.width, MAX_REC_HEIGHT / wbCanvas.height);
+            }
+            recordingCanvas.width = Math.floor(wbCanvas.width * ratio);
+            recordingCanvas.height = Math.floor(wbCanvas.height * ratio);
+            recordingCtx = recordingCanvas.getContext('2d');
+            recordingCtx.scale(ratio, ratio);
+
+            if (typeof recordingCanvas.captureStream === 'function') {
+              const canvasStream = recordingCanvas.captureStream(30);
+              combinedAttempt = new MediaStream([
+                ...canvasStream.getVideoTracks(),
+                ...audioStream.getAudioTracks(),
+              ]);
+              const mimeTypes = ['video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9,opus', 'video/webm', 'video/mp4'];
+              const selectedMime = mimeTypes.find((m) => MediaRecorder.isTypeSupported(m)) || '';
+
               try {
-                const Ctx = window.AudioContext || window.webkitAudioContext;
-                const audioContext = new Ctx();
-                const source = audioContext.createMediaStreamSource(rawAudioStream);
-                const gainNode = audioContext.createGain();
-                gainNode.gain.value = 3.0;
-                const dest = audioContext.createMediaStreamDestination();
-                source.connect(gainNode);
-                gainNode.connect(dest);
-                audioStream = dest.stream;
-              } catch (_) {}
-
-              recordingCanvas = document.createElement('canvas');
-              const MAX_W = 1280; const MAX_H = 720;
-              let ratio = 1;
-              if (wbCanvas.width > MAX_W || wbCanvas.height > MAX_H) {
-                ratio = Math.min(MAX_W / wbCanvas.width, MAX_H / wbCanvas.height);
+                if (combinedAttempt && selectedMime) {
+                  mediaRecorder = new MediaRecorder(combinedAttempt, { mimeType: selectedMime });
+                  recordingMode = 'video';
+                }
+              } catch (_) {
+                mediaRecorder = null;
               }
-              recordingCanvas.width = Math.floor(wbCanvas.width * ratio);
-              recordingCanvas.height = Math.floor(wbCanvas.height * ratio);
-              recordingCtx = recordingCanvas.getContext('2d');
-              recordingCtx.scale(ratio, ratio);
 
-              if (typeof recordingCanvas.captureStream === 'function') {
-                const canvasStream = recordingCanvas.captureStream(30);
-                const combined = new MediaStream([
-                  ...canvasStream.getVideoTracks(),
-                  ...audioStream.getAudioTracks(),
-                ]);
-                const vMime = ['video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9,opus', 'video/webm', 'video/mp4']
-                  .find((m) => MediaRecorder.isTypeSupported(m)) || '';
-                mediaRecorder = new MediaRecorder(combined, vMime ? { mimeType: vMime } : undefined);
-                recordingMode = 'video';
-              } else {
-                mediaRecorder = new MediaRecorder(audioStream);
+              if (!mediaRecorder) {
+                releaseMediaStream(combinedAttempt);
+                combinedAttempt = null;
+                try {
+                  const audioMimeTypes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
+                  const audioMime = audioMimeTypes.find((m) => MediaRecorder.isTypeSupported(m)) || '';
+                  mediaRecorder = new MediaRecorder(audioStream, audioMime ? { mimeType: audioMime } : undefined);
+                  recordingMode = 'audio';
+                } catch (_) {
+                  mediaRecorder = null;
+                }
+              }
+            } else {
+              try {
+                const audioMimeTypes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
+                const audioMime = audioMimeTypes.find((m) => MediaRecorder.isTypeSupported(m)) || '';
+                mediaRecorder = new MediaRecorder(audioStream, audioMime ? { mimeType: audioMime } : undefined);
                 recordingMode = 'audio';
+              } catch (_) {
+                mediaRecorder = null;
               }
-            } catch (e) {
-              console.error('[풀이 녹음] 웹 초기화 실패:', e);
             }
+          } catch (e) {
+            console.warn('[풀이 녹음] 마이크/녹화기 초기화 실패:', e);
+            releaseMediaStream(combinedAttempt);
+            combinedAttempt = null;
+            releaseMediaStream(audioStream);
+            audioStream = null;
+            releaseMediaStream(rawAudioStream);
+            rawAudioStream = null;
+            mediaRecorder = null;
           }
         }
 
@@ -580,6 +626,14 @@ export function renderStudentProblemBoard(container, params) {
         else if (type.includes('m4a')) ext = 'm4a';
         const fileName = `${isVideo ? 'video' : 'audio'}_${Date.now()}.${ext}`;
         savedMedia = await saveFile(new File([recordedBlob], fileName, { type }));
+      }
+
+      const mine = await getPresentationsByStudent(student.id);
+      const olds = mine.filter(
+        (p) => p.type === 'problem_solution' && String(p.problemPromptId || '') === String(problemPrompt.id)
+      );
+      for (const p of olds) {
+        await deletePresentationById(p.id);
       }
 
       await addPresentation(student.id, student.classId, {
