@@ -290,6 +290,48 @@ export function renderStudentDashboard(container) {
             </div>
           </section>
 
+          <!-- 한 문제 풀이 (항상 상단에 표시) -->
+          <div class="section-card card" style="margin-bottom: var(--s-6);">
+            <div class="section-card-header">
+              <span style="font-size: 1.2rem;">✏️</span>
+              <h2 class="section-card-title">한 문제 풀이</h2>
+            </div>
+            <p style="font-size: 0.82rem; color: var(--text-muted); margin: 0 0 var(--s-3); line-height: 1.45;">
+              선생님이 올린 문제에 칠판·녹화로 풀이를 남길 수 있어요.
+            </p>
+            <div class="flex flex-col gap-sm">
+              ${problemPrompts.length === 0
+    ? '<p class="text-center" style="color: var(--text-dim); padding: 12px;">출제된 한 문제가 없습니다.</p>'
+    : problemPrompts.map((pr) => {
+      const sols = allPresentations.filter((p) => p.studentId === freshStudent.id
+        && p.type === 'problem_solution'
+        && String(p.problemPromptId || '') === String(pr.id));
+      const sol = sols.length
+        ? sols.slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))[0]
+        : null;
+      const hasSol = !!sol;
+      return `
+                    <div class="interactive-item" style="flex-direction: column; align-items: stretch; gap: 10px;">
+                      <div>
+                        <div style="font-weight: 700; font-size: 0.95rem;">${escapeHtml(pr.title || '제목 없음')}</div>
+                        ${pr.description ? `<div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px; white-space: pre-line;">${escapeHtml(pr.description)}</div>` : ''}
+                        ${pr.files && pr.files.length ? `
+                          <div class="flex gap-sm flex-wrap" style="margin-top: 8px;">
+                            ${pr.files.map((f) => `<button type="button" class="btn btn-secondary btn-sm" style="font-size: 0.72rem;" onclick="window.downloadFile('${f.id}')">📎 ${escapeHtml(f.name)}</button>`).join('')}
+                          </div>` : ''}
+                      </div>
+                      <div class="flex flex-wrap gap-sm items-center justify-end">
+                        ${hasSol ? `<span class="badge badge-green">풀이 저장됨</span>
+                          <button type="button" class="btn btn-ghost btn-sm btn-toggle-share" data-id="${sol.id}" data-shared="${sol.shared ? 'true' : 'false'}">${sol.shared ? '🔒 공유 끄기' : '🌐 공유하기'}</button>` : ''}
+                        <button type="button" class="btn btn-primary btn-sm btn-open-problem-board" data-prompt-id="${pr.id}">
+                          ${hasSol ? '📝 풀이 다시 올리기' : '✍️ 풀이 올리기'}
+                        </button>
+                      </div>
+                    </div>`;
+    }).join('')}
+            </div>
+          </div>
+
           <div class="student-grid-37 student-dashboard-presentations-grid">
             <!-- My Presentations -->
             <div class="section-card card">
@@ -360,47 +402,6 @@ export function renderStudentDashboard(container) {
           <div class="student-grid-73 student-dashboard-main-grid">
             <!-- Assignments & Records -->
             <div class="flex flex-col student-dashboard-col-gap">
-              <div class="section-card card">
-                <div class="section-card-header">
-                  <span style="font-size: 1.2rem;">✏️</span>
-                  <h2 class="section-card-title">한 문제 풀이</h2>
-                </div>
-                <p style="font-size: 0.82rem; color: var(--text-muted); margin: 0 0 var(--s-3); line-height: 1.45;">
-                  선생님이 올린 문제에 칠판·녹화로 풀이를 남길 수 있어요.
-                </p>
-                <div class="flex flex-col gap-sm">
-                  ${problemPrompts.length === 0
-    ? '<p class="text-center" style="color: var(--text-dim); padding: 12px;">출제된 한 문제가 없습니다.</p>'
-    : problemPrompts.map((pr) => {
-      const sols = allPresentations.filter((p) => p.studentId === freshStudent.id
-        && p.type === 'problem_solution'
-        && String(p.problemPromptId || '') === String(pr.id));
-      const sol = sols.length
-        ? sols.slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))[0]
-        : null;
-      const hasSol = !!sol;
-      return `
-                    <div class="interactive-item" style="flex-direction: column; align-items: stretch; gap: 10px;">
-                      <div>
-                        <div style="font-weight: 700; font-size: 0.95rem;">${escapeHtml(pr.title || '제목 없음')}</div>
-                        ${pr.description ? `<div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px; white-space: pre-line;">${escapeHtml(pr.description)}</div>` : ''}
-                        ${pr.files && pr.files.length ? `
-                          <div class="flex gap-sm flex-wrap" style="margin-top: 8px;">
-                            ${pr.files.map((f) => `<button type="button" class="btn btn-secondary btn-sm" style="font-size: 0.72rem;" onclick="window.downloadFile('${f.id}')">📎 ${escapeHtml(f.name)}</button>`).join('')}
-                          </div>` : ''}
-                      </div>
-                      <div class="flex flex-wrap gap-sm items-center justify-end">
-                        ${hasSol ? `<span class="badge badge-green">풀이 저장됨</span>
-                          <button type="button" class="btn btn-ghost btn-sm btn-toggle-share" data-id="${sol.id}" data-shared="${sol.shared ? 'true' : 'false'}">${sol.shared ? '🔒 공유 끄기' : '🌐 공유하기'}</button>` : ''}
-                        <button type="button" class="btn btn-primary btn-sm btn-open-problem-board" data-prompt-id="${pr.id}">
-                          ${hasSol ? '📝 풀이 다시 올리기' : '✍️ 풀이 올리기'}
-                        </button>
-                      </div>
-                    </div>`;
-    }).join('')}
-                </div>
-              </div>
-
               <div class="section-card card">
                 <div class="section-card-header">
                   <span style="font-size: 1.2rem;">📝</span>
@@ -631,6 +632,14 @@ export function renderStudentDashboard(container) {
 
         if (probChanged) {
           renderQuizOverlay();
+          return;
+        }
+
+        // 갤러리 공개 상태 변경 감지
+        const prevRevealed = prev.galleryRevealed ?? false;
+        const curRevealed = quiz.galleryRevealed ?? false;
+        if (prevRevealed !== curRevealed) {
+          void hydrateQuizGallery(quizSubmissions);
         }
       } else {
         if (activeQuiz) {
@@ -664,6 +673,33 @@ export function renderStudentDashboard(container) {
   async function hydrateQuizGallery(subs) {
     const gallery = document.getElementById('quiz-gallery');
     if (!gallery || !Array.isArray(subs)) return;
+
+    const isRevealed = activeQuiz?.galleryRevealed === true;
+
+    // 사이드바 제목 업데이트
+    const heading = document.querySelector('#quiz-overlay .quiz-overlay-sidebar-heading');
+    if (heading) {
+      heading.textContent = isRevealed
+        ? `친구들의 풀이 (${subs.length})`
+        : `제출 현황 (${subs.length}명)`;
+    }
+
+    if (!isRevealed) {
+      // 공개 전: 이름 목록만 표시
+      if (subs.length === 0) {
+        gallery.innerHTML = '<p style="font-size: 0.85rem; color: var(--text-dim); text-align: center; padding: 16px;">아직 제출한 친구가 없습니다.</p>';
+      } else {
+        gallery.innerHTML = subs.map(s => `
+          <div class="card quiz-gallery__card" style="flex-direction: row; align-items: center; gap: 10px; padding: 10px 14px !important;">
+            <span style="font-size: 1.1rem;">✅</span>
+            <span class="quiz-gallery__student-name" style="margin-top: 0; font-size: 0.9rem;">${escapeHtml(s.studentName || '')}</span>
+          </div>
+        `).join('');
+      }
+      return;
+    }
+
+    // 공개 후: 전체 풀이 표시
     const rows = await Promise.all(
       subs.map(async (s) => ({
         s,
@@ -708,7 +744,7 @@ export function renderStudentDashboard(container) {
     overlay.className = 'modal-backdrop active page-enter';
     overlay.style.zIndex = '500';
     overlay.innerHTML = `
-      <div class="modal-content animate-up quiz-overlay-modal-inner" style="max-width: 1200px; width: 95%; height: min(92vh, 900px); display: flex; flex-direction: column; min-height: 0;">
+      <div class="modal-content animate-up quiz-overlay-modal-inner" style="max-width: 1200px; width: 95%; height: min(96vh, 900px); max-height: min(96dvh, 900px); display: flex; flex-direction: column; min-height: 0;">
         <div class="modal-header">
           <h2 class="modal-title">⚡ 실시간 번개 퀴즈</h2>
           <div class="flex items-center gap-sm">
@@ -813,9 +849,30 @@ export function renderStudentDashboard(container) {
     const solveStatus = overlay.querySelector('#quiz-solve-status');
     const solveText = overlay.querySelector('#quiz-solve-text');
 
-    overlay.querySelector('#quiz-solve-dropzone').addEventListener('click', () => solveInput.click());
+    const solveDropzone = overlay.querySelector('#quiz-solve-dropzone');
+    solveDropzone.addEventListener('click', () => solveInput.click());
     solveInput.addEventListener('change', () => {
       if (solveInput.files[0]) solveStatus.textContent = `선택됨: ${solveInput.files[0].name}`;
+    });
+
+    // 드래그앤드롭 지원
+    solveDropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      solveDropzone.classList.add('dragover');
+    });
+    solveDropzone.addEventListener('dragleave', () => {
+      solveDropzone.classList.remove('dragover');
+    });
+    solveDropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      solveDropzone.classList.remove('dragover');
+      const file = e.dataTransfer?.files[0];
+      if (file && file.type.startsWith('image/')) {
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        solveInput.files = dt.files;
+        solveStatus.textContent = `선택됨: ${file.name}`;
+      }
     });
 
     overlay.querySelector('#btn-submit-quiz-solve').addEventListener('click', async () => {

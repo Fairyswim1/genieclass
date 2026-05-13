@@ -6,7 +6,8 @@ import {
   praiseStudent, showToast, getStudentById, addPresentation,
   toggleSharePresentation, startQuiz, stopQuiz, listenToQuizSubmissions,
   saveFile, getPresentationsByStudent, formatDate, addStudentPoints,
-  subtractStudentPoints, deletePresentationById, getClassesByTeacher
+  subtractStudentPoints, deletePresentationById, getClassesByTeacher,
+  revealQuizGallery
 } from '../../store.js';
 import { escapeHtml, renderQuizMath } from '../../utils/quizMath.js';
 import { renderQuizLatexKeyboardHtml } from '../../utils/quizLatexKeyboard.js';
@@ -554,8 +555,11 @@ export function renderLessonMode(container, params) {
                     </div>` : ''}
                 </div>
                 
-                <div class="section-header" style="margin-top: var(--s-8);">
+                <div class="section-header flex justify-between items-center" style="margin-top: var(--s-8);">
                   <h2 class="section-title">학생 풀이 갤러리 (${quizSubmissions.length})</h2>
+                  ${!activeQuiz.galleryRevealed
+                    ? `<button class="btn btn-primary btn-sm" id="btn-reveal-gallery">🔓 학생에게 풀이 공개</button>`
+                    : `<span class="badge badge-green">✅ 풀이 공개됨</span>`}
                 </div>
                 <div class="grid" style="grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--s-6);">
                   ${quizSubmissions.map(s => `
@@ -612,6 +616,26 @@ export function renderLessonMode(container, params) {
     dropzone?.addEventListener('click', () => input.click());
     input?.addEventListener('change', () => {
       if (input.files[0]) statusText.textContent = `선택됨: ${input.files[0].name}`;
+    });
+
+    // 드래그앤드롭 지원
+    dropzone?.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropzone.classList.add('dragover');
+    });
+    dropzone?.addEventListener('dragleave', () => {
+      dropzone.classList.remove('dragover');
+    });
+    dropzone?.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('dragover');
+      const file = e.dataTransfer?.files[0];
+      if (file && file.type.startsWith('image/')) {
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        input.files = dt.files;
+        statusText.textContent = `선택됨: ${file.name}`;
+      }
     });
 
     let previewDebounce;
@@ -689,6 +713,23 @@ export function renderLessonMode(container, params) {
         activeQuiz = null;
         if (unsubscribeSubmissions) unsubscribeSubmissions();
         render();
+      }
+    });
+
+    document.getElementById('btn-reveal-gallery')?.addEventListener('click', async () => {
+      if (!activeQuiz) return;
+      const btn = document.getElementById('btn-reveal-gallery');
+      btn.disabled = true;
+      btn.textContent = '공개 중...';
+      try {
+        await revealQuizGallery(activeQuiz.id);
+        activeQuiz = { ...activeQuiz, galleryRevealed: true };
+        showToast('학생들에게 친구들의 풀이가 공개되었습니다! 🎉');
+        render();
+      } catch (err) {
+        showToast('공개 중 오류가 발생했습니다.', 'error');
+        btn.disabled = false;
+        btn.textContent = '🔓 학생에게 풀이 공개';
       }
     });
   }

@@ -204,10 +204,17 @@
   min-height: 0;
 }
 
+@media (max-width: 900px) {
+  #quiz-overlay .quiz-overlay-shell {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
 #quiz-overlay .quiz-problem-shell--student-overlay {
   flex: 0 0 auto;
-  min-height: min(280px, 44vh);
-  max-height: min(520px, 52vh);
+  /* min-height 제거: 텍스트가 짧으면 자동으로 작게 표시됨 */
+  max-height: min(50vh, 420px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -215,7 +222,7 @@
 
 #quiz-overlay .quiz-problem-shell--student-overlay .quiz-problem-shell__body {
   flex: 1 1 auto;
-  min-height: clamp(140px, 26vh, 320px);
+  /* min-height 제거: 내용에 맞게 자동 조절 */
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
@@ -229,6 +236,9 @@
 }
 
 @supports (height: 1dvh) {
+  #quiz-overlay .quiz-problem-shell--student-overlay {
+    max-height: min(50dvh, 420px);
+  }
   #quiz-overlay .quiz-problem-shell--student-overlay .quiz-problem-shell__img-wrap,
   #quiz-overlay .quiz-problem-shell--student-overlay .quiz-problem-shell__img {
     max-height: min(46dvh, 440px);
@@ -247,6 +257,23 @@
 @media (max-width: 900px) {
   #quiz-overlay .quiz-overlay-columns {
     grid-template-columns: 1fr;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* 모바일: 제출 카드 내부 스크롤 해제 → 전체 컬럼이 스크롤 */
+  #quiz-overlay .quiz-overlay-submit-card {
+    overflow-y: visible;
+  }
+
+  /* 모바일: 갤러리 최대 높이 제한 */
+  #quiz-overlay .quiz-overlay-sidebar {
+    min-height: auto;
+    max-height: 280px;
+  }
+
+  #quiz-overlay .quiz-overlay-gallery-grid {
+    max-height: 260px;
   }
 }
 

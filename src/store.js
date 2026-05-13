@@ -847,6 +847,7 @@ export async function startQuiz(classId, problemImageFile, problemText = '') {
         problemImage: problemImageFile || null, // { id, name, url? }
         problemText,
         active: true,
+        galleryRevealed: false,
         createdAt: new Date().toISOString(),
     };
 
@@ -866,6 +867,10 @@ export async function stopQuiz(classId) {
         await updateDoc(doc(db, COLLECTIONS.QUIZZES, cls.activeQuizId), { active: false });
         await updateDoc(doc(db, COLLECTIONS.CLASSES, classId), { activeQuizId: '' });
     }
+}
+
+export async function revealQuizGallery(quizId) {
+    await updateDoc(doc(db, COLLECTIONS.QUIZZES, quizId), { galleryRevealed: true });
 }
 
 export async function submitQuizSolution(quizId, studentId, studentName, solutionImageFile, solutionText = '') {
