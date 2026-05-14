@@ -15,8 +15,11 @@ import {
   problemPromptHasModelAnswer,
   downloadFile,
   getFileById,
+  enrichPresentationWithImageUrls,
+  presentationWhiteboardImageUrl,
 } from '../../store.js';
 import { escapeHtml } from '../../utils/quizMath.js';
+import { eraseSegmentDisk, WHITEBOARD_ERASER_ICON_HTML } from '../../utils/eraserCanvas.js';
 
 function escapeAttr(s) {
   return String(s)
@@ -189,7 +192,7 @@ export function renderStudentProblemBoard(container, params) {
               <div id="board-only-tools" class="prob-draw-tools" aria-label="그리기 도구">
                 <div class="whiteboard-tools">
                   <button type="button" class="whiteboard-tool ${currentTool === 'pen' ? 'active' : ''}" data-tool="pen" title="펜">✏️</button>
-                  <button type="button" class="whiteboard-tool ${currentTool === 'eraser' ? 'active' : ''}" data-tool="eraser" title="지우개">🧹</button>
+                  <button type="button" class="whiteboard-tool ${currentTool === 'eraser' ? 'active' : ''}" data-tool="eraser" title="지우개">${WHITEBOARD_ERASER_ICON_HTML}</button>
                   <button type="button" class="whiteboard-tool" data-tool="clear" title="전체 지우기">🗑️</button>
                 </div>
                 <div class="color-picker-group prob-draw-tools__colors">
@@ -356,17 +359,9 @@ export function renderStudentProblemBoard(container, params) {
 
       const isEraser = currentTool === 'eraser';
       if (isEraser) {
-        const size = penSize * 15;
-        wbCtx.save();
-        wbCtx.globalCompositeOperation = 'destination-out';
-        wbCtx.lineWidth = size;
-        wbCtx.beginPath();
         const p1 = currentPoints[currentPoints.length - 2];
         const p2 = currentPoints[currentPoints.length - 1];
-        wbCtx.moveTo(p1[0], p1[1]);
-        wbCtx.lineTo(p2[0], p2[1]);
-        wbCtx.stroke();
-        wbCtx.restore();
+        eraseSegmentDisk(wbCtx, p1[0], p1[1], p2[0], p2[1], penSize);
         return;
       }
 
@@ -440,17 +435,9 @@ export function renderStudentProblemBoard(container, params) {
       if (currentPoints.length < 2) return;
       const isEraser = currentTool === 'eraser';
       if (isEraser) {
-        const size = penSize * 15;
-        wbCtx.save();
-        wbCtx.globalCompositeOperation = 'destination-out';
-        wbCtx.lineWidth = size;
-        wbCtx.beginPath();
         const p1 = currentPoints[currentPoints.length - 2];
         const p2 = currentPoints[currentPoints.length - 1];
-        wbCtx.moveTo(p1[0], p1[1]);
-        wbCtx.lineTo(p2[0], p2[1]);
-        wbCtx.stroke();
-        wbCtx.restore();
+        eraseSegmentDisk(wbCtx, p1[0], p1[1], p2[0], p2[1], penSize);
       } else {
         const strokeSize = penSize * 2.5;
         const strokePolygon = getStroke(currentPoints, {
@@ -1028,6 +1015,79 @@ export function renderStudentProblemBoard(container, params) {
     });
   }
 
+  async function hydrateExistingProblemSubmission() {
+    try {
+      const mine = await getPresentationsByStudent(student.id);
+      const olds = mine.filter(
+        (p) => p.type === 'problem_solution'
+          && String(p.problemPromptId || '') === String(problemPrompt.id),
+      );
+      if (!olds.length) return;
+      const latest = olds.slice().sort(
+        (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0),
+      )[0];
+      const pres = await enrichPresentationWithImageUrls(latest);
+      const wbUrl = presentationWhiteboardImageUrl(pres);
+      if (!wbUrl) return;
+
+      const isPhoto = pres.solutionSource === 'photo';
+      submitMode = isPhoto ? 'photo' : 'board';
+      applySubmitMode();
+
+      if (isPhoto) {
+        let blob;
+        try {
+          const res = await fetch(wbUrl);
+          blob = await res.blob();
+        } catch (_) {
+          showToast('이전 사진 풀이를 불러오지 못했습니다. 새 이미지로 다시 선택해 주세요.', 'info', 4500);
+          return;
+        }
+        const nm = pres.whiteboardImage?.name || 'solution.jpg';
+        const mime = blob.type?.startsWith('image/') ? blob.type : 'image/jpeg';
+        attachedPhotoFile = new File([blob], nm, { type: mime });
+        if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
+        photoPreviewUrl = URL.createObjectURL(blob);
+        const pv = document.getElementById('prob-photo-preview');
+        if (pv) pv.src = photoPreviewUrl;
+        document.getElementById('prob-photo-preview-wrap')?.classList.remove('hidden');
+        document.getElementById('prob-photo-clear')?.classList.remove('hidden');
+        const st = document.getElementById('prob-photo-status');
+        if (st) st.textContent = '저장했던 사진입니다. 교체하려면 새 이미지를 선택하세요.';
+        showToast('이전 사진을 불러왔습니다. 바꾸거나 음성만 추가한 뒤 저장할 수 있어요.', 'info', 4000);
+        return;
+      }
+
+      if (!wbCanvas || !wbCtx) return;
+      const wrap = wbCanvas.parentElement;
+      const cw = wrap.clientWidth;
+      const ch = wrap.clientHeight;
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      await new Promise((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('칠판 이미지 로드 실패'));
+        img.src = wbUrl;
+      });
+      const iw = img.naturalWidth;
+      const ih = img.naturalHeight;
+      if (!iw || !ih) return;
+      wbCtx.save();
+      wbCtx.fillStyle = '#000';
+      wbCtx.fillRect(0, 0, cw, ch);
+      const scale = Math.min(cw / iw, ch / ih, 2);
+      const dw = iw * scale;
+      const dh = ih * scale;
+      const ox = (cw - dw) / 2;
+      const oy = (ch - dh) / 2;
+      wbCtx.drawImage(img, ox, oy, dw, dh);
+      wbCtx.restore();
+      showToast('이전 칠판을 불러왔습니다. 이어서 수정한 뒤 저장하세요.', 'info', 4000);
+    } catch (e) {
+      console.warn('[풀이 불러오기]', e);
+    }
+  }
+
   async function init() {
     problemPrompt = await getProblemPromptById(promptId);
     if (!problemPrompt || problemPrompt.classId !== student.classId) {
@@ -1041,6 +1101,8 @@ export function renderStudentProblemBoard(container, params) {
     bindPhotoMode();
     await fillProblemStripAttachments();
     applySubmitMode();
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    await hydrateExistingProblemSubmission();
     requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
   }
 

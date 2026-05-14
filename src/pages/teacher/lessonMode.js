@@ -13,6 +13,7 @@ import { escapeHtml, renderQuizMath } from '../../utils/quizMath.js';
 import { renderQuizLatexKeyboardHtml } from '../../utils/quizLatexKeyboard.js';
 import { renderCharacter, getLevelConfig, renderPraiseAnimation, deriveCharacterLevelFromPoints } from '../../components/characterAvatar.js';
 import { getStroke } from 'perfect-freehand';
+import { eraseSegmentDisk, WHITEBOARD_ERASER_ICON_HTML } from '../../utils/eraserCanvas.js';
 import { Capacitor } from '@capacitor/core';
 import { VoiceRecorder } from 'capacitor-voice-recorder';
 
@@ -767,7 +768,7 @@ export function renderLessonMode(container, params) {
           </div>
           <div class="whiteboard-tools">
             <button class="whiteboard-tool ${currentTool === 'pen' ? 'active' : ''}" data-tool="pen">✏️</button>
-            <button class="whiteboard-tool ${currentTool === 'eraser' ? 'active' : ''}" data-tool="eraser">🧹</button>
+            <button class="whiteboard-tool ${currentTool === 'eraser' ? 'active' : ''}" data-tool="eraser">${WHITEBOARD_ERASER_ICON_HTML}</button>
             <button class="whiteboard-tool" data-tool="clear">🗑️</button>
           </div>
           <div class="color-picker-group">
@@ -905,18 +906,9 @@ export function renderLessonMode(container, params) {
       const isEraser = currentTool === 'eraser';
       
       if (isEraser) {
-        // Eraser: Direct line segment drawing to wbCanvas (No perfect-freehand delay)
-        const size = penSize * 15;
-        wbCtx.save();
-        wbCtx.globalCompositeOperation = 'destination-out';
-        wbCtx.lineWidth = size;
-        wbCtx.beginPath();
         const p1 = currentPoints[currentPoints.length - 2];
         const p2 = currentPoints[currentPoints.length - 1];
-        wbCtx.moveTo(p1[0], p1[1]);
-        wbCtx.lineTo(p2[0], p2[1]);
-        wbCtx.stroke();
-        wbCtx.restore();
+        eraseSegmentDisk(wbCtx, p1[0], p1[1], p2[0], p2[1], penSize);
         return;
       }
       
@@ -1004,17 +996,9 @@ export function renderLessonMode(container, params) {
       if (currentPoints.length < 2) return;
       const isEraser = currentTool === 'eraser';
       if (isEraser) {
-        const size = penSize * 15;
-        wbCtx.save();
-        wbCtx.globalCompositeOperation = 'destination-out';
-        wbCtx.lineWidth = size;
-        wbCtx.beginPath();
         const p1 = currentPoints[currentPoints.length - 2];
         const p2 = currentPoints[currentPoints.length - 1];
-        wbCtx.moveTo(p1[0], p1[1]);
-        wbCtx.lineTo(p2[0], p2[1]);
-        wbCtx.stroke();
-        wbCtx.restore();
+        eraseSegmentDisk(wbCtx, p1[0], p1[1], p2[0], p2[1], penSize);
       } else {
         const strokeSize = penSize * 2.5;
         const strokePolygon = getStroke(currentPoints, {

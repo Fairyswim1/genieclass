@@ -433,6 +433,14 @@
     cursor: pointer;
     font-size: 1.1rem;
     transition: var(--transition-all);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.whiteboard-tool .wb-eraser-svg {
+    display: block;
+    color: inherit;
 }
 
 .whiteboard-tool.active {

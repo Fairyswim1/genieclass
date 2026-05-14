@@ -807,6 +807,15 @@ html[data-app-shell="student"] .prob-draw-tools .whiteboard-tool {
     width: 38px;
     height: 38px;
     font-size: 1rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+html[data-app-shell="student"] .prob-draw-tools .whiteboard-tool .wb-eraser-svg {
+    display: block;
+    color: inherit;
 }
 
 html[data-app-shell="student"] .prob-draw-tools__colors {
