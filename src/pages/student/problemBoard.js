@@ -13,6 +13,7 @@ import {
   saveFile,
   showToast,
   problemPromptHasModelAnswer,
+  downloadFile,
 } from '../../store.js';
 import { escapeHtml } from '../../utils/quizMath.js';
 
@@ -45,8 +46,38 @@ export function renderStudentProblemBoard(container, params) {
   let attachedPhotoFile = null;
   let photoPreviewUrl = null;
 
+  function buildProblemStripHtml() {
+    const pr = problemPrompt;
+    if (!pr) return '';
+    const title = escapeHtml(pr.title || '문제');
+    const descRaw = pr.description && String(pr.description).trim();
+    const desc = descRaw
+      ? `<div class="prob-problem-strip__desc">${escapeHtml(descRaw)}</div>`
+      : '';
+    const files = Array.isArray(pr.files) && pr.files.length
+      ? `<div class="prob-problem-strip__files">
+          <span class="prob-problem-strip__files-label">선생님 첨부</span>
+          <div class="flex flex-wrap gap-sm" style="margin-top:6px;">
+            ${pr.files.map((f) => `
+              <button type="button" class="btn btn-secondary btn-sm prob-strip-file-btn" data-file-id="${escapeHtml(String(f.id))}" style="font-size:0.75rem;">📎 ${escapeHtml(f.name)}</button>
+            `).join('')}
+          </div>
+        </div>`
+      : '';
+    return `
+        <div id="prob-problem-strip" class="prob-problem-strip" role="region" aria-label="출제 문제">
+          <div class="prob-problem-strip__inner">
+            <span class="prob-problem-strip__badge">문제</span>
+            <h2 class="prob-problem-strip__title">${title}</h2>
+            ${desc}
+            ${files}
+          </div>
+        </div>`;
+  }
+
   function renderBoardShell() {
     const head = escapeHtml(problemPrompt?.title || '한 문제 풀이');
+    const problemStrip = buildProblemStripHtml();
     container.innerHTML = `
       <div class="whiteboard-container page-enter" style="background: var(--bg-deep);">
         <div class="whiteboard-toolbar card" style="border-radius: 0; border-top: 0; border-left: 0; border-right: 0; flex-wrap: wrap; align-items: center; gap: 8px;">
@@ -86,6 +117,8 @@ export function renderStudentProblemBoard(container, params) {
           </button>
           <button class="btn btn-secondary btn-sm" id="wb-save">💾 풀이 저장</button>
         </div>
+
+        ${problemStrip}
 
         <div id="prob-panel-board">
           <div class="whiteboard-canvas-wrap" style="background: #000; position: relative;">
@@ -401,6 +434,13 @@ export function renderStudentProblemBoard(container, params) {
 
     document.getElementById('wb-record')?.addEventListener('click', handleRecordToggle);
     document.getElementById('wb-save')?.addEventListener('click', handleSaveProblem);
+
+    container.querySelectorAll('.prob-strip-file-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.fileId;
+        if (id) void downloadFile(id);
+      });
+    });
   }
 
   function applySubmitMode() {

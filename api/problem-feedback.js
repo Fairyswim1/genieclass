@@ -9,6 +9,7 @@
  * - 생략(자동) → GEMINI_API_KEY가 있으면 Gemini, 아니면 OPENAI_API_KEY로 OpenAI
  *
  * Gemini: GEMINI_API_KEY (Google AI Studio)
+ * 기본 모델: gemini-1.5-flash — `GEMINI_MODEL`로 변경 가능 (모델·프로젝트별 무료 한도가 다름)
  * OpenAI: OPENAI_API_KEY
  */
 
@@ -112,11 +113,63 @@ async function fetchUrlAsGeminiInlineImage(url, labelContext) {
   };
 }
 
+/** Gemini API 원문 오류 → 사용자 안내(한도·과금 등) */
+function humanizeGeminiError(message, httpStatus) {
+  const m = String(message || '');
+
+  // API가 프로젝트에서 아직 활성화되지 않음 (자주 403 / SERVICE_DISABLED)
+  if (
+    /has not been used in project|it is disabled|Enable it by visiting|SERVICE_DISABLED|generativelanguage\.googleapis\.com\/overview/i.test(
+      m,
+    )
+  ) {
+    const linkMatch = m.match(/https:\/\/console\.developers\.google\.com[^\s"'<>]+/);
+    const enableLink =
+      linkMatch && linkMatch[0]
+        ? linkMatch[0]
+        : 'https://console.cloud.google.com/apis/library/generativelanguage.googleapis.com';
+    return [
+      '이 API 키가 연결된 Google Cloud 프로젝트에서 「Generative Language API」(Gemini)가 아직 사용 설정되어 있지 않습니다.',
+      '',
+      '해결 순서:',
+      '1) 아래 링크로 들어가기 (오류 메시지에 붙어 있던 주소와 동일한 경우가 많아요)',
+      '2) 「사용」/ Enable 버튼으로 API 활성화',
+      '3) 방금 켰다면 2~5분 기다린 뒤 피드백 다시 시도',
+      '',
+      'AI Studio에서 키만 발급했어도, 해당 GCP 프로젝트에서 이 API를 한 번 켜 줘야 합니다.',
+      '',
+      enableLink,
+      '',
+      '--- 원본 ---',
+      m.slice(0, 600),
+    ].join('\n');
+  }
+
+  const is429 = httpStatus === 429;
+  const looksQuota =
+    is429 || /quota|exceeded|Resource exhausted|rate limit|free_tier|billing/i.test(m);
+  if (!looksQuota) return m;
+
+  return [
+    'Google Gemini 사용 한도에 걸렸습니다. (무료 등급: 분·일 요청 수·입력 토큰 제한)',
+    '',
+    '가능한 조치:',
+    '· 잠시 후(약 1분) 다시 눌러 보기 — 분당 제한이면 곧 풀립니다.',
+    '· Google AI Studio / Cloud에서 같은 키의 사용량·할당량 확인',
+    '· 무료 한도가 부족하면 Cloud 프로젝트에 결제(청구)를 연결하면 상한이 달라질 수 있음',
+    '· Vercel에 GEMINI_MODEL=gemini-1.5-flash 처럼 다른 모델을 넣어 보기(모델별 한도가 다름)',
+    '· OpenAI 키가 있다면 PROBLEM_FEEDBACK_PROVIDER=openai 로 전환',
+    '',
+    '--- 원본 ---',
+    m.slice(0, 600),
+  ].join('\n');
+}
+
 async function generateWithGemini(body, geminiKey) {
   const model =
     process.env.GEMINI_MODEL
     || process.env.PROBLEM_FEEDBACK_GEMINI_MODEL
-    || 'gemini-2.0-flash';
+    || 'gemini-1.5-flash';
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(geminiKey)}`;
 
@@ -126,6 +179,7 @@ async function generateWithGemini(body, geminiKey) {
   for (const imgUrl of modelUrls.slice(0, 6)) {
     if (typeof imgUrl === 'string' && imgUrl.startsWith('http')) {
       parts.push({ text: '[참고: 교사가 제공한 모범답안·참고 이미지]' });
+      parts.push(await fetchUrlAsGeminiInlineImage(imgUrl, '모범답안 이미지'));
     }
   }
 
@@ -150,13 +204,13 @@ async function generateWithGemini(body, geminiKey) {
   const json = await apiRes.json();
 
   if (!apiRes.ok) {
-    const msg =
+    const raw =
       typeof json?.error?.message === 'string'
         ? json.error.message
         : typeof json?.error === 'string'
           ? json.error
           : `Gemini 요청 오류 (${apiRes.status})`;
-    throw new Error(msg);
+    throw new Error(humanizeGeminiError(raw, apiRes.status));
   }
 
   const cand = json?.candidates?.[0];
