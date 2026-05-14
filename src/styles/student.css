@@ -696,7 +696,7 @@ html[data-app-shell="student"] .prob-problem-strip {
     flex-shrink: 0;
     margin: 0 var(--s-3) var(--s-2);
     padding: 0;
-    max-height: min(38vh, 300px);
+    max-height: min(50vh, 480px);
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     border-radius: var(--r-md);
@@ -707,6 +707,35 @@ html[data-app-shell="student"] .prob-problem-strip {
 
 html[data-app-shell="student"] .prob-problem-strip__inner {
     padding: var(--s-3) var(--s-4);
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-3);
+}
+
+@media (min-width: 720px) {
+    html[data-app-shell="student"] .prob-problem-strip__inner--with-files {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(200px, 48%);
+        grid-template-rows: auto 1fr;
+        column-gap: var(--s-5);
+        row-gap: var(--s-2);
+        align-items: start;
+    }
+
+    html[data-app-shell="student"] .prob-problem-strip__inner--with-files .prob-problem-strip__header {
+        grid-column: 1;
+        grid-row: 1 / -1;
+    }
+
+    html[data-app-shell="student"] .prob-problem-strip__inner--with-files .prob-problem-strip__attachments {
+        grid-column: 2;
+        grid-row: 1 / -1;
+        justify-self: stretch;
+    }
+}
+
+html[data-app-shell="student"] .prob-problem-strip__header {
+    min-width: 0;
 }
 
 html[data-app-shell="student"] .prob-problem-strip__badge {
@@ -732,7 +761,99 @@ html[data-app-shell="student"] .prob-problem-strip__desc {
     line-height: 1.55;
     color: var(--text-muted);
     white-space: pre-wrap;
-    margin: 0 0 var(--s-2);
+    margin: 0;
+}
+
+html[data-app-shell="student"] .prob-problem-strip__attachments {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--s-3);
+}
+
+html[data-app-shell="student"] .prob-problem-strip__attachments--loading {
+    align-items: flex-end;
+    min-height: 2rem;
+}
+
+html[data-app-shell="student"] .prob-problem-strip__loading {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+}
+
+html[data-app-shell="student"] .prob-problem-strip__empty {
+    font-size: 0.82rem;
+    color: var(--text-dim);
+    margin: 0;
+    text-align: right;
+}
+
+html[data-app-shell="student"] .prob-problem-strip__gallery {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: flex-end;
+    align-items: flex-start;
+    width: 100%;
+}
+
+html[data-app-shell="student"] .prob-strip-thumb {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    max-width: 100%;
+    width: min(200px, 46vw);
+    padding: 0;
+    margin: 0;
+    border: 1px solid var(--border-main);
+    border-radius: var(--r-sm);
+    background: var(--bg-main);
+    cursor: zoom-in;
+    overflow: hidden;
+    text-align: center;
+    box-shadow: var(--shadow-sm);
+}
+
+html[data-app-shell="student"] .prob-strip-thumb:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
+html[data-app-shell="student"] .prob-strip-thumb img {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: min(200px, 28vh);
+    object-fit: contain;
+    background: #111;
+}
+
+html[data-app-shell="student"] .prob-strip-thumb__label {
+    display: block;
+    font-size: 0.68rem;
+    color: var(--text-dim);
+    padding: 6px 8px;
+    line-height: 1.35;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+html[data-app-shell="student"] .prob-problem-strip__file-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+    width: 100%;
+}
+
+html[data-app-shell="student"] .prob-problem-strip__file-actions-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+    width: 100%;
 }
 
 html[data-app-shell="student"] .prob-problem-strip__files-label {

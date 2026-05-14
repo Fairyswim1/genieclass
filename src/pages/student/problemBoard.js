@@ -14,8 +14,23 @@ import {
   showToast,
   problemPromptHasModelAnswer,
   downloadFile,
+  getFileById,
 } from '../../store.js';
 import { escapeHtml } from '../../utils/quizMath.js';
+
+function escapeAttr(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;');
+}
+
+function isProblemFileImage(meta, ref) {
+  const t = String(meta?.type || '');
+  if (/^image\/(jpeg|jpg|pjpeg|png|gif|webp)/i.test(t)) return true;
+  const name = String(meta?.name || ref?.name || '');
+  return /\.(jpe?g|png|gif|webp)$/i.test(name);
+}
 
 export function renderStudentProblemBoard(container, params) {
   const student = getCurrentStudent();
@@ -54,25 +69,102 @@ export function renderStudentProblemBoard(container, params) {
     const desc = descRaw
       ? `<div class="prob-problem-strip__desc">${escapeHtml(descRaw)}</div>`
       : '';
-    const files = Array.isArray(pr.files) && pr.files.length
-      ? `<div class="prob-problem-strip__files">
-          <span class="prob-problem-strip__files-label">선생님 첨부</span>
-          <div class="flex flex-wrap gap-sm" style="margin-top:6px;">
-            ${pr.files.map((f) => `
-              <button type="button" class="btn btn-secondary btn-sm prob-strip-file-btn" data-file-id="${escapeHtml(String(f.id))}" style="font-size:0.75rem;">📎 ${escapeHtml(f.name)}</button>
-            `).join('')}
-          </div>
-        </div>`
+    const hasFiles = Array.isArray(pr.files) && pr.files.length > 0;
+    const innerCls = hasFiles ? 'prob-problem-strip__inner prob-problem-strip__inner--await-files' : 'prob-problem-strip__inner';
+    const attachmentsShell = hasFiles
+      ? `<div id="prob-problem-strip-attachments" class="prob-problem-strip__attachments prob-problem-strip__attachments--loading" aria-live="polite">
+            <span class="prob-problem-strip__loading">첨부 불러오는 중…</span>
+          </div>`
       : '';
     return `
         <div id="prob-problem-strip" class="prob-problem-strip" role="region" aria-label="출제 문제">
-          <div class="prob-problem-strip__inner">
-            <span class="prob-problem-strip__badge">문제</span>
-            <h2 class="prob-problem-strip__title">${title}</h2>
-            ${desc}
-            ${files}
+          <div class="${innerCls}">
+            <div class="prob-problem-strip__header">
+              <span class="prob-problem-strip__badge">문제</span>
+              <h2 class="prob-problem-strip__title">${title}</h2>
+              ${desc}
+            </div>
+            ${attachmentsShell}
           </div>
         </div>`;
+  }
+
+  async function fillProblemStripAttachments() {
+    const host = document.getElementById('prob-problem-strip-attachments');
+    const inner = host?.closest('.prob-problem-strip__inner');
+    if (!host || !problemPrompt?.files?.length) {
+      if (inner) inner.classList.remove('prob-problem-strip__inner--await-files');
+      return;
+    }
+
+    const images = [];
+    const others = [];
+    for (const ref of problemPrompt.files) {
+      if (!ref?.id) continue;
+      try {
+        const meta = await getFileById(ref.id);
+        if (!meta?.url) continue;
+        const entry = { ref, meta };
+        if (isProblemFileImage(meta, ref)) images.push(entry);
+        else others.push(entry);
+      } catch (_) {}
+    }
+
+    host.classList.remove('prob-problem-strip__attachments--loading');
+    if (inner) {
+      inner.classList.remove('prob-problem-strip__inner--await-files');
+      inner.classList.toggle('prob-problem-strip__inner--with-files', images.length > 0 || others.length > 0);
+    }
+
+    if (images.length === 0 && others.length === 0) {
+      host.innerHTML = '<p class="prob-problem-strip__empty">첨부 파일을 열 수 없습니다.</p>';
+      return;
+    }
+
+    const gallery =
+      images.length > 0
+        ? `<div class="prob-problem-strip__gallery" role="list">
+          ${images
+            .map(
+              ({ meta, ref }) => `
+            <button type="button" class="prob-strip-thumb" data-url="${escapeAttr(meta.url)}" title="${escapeHtml(meta.name || ref.name || '')}" role="listitem">
+              <img src="${escapeAttr(meta.url)}" alt="${escapeHtml(meta.name || '문제 이미지')}" loading="lazy" decoding="async" />
+              <span class="prob-strip-thumb__label">${escapeHtml(meta.name || ref.name || '이미지')}</span>
+            </button>`,
+            )
+            .join('')}
+        </div>`
+        : '';
+
+    const actions =
+      others.length > 0
+        ? `<div class="prob-problem-strip__file-actions">
+          <span class="prob-problem-strip__files-label">파일 열기</span>
+          <div class="prob-problem-strip__file-actions-row">
+            ${others
+              .map(
+                ({ meta, ref }) => `
+              <button type="button" class="btn btn-secondary btn-sm prob-strip-file-btn" data-file-id="${escapeHtml(String(ref.id))}">📎 ${escapeHtml(meta.name || ref.name || '파일')}</button>`,
+              )
+              .join('')}
+          </div>
+        </div>`
+        : '';
+
+    host.innerHTML = `${gallery}${actions}`;
+
+    host.querySelectorAll('.prob-strip-thumb').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const u = btn.dataset.url;
+        if (u) window.open(u, '_blank', 'noopener,noreferrer');
+      });
+    });
+    host.querySelectorAll('.prob-strip-file-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.fileId;
+        if (id) void downloadFile(id);
+      });
+    });
   }
 
   function renderBoardShell() {
@@ -434,13 +526,6 @@ export function renderStudentProblemBoard(container, params) {
 
     document.getElementById('wb-record')?.addEventListener('click', handleRecordToggle);
     document.getElementById('wb-save')?.addEventListener('click', handleSaveProblem);
-
-    container.querySelectorAll('.prob-strip-file-btn').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const id = btn.dataset.fileId;
-        if (id) void downloadFile(id);
-      });
-    });
   }
 
   function applySubmitMode() {
@@ -948,6 +1033,7 @@ export function renderStudentProblemBoard(container, params) {
     initWhiteboard();
     bindWhiteboardEvents();
     bindPhotoMode();
+    await fillProblemStripAttachments();
     applySubmitMode();
     requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
   }
