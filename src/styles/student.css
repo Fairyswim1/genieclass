@@ -685,15 +685,31 @@ html[data-app-shell="student"] .student-pres-list-wrap {
 /**
  * 학생 「한 문제 풀이」: 툴바 ~ 칠판 사이 문제 카드
  */
-html[data-app-shell="student"] .whiteboard-container {
+/** 교사 테마 대비: 학생 문제풀이 칠판은 페이지 플로우(전역 fixed 비활성) */
+.prob-student-wb.whiteboard-container {
+    position: relative !important;
+    inset: auto !important;
+    top: auto !important;
+    left: auto !important;
+    width: 100% !important;
+    max-width: 100vw;
+    height: auto !important;
+    min-height: 100dvh;
+    max-height: none !important;
+    z-index: auto !important;
+}
+
+html[data-app-shell="student"] .whiteboard-container,
+.prob-student-wb.whiteboard-container {
     display: flex;
     flex-direction: column;
     min-height: 100dvh;
     min-height: 100vh;
 }
 
-/** 학생 「한 문제 풀이」 헤더: 뒤로 | 문제(제목) | [도구 띠 — 제목 한 줄 또는 그 아래 전체폭 한 줄 가로 확장] */
-html[data-app-shell="student"] .whiteboard-container .prob-toolbar {
+/** 학생 「한 문제 풀이」 헤더: 그리드 1행 back | 제목(hero) | 도구 띠(tools, 가로 스크롤 가능) */
+html[data-app-shell="student"] .whiteboard-container .prob-toolbar,
+.prob-student-wb .prob-toolbar {
     flex-shrink: 0;
     margin: 0;
     padding: 8px 12px 10px;
@@ -701,55 +717,64 @@ html[data-app-shell="student"] .whiteboard-container .prob-toolbar {
     background: var(--bg-card);
 }
 
-html[data-app-shell="student"] .prob-toolbar__row--head {
+html[data-app-shell="student"] .prob-toolbar__row--head,
+.prob-student-wb .prob-toolbar__row--head {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    grid-template-areas:
-        'back hero'
-        'tools tools';
-    gap: 6px 10px;
+    /* 모바일에서도 제목 옆(같은 행)에 도구 — 예전 2행 그리드는 세로로만 쌓임 */
+    grid-template-columns: auto minmax(0, 1.5fr) minmax(0, 1.15fr);
+    grid-template-rows: auto;
+    grid-template-areas: 'back hero tools';
+    gap: 8px 10px;
     align-items: center;
     min-width: 0;
 }
 
-html[data-app-shell="student"] .prob-toolbar__row--head > .prob-toolbar__back {
+html[data-app-shell="student"] .prob-toolbar__row--head > .prob-toolbar__back,
+.prob-student-wb .prob-toolbar__row--head > .prob-toolbar__back {
     grid-area: back;
     flex-shrink: 0;
     margin-top: 0;
+    align-self: start;
 }
 
-html[data-app-shell="student"] .prob-toolbar__row--head > .prob-toolbar__hero {
+html[data-app-shell="student"] .prob-toolbar__row--head > .prob-toolbar__hero,
+.prob-student-wb .prob-toolbar__row--head > .prob-toolbar__hero {
     grid-area: hero;
+    min-width: 0;
 }
 
-html[data-app-shell="student"] .prob-toolbar__row--head > .prob-toolbar__tools-band {
+html[data-app-shell="student"] .prob-toolbar__row--head > .prob-toolbar__tools-band,
+.prob-student-wb .prob-toolbar__row--head > .prob-toolbar__tools-band {
     grid-area: tools;
     min-width: 0;
     width: 100%;
-    padding-top: 8px;
-    margin-top: 2px;
-    border-top: 1px solid var(--border-subtle);
+    max-width: 100%;
+    padding-top: 0;
+    margin-top: 0;
+    border-top: none;
+    align-self: center;
+    justify-self: stretch;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
 }
 
 @media (min-width: 768px) {
-    html[data-app-shell="student"] .prob-toolbar__row--head {
+    html[data-app-shell="student"] .prob-toolbar__row--head,
+    .prob-student-wb .prob-toolbar__row--head {
         grid-template-columns: auto minmax(0, 1fr) minmax(260px, 1.1fr);
-        grid-template-areas: 'back hero tools';
         align-items: start;
         gap: 10px;
     }
 
-    html[data-app-shell="student"] .prob-toolbar__row--head > .prob-toolbar__tools-band {
-        padding-top: 0;
-        margin-top: 0;
-        border-top: none;
-        align-self: center;
-        justify-self: stretch;
+    html[data-app-shell="student"] .prob-toolbar__row--head > .prob-toolbar__tools-band,
+    .prob-student-wb .prob-toolbar__row--head > .prob-toolbar__tools-band {
         max-width: none;
     }
 }
 
-html[data-app-shell="student"] .prob-toolbar__hero {
+html[data-app-shell="student"] .prob-toolbar__hero,
+.prob-student-wb .prob-toolbar__hero {
     flex: 1;
     min-width: 0;
     display: flex;
@@ -757,12 +782,14 @@ html[data-app-shell="student"] .prob-toolbar__hero {
     gap: 12px;
 }
 
-html[data-app-shell="student"] .prob-toolbar__hero-images {
+html[data-app-shell="student"] .prob-toolbar__hero-images,
+.prob-student-wb .prob-toolbar__hero-images {
     flex-shrink: 0;
     min-width: 0;
 }
 
-html[data-app-shell="student"] .prob-header-img-row {
+html[data-app-shell="student"] .prob-header-img-row,
+.prob-student-wb .prob-header-img-row {
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -772,7 +799,8 @@ html[data-app-shell="student"] .prob-header-img-row {
     -webkit-overflow-scrolling: touch;
 }
 
-html[data-app-shell="student"] .prob-header-thumb {
+html[data-app-shell="student"] .prob-header-thumb,
+.prob-student-wb .prob-header-thumb {
     display: block;
     padding: 0;
     margin: 0;
@@ -784,7 +812,8 @@ html[data-app-shell="student"] .prob-header-thumb {
     line-height: 0;
 }
 
-html[data-app-shell="student"] .prob-header-thumb img {
+html[data-app-shell="student"] .prob-header-thumb img,
+.prob-student-wb .prob-header-thumb img {
     display: block;
     max-height: min(112px, 18vh);
     max-width: min(200px, 44vw);
@@ -794,12 +823,14 @@ html[data-app-shell="student"] .prob-header-thumb img {
     object-fit: contain;
 }
 
-html[data-app-shell="student"] .prob-toolbar__hero-text {
+html[data-app-shell="student"] .prob-toolbar__hero-text,
+.prob-student-wb .prob-toolbar__hero-text {
     flex: 1;
     min-width: 0;
 }
 
-html[data-app-shell="student"] .prob-toolbar__mini-badge {
+html[data-app-shell="student"] .prob-toolbar__mini-badge,
+.prob-student-wb .prob-toolbar__mini-badge {
     display: inline-block;
     font-size: 0.65rem;
     font-weight: 800;
@@ -809,7 +840,8 @@ html[data-app-shell="student"] .prob-toolbar__mini-badge {
     margin-bottom: 4px;
 }
 
-html[data-app-shell="student"] .prob-toolbar__heading--hero {
+html[data-app-shell="student"] .prob-toolbar__heading--hero,
+.prob-student-wb .prob-toolbar__heading--hero {
     margin: 0;
     font-size: clamp(0.92rem, 2.9vw, 1.06rem);
     font-weight: 800;
@@ -823,18 +855,20 @@ html[data-app-shell="student"] .prob-toolbar__heading--hero {
 }
 
 @media (min-width: 768px) {
-    html[data-app-shell="student"] .prob-toolbar__heading--hero {
+    html[data-app-shell="student"] .prob-toolbar__heading--hero,
+    .prob-student-wb .prob-toolbar__heading--hero {
         -webkit-line-clamp: 2;
     }
 }
 
-html[data-app-shell="student"] .prob-header-tools-scroll {
-    display: flex;
-    flex-direction: row;
-    flex-wrap: nowrap;
+html[data-app-shell="student"] .prob-header-tools-scroll,
+.prob-student-wb .prob-header-tools-scroll {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
     align-items: center;
-    justify-content: space-between;
-    gap: 10px;
+    justify-content: flex-start;
+    gap: 8px 10px;
     width: 100%;
     min-width: 0;
     overflow-x: auto;
@@ -844,32 +878,40 @@ html[data-app-shell="student"] .prob-header-tools-scroll {
     padding-bottom: 2px;
 }
 
-html[data-app-shell="student"] .prob-header-tools-scroll__modes {
+html[data-app-shell="student"] .prob-header-tools-scroll__modes,
+.prob-student-wb .prob-header-tools-scroll__modes {
     flex-shrink: 0;
 }
 
-html[data-app-shell="student"] .prob-header-tools-scroll__actions {
+html[data-app-shell="student"] .prob-header-tools-scroll__actions,
+.prob-student-wb .prob-header-tools-scroll__actions {
     display: inline-flex;
     align-items: center;
     gap: 8px;
     flex-shrink: 0;
+    margin-left: auto;
 }
 
-html[data-app-shell="student"] .prob-toolbar__tools-band #board-only-tools.prob-draw-tools--toolbar-inline {
+html[data-app-shell="student"] .prob-toolbar__tools-band #board-only-tools.prob-draw-tools--toolbar-inline,
+.prob-student-wb .prob-toolbar__tools-band #board-only-tools.prob-draw-tools--toolbar-inline,
+html[data-app-shell="student"] .prob-toolbar__tools-band .prob-draw-strip,
+.prob-student-wb .prob-toolbar__tools-band .prob-draw-strip {
     flex: 1 1 auto;
-    min-width: 140px;
-    display: inline-flex;
-    flex-direction: row;
-    flex-wrap: nowrap;
-    align-items: center;
-    justify-content: space-evenly;
-    gap: 8px 12px;
+    min-width: 0;
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    justify-content: flex-start;
+    gap: 8px 10px;
     overflow-x: auto;
-    overflow-y: visible;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
 }
 
 /** 녹화(채움 보라)와 구별되는 저장 버튼 */
-html[data-app-shell="student"] .prob-save-btn {
+html[data-app-shell="student"] .prob-save-btn,
+.prob-student-wb .prob-save-btn {
     font-weight: 700;
     color: var(--primary) !important;
     background: var(--bg-main) !important;
@@ -877,16 +919,19 @@ html[data-app-shell="student"] .prob-save-btn {
     box-shadow: 0 2px 8px rgba(79, 70, 229, 0.15);
 }
 
-html[data-app-shell="student"] .prob-save-btn:hover {
+html[data-app-shell="student"] .prob-save-btn:hover,
+.prob-student-wb .prob-save-btn:hover {
     background: rgba(79, 70, 229, 0.1) !important;
     transform: translateY(-1px);
 }
 
-html[data-app-shell="student"] .prob-save-btn:active {
+html[data-app-shell="student"] .prob-save-btn:active,
+.prob-student-wb .prob-save-btn:active {
     transform: translateY(0);
 }
 
-html[data-app-shell="student"] .prob-toolbar__desc {
+html[data-app-shell="student"] .prob-toolbar__desc,
+.prob-student-wb .prob-toolbar__desc {
     margin: 6px 0 0;
     font-size: 0.8rem;
     line-height: 1.48;
@@ -897,23 +942,27 @@ html[data-app-shell="student"] .prob-toolbar__desc {
     -webkit-overflow-scrolling: touch;
 }
 
-html[data-app-shell="student"] .prob-toolbar__extra-files {
+html[data-app-shell="student"] .prob-toolbar__extra-files,
+.prob-student-wb .prob-toolbar__extra-files {
     margin-top: 6px;
 }
 
-html[data-app-shell="student"] .prob-toolbar-extra-files-inner {
+html[data-app-shell="student"] .prob-toolbar-extra-files-inner,
+.prob-student-wb .prob-toolbar-extra-files-inner {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
 }
 
-html[data-app-shell="student"] .prob-toolbar-att-empty {
+html[data-app-shell="student"] .prob-toolbar-att-empty,
+.prob-student-wb .prob-toolbar-att-empty {
     font-size: 0.72rem;
     color: var(--text-dim);
     margin: 0;
 }
 
-html[data-app-shell="student"] .prob-mode-seg {
+html[data-app-shell="student"] .prob-mode-seg,
+.prob-student-wb .prob-mode-seg {
     display: inline-flex;
     border-radius: 11px;
     padding: 3px;
@@ -923,7 +972,8 @@ html[data-app-shell="student"] .prob-mode-seg {
     flex-shrink: 0;
 }
 
-html[data-app-shell="student"] .prob-mode-seg__btn {
+html[data-app-shell="student"] .prob-mode-seg__btn,
+.prob-student-wb .prob-mode-seg__btn {
     appearance: none;
     -webkit-appearance: none;
     border: none;
@@ -939,19 +989,22 @@ html[data-app-shell="student"] .prob-mode-seg__btn {
     transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
 
-html[data-app-shell="student"] .prob-mode-seg__btn:hover:not(.prob-mode-seg__btn--active) {
+html[data-app-shell="student"] .prob-mode-seg__btn:hover:not(.prob-mode-seg__btn--active),
+.prob-student-wb .prob-mode-seg__btn:hover:not(.prob-mode-seg__btn--active) {
     color: var(--text-main);
     background: rgba(99, 102, 241, 0.08);
 }
 
-html[data-app-shell="student"] .prob-mode-seg__btn--active {
+html[data-app-shell="student"] .prob-mode-seg__btn--active,
+.prob-student-wb .prob-mode-seg__btn--active {
     background: var(--primary);
     color: #fff;
     box-shadow: 0 2px 8px rgba(79, 70, 229, 0.35);
 }
 
 /** 칠판·사진 패널 (문제 카드 내용은 상단 툴바 히어로에 표시) */
-html[data-app-shell="student"] .prob-workspace {
+html[data-app-shell="student"] .prob-workspace,
+.prob-student-wb .prob-workspace {
     flex: 1;
     min-height: 0;
     display: flex;
@@ -961,7 +1014,8 @@ html[data-app-shell="student"] .prob-workspace {
     padding: 0 var(--s-2);
 }
 
-html[data-app-shell="student"] .prob-main {
+html[data-app-shell="student"] .prob-main,
+.prob-student-wb .prob-main {
     flex: 1;
     min-height: 0;
     display: flex;
@@ -971,34 +1025,40 @@ html[data-app-shell="student"] .prob-main {
 
 
 /** 헤더 도구 띠: 버튼·슬라이더 크기 줄여 한 줄 확보 */
-html[data-app-shell="student"] .prob-toolbar__tools-band .prob-draw-tools .whiteboard-tool {
+html[data-app-shell="student"] .prob-toolbar__tools-band .prob-draw-tools .whiteboard-tool,
+.prob-student-wb .prob-toolbar__tools-band .prob-draw-tools .whiteboard-tool {
     width: 32px;
     height: 32px;
     font-size: 0.92rem;
 }
 
-html[data-app-shell="student"] .prob-header-tools-scroll .prob-mode-seg {
+html[data-app-shell="student"] .prob-header-tools-scroll .prob-mode-seg,
+.prob-student-wb .prob-header-tools-scroll .prob-mode-seg {
     padding: 2px;
 }
 
-html[data-app-shell="student"] .prob-header-tools-scroll .prob-mode-seg__btn {
+html[data-app-shell="student"] .prob-header-tools-scroll .prob-mode-seg__btn,
+.prob-student-wb .prob-header-tools-scroll .prob-mode-seg__btn {
     padding: 5px 11px;
     font-size: 0.75rem;
 }
 
-html[data-app-shell="student"] .prob-toolbar__tools-band .prob-draw-tools .pen-size-control input[type="range"] {
+html[data-app-shell="student"] .prob-toolbar__tools-band .prob-draw-tools .pen-size-control input[type="range"],
+.prob-student-wb .prob-toolbar__tools-band .prob-draw-tools .pen-size-control input[type="range"] {
     width: clamp(70px, 28vw, 140px);
     max-width: 42vw;
 }
 
-html[data-app-shell="student"] .prob-draw-tools .whiteboard-tools {
+html[data-app-shell="student"] .prob-draw-tools .whiteboard-tools,
+.prob-student-wb .prob-draw-tools .whiteboard-tools {
     display: inline-flex;
     align-items: center;
     gap: 6px;
     flex-shrink: 0;
 }
 
-html[data-app-shell="student"] .prob-draw-tools .whiteboard-tool {
+html[data-app-shell="student"] .prob-draw-tools .whiteboard-tool,
+.prob-student-wb .prob-draw-tools .whiteboard-tool {
     width: 38px;
     height: 38px;
     font-size: 1rem;
@@ -1008,12 +1068,14 @@ html[data-app-shell="student"] .prob-draw-tools .whiteboard-tool {
     padding: 0;
 }
 
-html[data-app-shell="student"] .prob-draw-tools .whiteboard-tool .wb-eraser-svg {
+html[data-app-shell="student"] .prob-draw-tools .whiteboard-tool .wb-eraser-svg,
+.prob-student-wb .prob-draw-tools .whiteboard-tool .wb-eraser-svg {
     display: block;
     color: inherit;
 }
 
-html[data-app-shell="student"] .prob-draw-tools__colors {
+html[data-app-shell="student"] .prob-draw-tools__colors,
+.prob-student-wb .prob-draw-tools__colors {
     display: inline-flex;
     margin: 0;
     gap: 5px;
@@ -1021,7 +1083,8 @@ html[data-app-shell="student"] .prob-draw-tools__colors {
     align-items: center;
 }
 
-html[data-app-shell="student"] .prob-draw-tools__pen {
+html[data-app-shell="student"] .prob-draw-tools__pen,
+.prob-student-wb .prob-draw-tools__pen {
     display: inline-flex;
     margin: 0;
     gap: 4px;
@@ -1029,7 +1092,8 @@ html[data-app-shell="student"] .prob-draw-tools__pen {
     align-items: center;
 }
 
-html[data-app-shell="student"] .prob-draw-tools .pen-size-control label {
+html[data-app-shell="student"] .prob-draw-tools .pen-size-control label,
+.prob-student-wb .prob-draw-tools .pen-size-control label {
     font-size: 0.68rem;
     font-weight: 700;
     color: var(--text-muted);
@@ -1037,13 +1101,15 @@ html[data-app-shell="student"] .prob-draw-tools .pen-size-control label {
     flex-shrink: 0;
 }
 
-html[data-app-shell="student"] .prob-draw-tools .pen-size-control input[type="range"] {
+html[data-app-shell="student"] .prob-draw-tools .pen-size-control input[type="range"],
+.prob-student-wb .prob-draw-tools .pen-size-control input[type="range"] {
     width: clamp(76px, 22vw, 120px);
     max-width: 36vw;
     accent-color: var(--primary);
 }
 
-html[data-app-shell="student"] .prob-toolbar__hint {
+html[data-app-shell="student"] .prob-toolbar__hint,
+.prob-student-wb .prob-toolbar__hint {
     margin: 10px 0 0;
     padding: 8px 11px;
     font-size: 0.76rem;
@@ -1054,7 +1120,8 @@ html[data-app-shell="student"] .prob-toolbar__hint {
     border: 1px solid var(--border-subtle);
 }
 
-html[data-app-shell="student"] .prob-toolbar__hint strong {
+html[data-app-shell="student"] .prob-toolbar__hint strong,
+.prob-student-wb .prob-toolbar__hint strong {
     color: var(--primary);
     font-weight: 700;
 }
@@ -1064,7 +1131,8 @@ html[data-app-shell="student"] .prob-toolbar__hint strong {
  * #prob-panel-board 래핑 때문에 .whiteboard-canvas-wrap 의 flex:1 가 상위 플렉스에 전달되지 않고,
  * 캔버스만 absolute 라 래퍼 높이가 0으로 붕괴해 필기가 되지 않는 문제 수정.
  */
-.whiteboard-container #prob-panel-board {
+.whiteboard-container #prob-panel-board,
+.prob-student-wb #prob-panel-board {
     flex: 1;
     min-height: 0;
     display: flex;
@@ -1072,12 +1140,14 @@ html[data-app-shell="student"] .prob-toolbar__hint strong {
     overflow: hidden;
 }
 
-.whiteboard-container #prob-panel-board .whiteboard-canvas-wrap {
+.whiteboard-container #prob-panel-board .whiteboard-canvas-wrap,
+.prob-student-wb #prob-panel-board .whiteboard-canvas-wrap {
     flex: 1;
     min-height: clamp(272px, 56dvh, 720px);
 }
 
-.whiteboard-container #prob-panel-photo:not(.hidden) {
+.whiteboard-container #prob-panel-photo:not(.hidden),
+.prob-student-wb #prob-panel-photo:not(.hidden) {
     flex: 1;
     min-height: 0;
     overflow-y: auto;

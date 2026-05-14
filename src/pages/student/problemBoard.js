@@ -147,7 +147,7 @@ export function renderStudentProblemBoard(container, params) {
       ? `<div class="prob-toolbar__desc">${escapeHtml(descRaw)}</div>`
       : '';
     container.innerHTML = `
-      <div class="whiteboard-container page-enter" style="background: var(--bg-deep);">
+      <div class="whiteboard-container prob-student-wb page-enter" style="background: var(--bg-deep);">
         <header class="prob-toolbar card" style="border-radius: 0; border-top: 0; border-left: 0; border-right: 0;">
           <div class="prob-toolbar__row prob-toolbar__row--head">
             <button type="button" class="btn btn-ghost btn-sm prob-toolbar__back" id="wb-back">← 대시보드</button>
@@ -166,7 +166,7 @@ export function renderStudentProblemBoard(container, params) {
                   <button type="button" class="prob-mode-tab prob-mode-seg__btn prob-mode-seg__btn--active" data-mode="board" id="tab-mode-board" role="tab" aria-selected="true">칠판</button>
                   <button type="button" class="prob-mode-tab prob-mode-seg__btn" data-mode="photo" id="tab-mode-photo" role="tab" aria-selected="false">사진</button>
                 </div>
-                <div id="board-only-tools" class="prob-draw-tools prob-draw-tools--toolbar-inline" aria-label="그리기 도구">
+                <div id="board-only-tools" class="prob-draw-tools prob-draw-tools--toolbar-inline prob-draw-strip" aria-label="그리기 도구">
                   <div class="whiteboard-tools">
                     <button type="button" class="whiteboard-tool ${currentTool === 'pen' ? 'active' : ''}" data-tool="pen" title="펜">✏️</button>
                     <button type="button" class="whiteboard-tool ${currentTool === 'eraser' ? 'active' : ''}" data-tool="eraser" title="지우개">${WHITEBOARD_ERASER_ICON_HTML}</button>
