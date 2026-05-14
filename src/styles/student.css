@@ -681,3 +681,28 @@ html[data-app-shell="student"] #student-note-modal .student-note-modal-body {
 html[data-app-shell="student"] .student-pres-list-wrap {
     max-height: min(420px, 45dvh);
 }
+
+/**
+ * 학생 「한 문제 풀이」 칠판 레이아웃
+ * #prob-panel-board 래핑 때문에 .whiteboard-canvas-wrap 의 flex:1 가 상위 플렉스에 전달되지 않고,
+ * 캔버스만 absolute 라 래퍼 높이가 0으로 붕괴해 필기가 되지 않는 문제 수정.
+ */
+.whiteboard-container #prob-panel-board {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.whiteboard-container #prob-panel-board .whiteboard-canvas-wrap {
+    flex: 1;
+    min-height: 0;
+}
+
+.whiteboard-container #prob-panel-photo:not(.hidden) {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}

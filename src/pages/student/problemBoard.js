@@ -411,6 +411,11 @@ export function renderStudentProblemBoard(container, params) {
     if (photoPanel) photoPanel.classList.toggle('hidden', submitMode !== 'photo');
     if (boardTools) boardTools.style.display = submitMode === 'board' ? '' : 'none';
     updateWhiteboardUI();
+    if (submitMode === 'board') {
+      requestAnimationFrame(() => {
+        window.dispatchEvent(new Event('resize'));
+      });
+    }
   }
 
   function clearPhotoAttachment() {
@@ -899,6 +904,7 @@ export function renderStudentProblemBoard(container, params) {
     bindWhiteboardEvents();
     bindPhotoMode();
     applySubmitMode();
+    requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
   }
 
   void init();
