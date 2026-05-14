@@ -64,41 +64,25 @@ export function renderStudentProblemBoard(container, params) {
   let attachedPhotoFile = null;
   let photoPreviewUrl = null;
 
-  function buildProblemStripHtml() {
-    const pr = problemPrompt;
-    if (!pr) return '';
-    const title = escapeHtml(pr.title || '문제');
-    const descRaw = pr.description && String(pr.description).trim();
-    const desc = descRaw
-      ? `<div class="prob-problem-strip__desc">${escapeHtml(descRaw)}</div>`
-      : '';
-    const hasFiles = Array.isArray(pr.files) && pr.files.length > 0;
-    const innerCls = hasFiles ? 'prob-problem-strip__inner prob-problem-strip__inner--await-files' : 'prob-problem-strip__inner';
-    const attachmentsShell = hasFiles
-      ? `<div id="prob-problem-strip-attachments" class="prob-problem-strip__attachments prob-problem-strip__attachments--loading" aria-live="polite">
-            <span class="prob-problem-strip__loading">첨부 불러오는 중…</span>
-          </div>`
-      : '';
-    return `
-        <div id="prob-problem-strip" class="prob-problem-strip" role="region" aria-label="출제 문제">
-          <div class="${innerCls}">
-            <div class="prob-problem-strip__header">
-              <span class="prob-problem-strip__badge">문제</span>
-              <h2 class="prob-problem-strip__title">${title}</h2>
-              ${desc}
-            </div>
-            ${attachmentsShell}
-          </div>
-        </div>`;
-  }
+  async function fillToolbarProblemAttachments() {
+    const imageRow = document.getElementById('prob-toolbar-image-row');
+    const extraFilesEl = document.getElementById('prob-toolbar-extra-files');
+    const visual = document.getElementById('prob-toolbar-problem-visual');
 
-  async function fillProblemStripAttachments() {
-    const host = document.getElementById('prob-problem-strip-attachments');
-    const inner = host?.closest('.prob-problem-strip__inner');
-    if (!host || !problemPrompt?.files?.length) {
-      if (inner) inner.classList.remove('prob-problem-strip__inner--await-files');
+    const clearSlots = () => {
+      if (imageRow) imageRow.innerHTML = '';
+      if (extraFilesEl) extraFilesEl.innerHTML = '';
+      if (visual) visual.classList.remove('prob-toolbar-problem-visual--has-images');
+    };
+
+    clearSlots();
+
+    if (!problemPrompt?.files?.length) {
+      visual?.classList.add('prob-toolbar-problem-visual--empty');
       return;
     }
+
+    visual?.classList.remove('prob-toolbar-problem-visual--empty');
 
     const images = [];
     const others = [];
@@ -113,88 +97,80 @@ export function renderStudentProblemBoard(container, params) {
       } catch (_) {}
     }
 
-    host.classList.remove('prob-problem-strip__attachments--loading');
-    if (inner) {
-      inner.classList.remove('prob-problem-strip__inner--await-files');
-      inner.classList.toggle('prob-problem-strip__inner--with-files', images.length > 0 || others.length > 0);
+    if (images.length > 0 && imageRow) {
+      visual?.classList.add('prob-toolbar-problem-visual--has-images');
+      imageRow.innerHTML = `<div class="prob-header-img-row" role="list">${images
+        .map(
+          ({ meta, ref }) =>
+            `<button type="button" class="prob-header-thumb" data-url="${escapeAttr(meta.url)}" title="${escapeHtml(meta.name || ref.name || '')}" role="listitem">
+              <img src="${escapeAttr(meta.url)}" alt="${escapeHtml(meta.name || '문제 이미지')}" loading="lazy" decoding="async" />
+            </button>`,
+        )
+        .join('')}</div>`;
+      imageRow.querySelectorAll('.prob-header-thumb').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const u = btn.dataset.url;
+          if (u) window.open(u, '_blank', 'noopener,noreferrer');
+        });
+      });
+    }
+
+    if (others.length > 0 && extraFilesEl) {
+      extraFilesEl.innerHTML = `<div class="prob-toolbar-extra-files-inner">
+          ${others
+            .map(
+              ({ meta, ref }) =>
+                `<button type="button" class="btn btn-secondary btn-sm prob-strip-file-btn" data-file-id="${escapeHtml(String(ref.id))}">📎 ${escapeHtml(meta.name || ref.name || '파일')}</button>`,
+            )
+            .join('')}
+        </div>`;
+      extraFilesEl.querySelectorAll('.prob-strip-file-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const id = btn.dataset.fileId;
+          if (id) void downloadFile(id);
+        });
+      });
     }
 
     if (images.length === 0 && others.length === 0) {
-      host.innerHTML = '<p class="prob-problem-strip__empty">첨부 파일을 열 수 없습니다.</p>';
-      return;
+      visual?.classList.remove('prob-toolbar-problem-visual--has-images');
+      if (extraFilesEl) {
+        extraFilesEl.innerHTML = '<p class="prob-toolbar-att-empty">문제 파일을 불러오지 못했습니다.</p>';
+      }
     }
-
-    const gallery =
-      images.length > 0
-        ? `<div class="prob-problem-strip__gallery" role="list">
-          ${images
-            .map(
-              ({ meta, ref }) => `
-            <button type="button" class="prob-strip-thumb" data-url="${escapeAttr(meta.url)}" title="${escapeHtml(meta.name || ref.name || '')}" role="listitem">
-              <img src="${escapeAttr(meta.url)}" alt="${escapeHtml(meta.name || '문제 이미지')}" loading="lazy" decoding="async" />
-              <span class="prob-strip-thumb__label">${escapeHtml(meta.name || ref.name || '이미지')}</span>
-            </button>`,
-            )
-            .join('')}
-        </div>`
-        : '';
-
-    const actions =
-      others.length > 0
-        ? `<div class="prob-problem-strip__file-actions">
-          <span class="prob-problem-strip__files-label">파일 열기</span>
-          <div class="prob-problem-strip__file-actions-row">
-            ${others
-              .map(
-                ({ meta, ref }) => `
-              <button type="button" class="btn btn-secondary btn-sm prob-strip-file-btn" data-file-id="${escapeHtml(String(ref.id))}">📎 ${escapeHtml(meta.name || ref.name || '파일')}</button>`,
-              )
-              .join('')}
-          </div>
-        </div>`
-        : '';
-
-    host.innerHTML = `${gallery}${actions}`;
-
-    host.querySelectorAll('.prob-strip-thumb').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const u = btn.dataset.url;
-        if (u) window.open(u, '_blank', 'noopener,noreferrer');
-      });
-    });
-    host.querySelectorAll('.prob-strip-file-btn').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const id = btn.dataset.fileId;
-        if (id) void downloadFile(id);
-      });
-    });
   }
 
   function renderBoardShell() {
     const head = escapeHtml(problemPrompt?.title || '한 문제 풀이');
-    const problemStrip = buildProblemStripHtml();
+    const descRaw = problemPrompt?.description && String(problemPrompt.description).trim();
+    const descHtml = descRaw
+      ? `<div class="prob-toolbar__desc">${escapeHtml(descRaw)}</div>`
+      : '';
     container.innerHTML = `
       <div class="whiteboard-container page-enter" style="background: var(--bg-deep);">
         <header class="prob-toolbar card" style="border-radius: 0; border-top: 0; border-left: 0; border-right: 0;">
-          <div class="prob-toolbar__row prob-toolbar__row--primary">
-            <div class="prob-toolbar__start">
-              <button type="button" class="btn btn-ghost btn-sm prob-toolbar__back" id="wb-back">← 대시보드</button>
-              <div class="prob-toolbar__headline">
-                <span class="prob-toolbar__emoji" aria-hidden="true">✏️</span>
-                <h1 class="prob-toolbar__heading">${head}</h1>
+          <div class="prob-toolbar__row prob-toolbar__row--head">
+            <button type="button" class="btn btn-ghost btn-sm prob-toolbar__back" id="wb-back">← 대시보드</button>
+            <div class="prob-toolbar__hero" id="prob-toolbar-problem-visual">
+              <div class="prob-toolbar__hero-images" id="prob-toolbar-image-row" aria-label="문제 이미지"></div>
+              <div class="prob-toolbar__hero-text">
+                <span class="prob-toolbar__mini-badge">문제</span>
+                <h1 class="prob-toolbar__heading prob-toolbar__heading--hero">${head}</h1>
+                ${descHtml}
+                <div id="prob-toolbar-extra-files" class="prob-toolbar__extra-files"></div>
               </div>
             </div>
-            <div class="prob-toolbar__actions">
-              <div class="prob-mode-seg" role="tablist" aria-label="풀이 방식">
-                <button type="button" class="prob-mode-tab prob-mode-seg__btn prob-mode-seg__btn--active" data-mode="board" id="tab-mode-board" role="tab" aria-selected="true">칠판</button>
-                <button type="button" class="prob-mode-tab prob-mode-seg__btn" data-mode="photo" id="tab-mode-photo" role="tab" aria-selected="false">사진</button>
-              </div>
-              <div class="prob-toolbar__cta">
-                <button type="button" class="btn ${isRecording ? 'btn-danger' : 'btn-primary'} btn-sm" id="wb-record">
-                  ${isRecording ? '⏹ 중지' : '📽️ 녹화'}
-                </button>
-                <button type="button" class="btn btn-secondary btn-sm" id="wb-save">💾 저장</button>
-              </div>
+          </div>
+          <div class="prob-toolbar__row prob-toolbar__row--controls">
+            <div class="prob-mode-seg" role="tablist" aria-label="풀이 방식">
+              <button type="button" class="prob-mode-tab prob-mode-seg__btn prob-mode-seg__btn--active" data-mode="board" id="tab-mode-board" role="tab" aria-selected="true">칠판</button>
+              <button type="button" class="prob-mode-tab prob-mode-seg__btn" data-mode="photo" id="tab-mode-photo" role="tab" aria-selected="false">사진</button>
+            </div>
+            <div class="prob-toolbar__cta">
+              <button type="button" class="btn ${isRecording ? 'btn-danger' : 'btn-primary'} btn-sm" id="wb-record">
+                ${isRecording ? '⏹ 중지' : '📽️ 녹화'}
+              </button>
+              <button type="button" class="btn btn-secondary btn-sm" id="wb-save">💾 저장</button>
             </div>
           </div>
           ${problemPromptHasModelAnswer(problemPrompt) ? `
@@ -202,7 +178,6 @@ export function renderStudentProblemBoard(container, params) {
         </header>
 
         <div class="prob-workspace">
-          ${problemStrip}
           <div class="prob-main">
             <div id="prob-panel-board">
               <div class="whiteboard-canvas-wrap" style="background: #000; position: relative;">
@@ -319,16 +294,41 @@ export function renderStudentProblemBoard(container, params) {
 
     window.onresize = () => {
       if (!wbCanvas || !wbCtx) return;
-      const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = wbCanvas.width;
-      tempCanvas.height = wbCanvas.height;
-      tempCanvas.getContext('2d').drawImage(wbCanvas, 0, 0);
+      const prevW = wbCanvas.width;
+      const prevH = wbCanvas.height;
+      let tempCanvas = null;
+      if (prevW > 0 && prevH > 0) {
+        tempCanvas = document.createElement('canvas');
+        tempCanvas.width = prevW;
+        tempCanvas.height = prevH;
+        try {
+          tempCanvas.getContext('2d').drawImage(wbCanvas, 0, 0);
+        } catch (_) {
+          tempCanvas = null;
+        }
+      }
 
       setSize();
 
+      const logW = wrap.clientWidth;
+      const logH = wrap.clientHeight;
+      if (logW <= 0 || logH <= 0 || wbCanvas.width <= 0 || wbCanvas.height <= 0) {
+        return;
+      }
+
       wbCtx.save();
       wbCtx.setTransform(1, 0, 0, 1, 0, 0);
-      wbCtx.drawImage(tempCanvas, 0, 0);
+      if (tempCanvas) {
+        try {
+          wbCtx.drawImage(tempCanvas, 0, 0);
+        } catch (_) {
+          wbCtx.fillStyle = '#000';
+          wbCtx.fillRect(0, 0, wbCanvas.width, wbCanvas.height);
+        }
+      } else {
+        wbCtx.fillStyle = '#000';
+        wbCtx.fillRect(0, 0, wbCanvas.width, wbCanvas.height);
+      }
       wbCtx.restore();
     };
 
@@ -1020,6 +1020,23 @@ export function renderStudentProblemBoard(container, params) {
     });
   }
 
+  /** 칠판 래퍼가 레이아웃된 뒤에만 리사이즈·하이드레이트한다. */
+  async function waitBoardWrapReady(minW = 32, minH = 32, maxAttempts = 45) {
+    for (let i = 0; i < maxAttempts; i++) {
+      const wrap = wbCanvas?.parentElement;
+      if (
+        wrap
+        && wrap.clientWidth >= minW
+        && wrap.clientHeight >= minH
+      ) {
+        return true;
+      }
+      await new Promise((r) => requestAnimationFrame(r));
+    }
+    const wrap = wbCanvas?.parentElement;
+    return !!(wrap && wrap.clientWidth > 0 && wrap.clientHeight > 0);
+  }
+
   async function hydrateExistingProblemSubmission() {
     try {
       const mine = await getPresentationsByStudent(student.id);
@@ -1064,9 +1081,18 @@ export function renderStudentProblemBoard(container, params) {
       }
 
       if (!wbCanvas || !wbCtx) return;
+      await waitBoardWrapReady();
+      window.dispatchEvent(new Event('resize'));
+      await new Promise((r) => requestAnimationFrame(r));
+
       const wrap = wbCanvas.parentElement;
       const cw = wrap.clientWidth;
       const ch = wrap.clientHeight;
+      if (cw < 2 || ch < 2) {
+        console.warn('[풀이 불러오기] 칠판 영역 크기 확보 실패');
+        showToast('칠판을 불러오는 중입니다. 화면을 한 번 줄였다 펼쳐 주세요.', 'info', 5000);
+        return;
+      }
       const img = new Image();
       img.crossOrigin = 'anonymous';
       await new Promise((resolve, reject) => {
@@ -1104,7 +1130,7 @@ export function renderStudentProblemBoard(container, params) {
     initWhiteboard();
     bindWhiteboardEvents();
     bindPhotoMode();
-    await fillProblemStripAttachments();
+    await fillToolbarProblemAttachments();
     applySubmitMode();
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
     await hydrateExistingProblemSubmission();

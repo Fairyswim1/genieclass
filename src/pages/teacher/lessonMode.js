@@ -850,16 +850,40 @@ export function renderLessonMode(container, params) {
     // Handle resize
     window.onresize = () => {
       if (!wbCanvas || !wbCtx) return;
-      const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = wbCanvas.width;
-      tempCanvas.height = wbCanvas.height;
-      tempCanvas.getContext('2d').drawImage(wbCanvas, 0, 0);
+      const wrap = wbCanvas.parentElement;
+      const prevW = wbCanvas.width;
+      const prevH = wbCanvas.height;
+      let tempCanvas = null;
+      if (prevW > 0 && prevH > 0) {
+        tempCanvas = document.createElement('canvas');
+        tempCanvas.width = prevW;
+        tempCanvas.height = prevH;
+        try {
+          tempCanvas.getContext('2d').drawImage(wbCanvas, 0, 0);
+        } catch (_) {
+          tempCanvas = null;
+        }
+      }
 
       setSize();
-      
+
+      if (!wrap || wrap.clientWidth <= 0 || wrap.clientHeight <= 0 || wbCanvas.width <= 0 || wbCanvas.height <= 0) {
+        return;
+      }
+
       wbCtx.save();
       wbCtx.setTransform(1, 0, 0, 1, 0, 0);
-      wbCtx.drawImage(tempCanvas, 0, 0);
+      if (tempCanvas) {
+        try {
+          wbCtx.drawImage(tempCanvas, 0, 0);
+        } catch (_) {
+          wbCtx.fillStyle = '#000';
+          wbCtx.fillRect(0, 0, wbCanvas.width, wbCanvas.height);
+        }
+      } else {
+        wbCtx.fillStyle = '#000';
+        wbCtx.fillRect(0, 0, wbCanvas.width, wbCanvas.height);
+      }
       wbCtx.restore();
     };
 
