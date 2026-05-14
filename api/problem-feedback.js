@@ -9,7 +9,8 @@
  * - 생략(자동) → GEMINI_API_KEY가 있으면 Gemini, 아니면 OPENAI_API_KEY로 OpenAI
  *
  * Gemini: GEMINI_API_KEY (Google AI Studio)
- * 기본 모델: gemini-1.5-flash — `GEMINI_MODEL`로 변경 가능 (모델·프로젝트별 무료 한도가 다름)
+ * 기본 모델: gemini-2.0-flash — `GEMINI_MODEL` 로 변경 가능 (계정·지역별 제공 모델이 다름)
+ * ※ gemini-1.5-flash 는 많은 새 프로젝트에서 더 이상 노출되지 않음
  * OpenAI: OPENAI_API_KEY
  */
 
@@ -168,6 +169,34 @@ function humanizeGeminiError(message, httpStatus) {
     ].join('\n');
   }
 
+  const is404Model =
+    /not found for API version|is not supported for generateContent|models\/[^\s]+\s+is\s+not\s+found|\b404\b.*models\//i.test(
+      m,
+    );
+
+  if (is404Model) {
+    const modelHint =
+      process.env.GEMINI_MODEL
+      || process.env.PROBLEM_FEEDBACK_GEMINI_MODEL
+      || 'gemini-2.0-flash';
+    return [
+      '지금 선택된 Gemini 모델이 이 API 버전에서 찾히지 않거나 `generateContent`를 지원하지 않습니다.',
+      '(신규 API 키·프로젝트에서는 `gemini-1.5-flash` 등 예전 이름이 목록에서 빠져 있는 경우가 많습니다.)',
+      '',
+      '조치:',
+      '1) Vercel 등 서버 환경 변수 **`GEMINI_MODEL`** 을 아래처럼 최신 모델로 바꾼 뒤 재배포합니다.',
+      '   예: **`gemini-2.0-flash`**, **`gemini-2.5-flash`**, 또는 AI Studio/API 문서에 나온 이름',
+      '',
+      `2) 현재 서버 기본값(미설정 시): \`${modelHint}\``,
+      '',
+      '3) 호출 가능한 모델 목록 확인 (브라우저나 터미널에서, 키는 노출 금지):',
+      '`GET https://generativelanguage.googleapis.com/v1beta/models?key=YOUR_KEY`',
+      '',
+      '--- 원본 ---',
+      m.slice(0, 800),
+    ].join('\n');
+  }
+
   const is429 = httpStatus === 429;
   const looksQuota =
     is429 || /quota|exceeded|Resource exhausted|rate limit|free_tier|billing/i.test(m);
@@ -180,7 +209,7 @@ function humanizeGeminiError(message, httpStatus) {
     '· 잠시 후(약 1분) 다시 눌러 보기 — 분당 제한이면 곧 풀립니다.',
     '· Google AI Studio / Cloud에서 같은 키의 사용량·할당량 확인',
     '· 무료 한도가 부족하면 Cloud 프로젝트에 결제(청구)를 연결하면 상한이 달라질 수 있음',
-    '· Vercel에 GEMINI_MODEL=gemini-1.5-flash 처럼 다른 모델을 넣어 보기(모델별 한도가 다름)',
+    '· Vercel에 GEMINI_MODEL=gemini-2.0-flash 등 **현재 키에 열린 모델**을 넣어 보기',
     '· OpenAI 키가 있다면 PROBLEM_FEEDBACK_PROVIDER=openai 로 전환',
     '',
     '--- 원본 ---',
@@ -192,7 +221,7 @@ async function generateWithGemini(body, geminiKey) {
   const model =
     process.env.GEMINI_MODEL
     || process.env.PROBLEM_FEEDBACK_GEMINI_MODEL
-    || 'gemini-1.5-flash';
+    || 'gemini-2.0-flash';
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(geminiKey)}`;
 
