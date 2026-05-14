@@ -531,18 +531,35 @@ export async function createProblemPrompt(classId, teacherId, data) {
     return prompt;
 }
 
+function normalizeModelAnswerFileRefs(raw) {
+    if (Array.isArray(raw)) return raw;
+    if (raw && typeof raw === 'object') {
+        try {
+            return Object.values(raw);
+        } catch (_) {
+            return [];
+        }
+    }
+    return [];
+}
+
 /** 모범답안 텍스트·첨부 중 하나라도 있으면 true (선택 과제 기능용) */
 export function problemPromptHasModelAnswer(prompt) {
     if (!prompt) return false;
-    const t = typeof prompt.modelAnswerText === 'string' ? prompt.modelAnswerText.trim() : '';
-    const files = Array.isArray(prompt.modelAnswerFiles) ? prompt.modelAnswerFiles : [];
+    let t = '';
+    if (typeof prompt.modelAnswerText === 'string') {
+        t = prompt.modelAnswerText.trim();
+    } else if (prompt.modelAnswerText != null && String(prompt.modelAnswerText).trim()) {
+        t = String(prompt.modelAnswerText).trim();
+    }
+    const files = normalizeModelAnswerFileRefs(prompt.modelAnswerFiles);
     return t.length > 0 || files.length > 0;
 }
 
 /** 문제 모범답안 참고 파일 중 이미지만 HTTP URL 목록으로 (Vision API용) */
 export async function collectImageUrlsFromModelAnswerFiles(modelAnswerFiles) {
     const out = [];
-    for (const ref of Array.isArray(modelAnswerFiles) ? modelAnswerFiles : []) {
+    for (const ref of normalizeModelAnswerFileRefs(modelAnswerFiles)) {
         if (!ref?.id) continue;
         const meta = await getFileById(ref.id);
         const type = String(meta?.type || '');
@@ -558,7 +575,7 @@ export async function collectImageUrlsFromModelAnswerFiles(modelAnswerFiles) {
 /** PDF 등 비이미지 모범답안 참고물 이름 목록(AI에게 문맥용) */
 export async function collectNonImageModelAnswerFileNotes(modelAnswerFiles) {
     const notes = [];
-    for (const ref of Array.isArray(modelAnswerFiles) ? modelAnswerFiles : []) {
+    for (const ref of normalizeModelAnswerFileRefs(modelAnswerFiles)) {
         if (!ref?.id) continue;
         const meta = await getFileById(ref.id);
         const type = String(meta?.type || '');
@@ -1088,6 +1105,47 @@ export async function getFileById(fileId) {
     if (!fileId) return null;
     const docSnap = await getDoc(doc(db, COLLECTIONS.FILES, fileId));
     return docSnap.exists() ? docSnap.data() : null;
+}
+
+/** 발표·풀이에 붙은 칠판 이미지 공개 URL (동기). */
+export function presentationWhiteboardImageUrl(pres) {
+    const w = pres?.whiteboardImage;
+    if (!w || typeof w !== 'object') return '';
+    const u = w.url;
+    if (typeof u === 'string' && u.trim()) return u.trim();
+    return '';
+}
+
+/**
+ * whiteboardImage에 url이 없고 id만 있는 문서 → files 컬렉션에서 url 보강
+ */
+export async function enrichPresentationWithImageUrls(pres) {
+    if (!pres || typeof pres !== 'object') return pres;
+    if (presentationWhiteboardImageUrl(pres)) return pres;
+    const w = pres.whiteboardImage;
+    if (!w?.id) return pres;
+    try {
+        const meta = await getFileById(w.id);
+        if (meta?.url) {
+            return {
+                ...pres,
+                whiteboardImage: {
+                    ...w,
+                    url: meta.url,
+                    name: w.name || meta.name,
+                    type: w.type || meta.type,
+                },
+            };
+        }
+    } catch (e) {
+        console.warn('[enrichPresentationWithImageUrls]', e);
+    }
+    return pres;
+}
+
+export async function enrichPresentationsWithImageUrls(presentations) {
+    if (!Array.isArray(presentations) || presentations.length === 0) return presentations;
+    return Promise.all(presentations.map((p) => enrichPresentationWithImageUrls(p)));
 }
 
 export async function downloadFile(fileId) {

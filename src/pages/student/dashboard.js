@@ -19,6 +19,8 @@ import {
   fetchProblemSolutionFeedback,
   collectImageUrlsFromModelAnswerFiles,
   collectNonImageModelAnswerFileNotes,
+  enrichPresentationsWithImageUrls,
+  presentationWhiteboardImageUrl,
 } from '../../store.js';
 import { escapeHtml, renderQuizMath } from '../../utils/quizMath.js';
 import { renderCharacter, getLevelConfig, PLANT_TYPES, getLevelProgress } from '../../components/characterAvatar.js';
@@ -136,7 +138,13 @@ export function renderStudentDashboard(container) {
         loadOr('제출물', getSubmissionsByStudent(freshStudent.id), []),
         loadOr('공지', cls ? getAnnouncementsByClass(cls.id) : Promise.resolve([]), []),
         loadOr('자료', cls ? getResourcesByClass(cls.id) : Promise.resolve([]), []),
-        loadOr('발표', cls ? getPresentationsByClass(cls.id) : Promise.resolve([]), []),
+        loadOr(
+          '발표',
+          cls
+            ? getPresentationsByClass(cls.id).then((arr) => enrichPresentationsWithImageUrls(arr))
+            : Promise.resolve([]),
+          [],
+        ),
         loadOr('자기기록', getStudentSelfRecords(freshStudent.id), []),
         loadOr('쪽지', getStudentNotesByStudent(freshStudent.id), []),
         loadOr('한문제', cls ? getProblemPromptsByClass(cls.id) : Promise.resolve([]), []),
@@ -305,6 +313,9 @@ export function renderStudentDashboard(container) {
             </div>
             <p style="font-size: 0.82rem; color: var(--text-muted); margin: 0 0 var(--s-3); line-height: 1.45;">
               선생님이 올린 문제에 <strong>칠판</strong>으로 쓰거나, <strong>종이 풀이 사진</strong>을 올리고 필요하면 <strong>음성</strong>도 덧붙일 수 있어요.
+              <span style="display: block; margin-top: 6px; font-size: 0.78rem; color: var(--text-dim);">
+                ✨ 피드백 버튼은 선생님이 문제를 올릴 때 <strong>「모범답안·해설」</strong> 칸(텍스트 또는 파일)을 넣은 문제에서만 보여요. (문제 본문·문제 첨부만으로는 피드백이 켜지지 않습니다.)
+              </span>
             </p>
             <div class="flex flex-col gap-sm">
               ${problemPrompts.length === 0
@@ -317,7 +328,7 @@ export function renderStudentDashboard(container) {
         ? sols.slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))[0]
         : null;
       const hasSol = !!sol;
-      const wbUrlMine = typeof sol?.whiteboardImage?.url === 'string' ? sol.whiteboardImage.url.trim() : '';
+      const wbUrlMine = presentationWhiteboardImageUrl(sol);
       const canAiFeedback =
         problemPromptHasModelAnswer(pr)
         && hasSol
@@ -1225,7 +1236,13 @@ export function renderStudentDashboard(container) {
         const sid = btn.dataset.solutionId;
         const pr = problemPrompts.find((p) => String(p.id) === String(pid));
         const sol = allPresentations.find((p) => String(p.id) === String(sid));
-        const studentImg = typeof sol?.whiteboardImage?.url === 'string' ? sol.whiteboardImage.url.trim() : '';
+        let studentImg = presentationWhiteboardImageUrl(sol);
+        if (!studentImg && sol?.whiteboardImage?.id) {
+          try {
+            const meta = await getFileById(sol.whiteboardImage.id);
+            studentImg = typeof meta?.url === 'string' ? meta.url.trim() : '';
+          } catch (_) {}
+        }
 
         if (!pr || !sol || !studentImg) {
           showToast('풀이 이미지를 찾을 수 없습니다.', 'error');
