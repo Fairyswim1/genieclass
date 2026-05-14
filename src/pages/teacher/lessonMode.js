@@ -10,6 +10,7 @@ import {
   revealQuizGallery, getQuizById
 } from '../../store.js';
 import { escapeHtml, renderQuizMath } from '../../utils/quizMath.js';
+import { bindClipboardPasteZone } from '../../utils/clipboardPaste.js';
 import { renderQuizLatexKeyboardHtml } from '../../utils/quizLatexKeyboard.js';
 import { renderCharacter, getLevelConfig, renderPraiseAnimation, deriveCharacterLevelFromPoints } from '../../components/characterAvatar.js';
 import { getStroke } from 'perfect-freehand';
@@ -34,6 +35,7 @@ export function renderLessonMode(container, params) {
   let activeQuiz = null;
   let quizSubmissions = [];
   let unsubscribeSubmissions = null;
+  let clipboardPasteQuizUnsubs = [];
 
   // Whiteboard State
   let wbCanvas, wbCtx;
@@ -548,7 +550,7 @@ export function renderLessonMode(container, params) {
                     <label class="input-label">이미지 첨부 (선택)</label>
                     <div class="drop-zone" id="quiz-img-dropzone" style="height: 150px; display: flex; flex-direction: column; justify-content: center;">
                       <span style="font-size: 2rem; margin-bottom: 8px;">🖼️</span>
-                      <p id="quiz-img-status" style="font-weight: 600; margin-bottom: 4px;">이미지를 여기에 드래그하거나 클릭하여 업로드</p>
+                      <p id="quiz-img-status" style="font-weight: 600; margin-bottom: 4px;">이미지를 여기에 드래그하거나 클릭하여 업로드 · 붙여넣기(Ctrl+V)</p>
                       <p style="font-size: 0.8rem; opacity: 0.65; margin: 0;">JPG, PNG 등 이미지 파일 지원</p>
                       <input type="file" id="quiz-img-input" class="hidden" accept="image/*" />
                     </div>
@@ -618,6 +620,9 @@ export function renderLessonMode(container, params) {
   }
 
   function bindQuizEvents() {
+    clipboardPasteQuizUnsubs.forEach((u) => u());
+    clipboardPasteQuizUnsubs.length = 0;
+
     document.getElementById('quiz-back')?.addEventListener('click', () => {
       if (unsubscribeSubmissions) unsubscribeSubmissions();
       activeView = 'lesson';
@@ -653,6 +658,23 @@ export function renderLessonMode(container, params) {
         statusText.textContent = `선택됨: ${file.name}`;
       }
     });
+
+    if (dropzone && input && statusText) {
+      clipboardPasteQuizUnsubs.push(
+        bindClipboardPasteZone({
+          zone: dropzone,
+          imagesOnly: true,
+          onPaste: (files) => {
+            const file = files.find((f) => String(f.type || '').startsWith('image/'));
+            if (!file) return;
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            input.files = dt.files;
+            statusText.textContent = `선택됨: ${file.name}`;
+          },
+        }),
+      );
+    }
 
     let previewDebounce;
     const refreshTeacherQuizPreview = () => {
@@ -1664,6 +1686,8 @@ export function renderLessonMode(container, params) {
 
   return function cleanup() {
     isActive = false;
+    clipboardPasteQuizUnsubs.forEach((u) => u());
+    clipboardPasteQuizUnsubs.length = 0;
     if (unsubscribeSubmissions) {
       unsubscribeSubmissions();
       unsubscribeSubmissions = null;

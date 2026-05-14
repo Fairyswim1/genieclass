@@ -10,6 +10,7 @@ import {
   getPresentationsByClass,
 } from '../../store.js';
 import { escapeHtml } from '../../utils/quizMath.js';
+import { bindClipboardPasteZone } from '../../utils/clipboardPaste.js';
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
 
@@ -40,6 +41,9 @@ export function renderAssignMode(container, params) {
   let existingFilesQueue = []; // Array of {id, name} objects for EDITING
   let probFilesQueue = [];
   let probModelFilesQueue = [];
+
+  /** render → bindEvents마다 교체 전 이전 창 레벨 paste 리스너 제거 */
+  let clipboardPasteUnsubs = [];
 
   async function init() {
     cls = await getClassById(classId);
@@ -730,6 +734,14 @@ export function renderAssignMode(container, params) {
         fileInput.value = ''; // Reset so same file can be selected again if removed
       }
     });
+
+    clipboardPasteUnsubs.push(
+      bindClipboardPasteZone({
+        zone: dropZone,
+        imagesOnly: false,
+        onPaste: (files) => addFilesToQueue(type, files),
+      }),
+    );
   }
 
   function addFilesToQueue(type, files) {
@@ -749,6 +761,9 @@ export function renderAssignMode(container, params) {
   }
 
   function bindEvents() {
+    clipboardPasteUnsubs.forEach((u) => u());
+    clipboardPasteUnsubs.length = 0;
+
     document.getElementById('btn-back-dashboard')?.addEventListener('click', () => {
       window.location.hash = '/teacher/dashboard';
     });
@@ -1217,5 +1232,7 @@ export function renderAssignMode(container, params) {
 
   return function cleanup() {
     isActive = false;
+    clipboardPasteUnsubs.forEach((u) => u());
+    clipboardPasteUnsubs.length = 0;
   };
 }

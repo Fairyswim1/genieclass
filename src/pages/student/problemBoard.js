@@ -19,6 +19,7 @@ import {
   presentationWhiteboardImageUrl,
 } from '../../store.js';
 import { escapeHtml } from '../../utils/quizMath.js';
+import { bindClipboardPasteZone } from '../../utils/clipboardPaste.js';
 import { eraseSegmentDisk, WHITEBOARD_ERASER_ICON_HTML } from '../../utils/eraserCanvas.js';
 
 function escapeAttr(s) {
@@ -65,6 +66,9 @@ export function renderStudentProblemBoard(container, params) {
   let photoPreviewUrl = null;
 
   const SIDE_REF_STORAGE_KEY = 'genie_prob_side_ref';
+
+  /** 라우트 이탈 시 클립보드 paste 리스너 제거 */
+  let unbindPhotoClipboard = () => {};
 
   function setSideReferenceOpen(open, persist = true) {
     const main = document.getElementById('prob-main-wrap');
@@ -260,6 +264,10 @@ export function renderStudentProblemBoard(container, params) {
         </header>
 
         <div class="prob-workspace">
+          <div class="prob-pan-strip" id="prob-pan-strip" aria-label="화면 위아래 이동(스크롤)">
+            <span class="prob-pan-strip__icon" aria-hidden="true"></span>
+            <span class="prob-pan-strip__text">위·아래로 밀어 화면 이동 (문제·저장 버튼) · 두 번 탭하면 맨 위로</span>
+          </div>
           <div class="prob-main" id="prob-main-wrap">
             <aside id="prob-side-reference" class="prob-side-reference hidden" aria-hidden="true">
               <div class="prob-side-reference__top">
@@ -282,7 +290,7 @@ export function renderStudentProblemBoard(container, params) {
             </p>
             <div class="drop-zone" id="prob-photo-dropzone" style="min-height: 120px; cursor: pointer;">
               <span style="font-size: 2rem;">🖼️</span>
-              <p id="prob-photo-status" style="font-weight: 600; margin: 6px 0 4px;">이미지를 드래그하거나 아래 버튼을 누르세요</p>
+              <p id="prob-photo-status" style="font-weight: 600; margin: 6px 0 4px;">드래그·클릭·붙여넣기(Ctrl+V)</p>
               <p style="font-size: 0.78rem; opacity: 0.7; margin: 0;">JPG, PNG 등 이미지 한 장</p>
             </div>
             <div class="flex flex-wrap gap-sm justify-center" style="margin-top: var(--s-3);">
@@ -318,6 +326,7 @@ export function renderStudentProblemBoard(container, params) {
     const draftCtx = draftCanvas.getContext('2d');
 
     wbCanvas.style.touchAction = 'none';
+
     wbCanvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
     const wrap = wbCanvas.parentElement;
@@ -415,7 +424,9 @@ export function renderStudentProblemBoard(container, params) {
       const pos = getPos(e);
       const pressure = e.pointerType === 'pen' && e.pressure ? e.pressure : 0.5;
       currentPoints = [[pos.x, pos.y, pressure]];
-      try { wbCanvas.setPointerCapture(e.pointerId); } catch (_) {}
+      try {
+        wbCanvas.setPointerCapture(e.pointerId);
+      } catch (_) {}
     };
 
     const moveDrawing = (e) => {
@@ -423,7 +434,11 @@ export function renderStudentProblemBoard(container, params) {
       e.stopPropagation();
       if (!drawing) return;
       let events;
-      try { events = e.getCoalescedEvents ? e.getCoalescedEvents() : null; } catch (_) { events = null; }
+      try {
+        events = e.getCoalescedEvents ? e.getCoalescedEvents() : null;
+      } catch (_) {
+        events = null;
+      }
       if (!events || events.length === 0) events = [e];
       for (const ev of events) {
         const pos = getPos(ev);
@@ -488,71 +503,6 @@ export function renderStudentProblemBoard(container, params) {
     wbCanvas.addEventListener('pointermove', moveDrawing);
     wbCanvas.addEventListener('pointerup', stopDrawing);
     wbCanvas.addEventListener('pointercancel', stopDrawing);
-
-    const getTouchPos = (touch) => {
-      const rect = wbCanvas.getBoundingClientRect();
-      return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
-    };
-    wbCanvas.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      if (drawing) return;
-      const touch = e.touches[0];
-      const pos = getTouchPos(touch);
-      drawing = true;
-      currentPoints = [[pos.x, pos.y, 0.5]];
-    }, { passive: false });
-    wbCanvas.addEventListener('touchmove', (e) => {
-      e.preventDefault();
-      if (!drawing) return;
-      const touch = e.touches[0];
-      const pos = getTouchPos(touch);
-      currentPoints.push([pos.x, pos.y, 0.5]);
-      if (currentPoints.length < 2) return;
-      const isEraser = currentTool === 'eraser';
-      if (isEraser) {
-        const p1 = currentPoints[currentPoints.length - 2];
-        const p2 = currentPoints[currentPoints.length - 1];
-        eraseSegmentDisk(wbCtx, p1[0], p1[1], p2[0], p2[1], penSize);
-      } else {
-        const strokeSize = penSize * 2.5;
-        const strokePolygon = getStroke(currentPoints, {
-          size: strokeSize, thinning: 0.5, smoothing: 0.5, streamline: 0.5,
-          simulatePressure: true,
-        });
-        const pathData = getSvgPathFromStroke(strokePolygon);
-        if (pathData) {
-          const path = new Path2D(pathData);
-          draftCtx.save();
-          draftCtx.setTransform(1, 0, 0, 1, 0, 0);
-          draftCtx.clearRect(0, 0, draftCanvas.width, draftCanvas.height);
-          draftCtx.restore();
-          draftCtx.save();
-          draftCtx.fillStyle = penColor;
-          draftCtx.fill(path);
-          draftCtx.restore();
-        }
-      }
-    }, { passive: false });
-    wbCanvas.addEventListener('touchend', (e) => {
-      e.preventDefault();
-      if (!drawing) return;
-      if (currentTool === 'pen') {
-        wbCtx.save();
-        wbCtx.setTransform(1, 0, 0, 1, 0, 0);
-        wbCtx.drawImage(draftCanvas, 0, 0);
-        wbCtx.restore();
-        draftCtx.save();
-        draftCtx.setTransform(1, 0, 0, 1, 0, 0);
-        draftCtx.clearRect(0, 0, draftCanvas.width, draftCanvas.height);
-        draftCtx.restore();
-      }
-      drawing = false;
-      currentPoints = [];
-    }, { passive: false });
-    wbCanvas.addEventListener('touchcancel', () => {
-      drawing = false;
-      currentPoints = [];
-    }, { passive: false });
   }
 
   function bindWhiteboardEvents() {
@@ -600,6 +550,13 @@ export function renderStudentProblemBoard(container, params) {
       setSideReferenceOpen(!on);
     });
     document.getElementById('prob-side-collapse')?.addEventListener('click', () => setSideReferenceOpen(false));
+
+    document.getElementById('prob-pan-strip')?.addEventListener('dblclick', () => {
+      document.querySelector('.prob-student-wb .prob-toolbar')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    });
   }
 
   function applySubmitMode() {
@@ -618,6 +575,7 @@ export function renderStudentProblemBoard(container, params) {
     if (photoPanel) photoPanel.classList.toggle('hidden', submitMode !== 'photo');
     if (boardTools) boardTools.style.display = submitMode === 'board' ? '' : 'none';
     if (sideToggle) sideToggle.style.display = submitMode === 'board' ? '' : 'none';
+    document.getElementById('prob-pan-strip')?.classList.toggle('hidden', submitMode !== 'board');
 
     if (submitMode !== 'board') {
       mainWrap?.classList.remove('prob-main--side-ref');
@@ -648,7 +606,7 @@ export function renderStudentProblemBoard(container, params) {
     if (prev) prev.removeAttribute('src');
     document.getElementById('prob-photo-preview-wrap')?.classList.add('hidden');
     const st = document.getElementById('prob-photo-status');
-    if (st) st.textContent = '이미지를 드래그하거나 아래 버튼을 누르세요';
+    if (st) st.textContent = '드래그·클릭·붙여넣기(Ctrl+V)';
     document.getElementById('prob-photo-clear')?.classList.add('hidden');
   }
 
@@ -701,6 +659,15 @@ export function renderStudentProblemBoard(container, params) {
       if (f) onFile(f);
     });
 
+    const unbindPaste = bindClipboardPasteZone({
+      zone: dz,
+      imagesOnly: true,
+      onPaste: (files) => {
+        const f = files.find((x) => String(x.type || '').startsWith('image/'));
+        if (f) onFile(f);
+      },
+    });
+
     document.querySelectorAll('.prob-mode-tab').forEach((btn) => {
       btn.addEventListener('click', () => {
         const mode = btn.dataset.mode;
@@ -714,6 +681,8 @@ export function renderStudentProblemBoard(container, params) {
         applySubmitMode();
       });
     });
+
+    return unbindPaste;
   }
 
   function renderRecordingFrame() {
@@ -1221,7 +1190,7 @@ export function renderStudentProblemBoard(container, params) {
     renderBoardShell();
     initWhiteboard();
     bindWhiteboardEvents();
-    bindPhotoMode();
+    unbindPhotoClipboard = bindPhotoMode();
     await fillToolbarProblemAttachments();
     applySubmitMode();
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
@@ -1230,4 +1199,8 @@ export function renderStudentProblemBoard(container, params) {
   }
 
   void init();
+
+  return () => {
+    unbindPhotoClipboard();
+  };
 }

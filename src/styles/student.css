@@ -694,7 +694,8 @@ html[data-app-shell="student"] .student-pres-list-wrap {
     width: 100% !important;
     max-width: 100vw;
     height: auto !important;
-    min-height: 100dvh;
+    /* 툴바·히어로를 다시 보이게 브라우저 스크롤이 생기도록 약간 넘김 */
+    min-height: calc(100dvh + max(100px, 14dvh));
     max-height: none !important;
     z-index: auto !important;
 }
@@ -703,6 +704,10 @@ html[data-app-shell="student"] .whiteboard-container,
 .prob-student-wb.whiteboard-container {
     display: flex;
     flex-direction: column;
+}
+
+/** 문제 풀이( prob-student-wb )는 위에서 min-height: calc(...) 로 스크롤 여유 처리 — 여기선 덮어쓰지 않음 */
+html[data-app-shell="student"] .whiteboard-container:not(.prob-student-wb) {
     min-height: 100dvh;
     min-height: 100vh;
 }
@@ -1010,8 +1015,50 @@ html[data-app-shell="student"] .prob-workspace,
     display: flex;
     flex-direction: column;
     align-items: stretch;
-    gap: 0;
+    gap: 6px;
     padding: 0 var(--s-2);
+}
+
+/** 패드 브라우저: 칠판 필기 때문에 캔버스에서는 스크롤을 막아 둠 → 세로 패닝은 이 띠에서만 허용 */
+html[data-app-shell="student"] .prob-pan-strip,
+.prob-student-wb .prob-pan-strip {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 11px;
+    border-radius: var(--r-sm);
+    border: 1px dashed rgba(148, 163, 184, 0.5);
+    background: rgba(15, 23, 42, 0.38);
+    color: rgba(226, 232, 240, 0.88);
+    font-size: 0.72rem;
+    line-height: 1.38;
+    font-weight: 600;
+    touch-action: pan-y;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+html[data-app-shell="student"] .prob-pan-strip__icon,
+.prob-student-wb .prob-pan-strip__icon {
+    flex-shrink: 0;
+    width: 9px;
+    height: 20px;
+    border-radius: 4px;
+    border: 2px solid rgba(148, 163, 184, 0.7);
+    background: repeating-linear-gradient(
+        180deg,
+        rgba(148, 163, 184, 0.4),
+        rgba(148, 163, 184, 0.4) 3px,
+        transparent 3px,
+        transparent 6px
+    );
+}
+
+html[data-app-shell="student"] .prob-pan-strip__text,
+.prob-student-wb .prob-pan-strip__text {
+    flex: 1;
+    min-width: 0;
 }
 
 html[data-app-shell="student"] .prob-main,

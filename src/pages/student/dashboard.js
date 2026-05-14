@@ -24,6 +24,7 @@ import {
   getClassesByTeacher,
 } from '../../store.js';
 import { escapeHtml, renderQuizMath } from '../../utils/quizMath.js';
+import { bindClipboardPasteZone } from '../../utils/clipboardPaste.js';
 import { renderCharacter, getLevelConfig, PLANT_TYPES, getLevelProgress } from '../../components/characterAvatar.js';
 import { Capacitor } from '@capacitor/core';
 import { VoiceRecorder } from 'capacitor-voice-recorder';
@@ -55,6 +56,11 @@ export function renderStudentDashboard(container) {
     cleared: false,
   };
   let selfRecordFilesQueue = [];
+  /** bindEvents 교체 전 정리 및 과제 상세 페이지 전용 */
+  let clipboardPasteUnsubs = [];
+  let submissionPasteUnsub = null;
+  let quizOverlayPasteUnsub = null;
+
   /** 상단 '선생님께 쪽지' 버튼으로만 열림 */
   let studentNotePanelOpen = false;
 
@@ -188,6 +194,13 @@ export function renderStudentDashboard(container) {
       } catch (_) {}
     } catch (err) {
       console.error('Data loading error:', err);
+    }
+
+    if (!(activeView === 'assignment' && selectedAssignment)) {
+      if (submissionPasteUnsub) {
+        submissionPasteUnsub();
+        submissionPasteUnsub = null;
+      }
     }
 
     if (activeView === 'assignment' && selectedAssignment) {
@@ -842,7 +855,7 @@ export function renderStudentDashboard(container) {
                 <label class="input-label">사진 제출 (선택)</label>
                 <div class="drop-zone" id="quiz-solve-dropzone" style="padding: 20px; min-height: 100px;">
                   <span style="font-size: 1.5rem;">📷</span>
-                  <p id="quiz-solve-status" style="font-weight: 600; margin-bottom: 4px;">사진을 여기에 드래그하거나 클릭하여 업로드</p>
+                  <p id="quiz-solve-status" style="font-weight: 600; margin-bottom: 4px;">사진을 여기에 드래그하거나 클릭 · 붙여넣기(Ctrl+V)</p>
                   <p style="font-size: 0.75rem; opacity: 0.65; margin: 0;">JPG, PNG 등 이미지 파일 지원</p>
                   <input type="file" id="quiz-solve-input" class="hidden" accept="image/*" />
                 </div>
@@ -937,6 +950,19 @@ export function renderStudentDashboard(container) {
       }
     });
 
+    quizOverlayPasteUnsub = bindClipboardPasteZone({
+      zone: solveDropzone,
+      imagesOnly: true,
+      onPaste: (files) => {
+        const file = files.find((f) => String(f.type || '').startsWith('image/'));
+        if (!file) return;
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        solveInput.files = dt.files;
+        solveStatus.textContent = `선택됨: ${file.name}`;
+      },
+    });
+
     overlay.querySelector('#btn-submit-quiz-solve').addEventListener('click', async () => {
       const solutionText = solveText.value.trim();
       const hasImage = solveInput.files[0];
@@ -969,11 +995,18 @@ export function renderStudentDashboard(container) {
   }
 
   function removeQuizOverlay() {
+    if (quizOverlayPasteUnsub) {
+      quizOverlayPasteUnsub();
+      quizOverlayPasteUnsub = null;
+    }
     const existing = document.getElementById('quiz-overlay');
     if (existing) existing.remove();
   }
 
   function bindEvents(assignments, freshStudent, cls, problemPrompts = [], allPresentations = []) {
+    clipboardPasteUnsubs.forEach((u) => u());
+    clipboardPasteUnsubs.length = 0;
+
     // Media Playback Modal
     const videoModal = document.getElementById('video-modal');
     const player = document.getElementById('player');
@@ -1253,6 +1286,16 @@ export function renderStudentDashboard(container) {
       if (e.dataTransfer.files.length > 0) addSelfRecordFiles(e.dataTransfer.files);
     });
 
+    if (selfRecordDropzone) {
+      clipboardPasteUnsubs.push(
+        bindClipboardPasteZone({
+          zone: selfRecordDropzone,
+          imagesOnly: false,
+          onPaste: (files) => addSelfRecordFiles(files),
+        }),
+      );
+    }
+
     document.getElementById('btn-save-self-record')?.addEventListener('click', async () => {
       const title = document.getElementById('self-record-title').value.trim();
       const content = document.getElementById('self-record-content').value.trim();
@@ -1404,6 +1447,10 @@ export function renderStudentDashboard(container) {
   }
 
   function renderAssignmentDetail(freshStudent, assignment, submissions) {
+    if (submissionPasteUnsub) {
+      submissionPasteUnsub();
+      submissionPasteUnsub = null;
+    }
     resetAssignmentRecording();
     const sub = submissions.find(s => s.assignmentId === assignment.id);
 
@@ -1467,7 +1514,7 @@ export function renderStudentDashboard(container) {
               <div id="submission-form-view" class="${sub ? 'hidden' : ''}">
                 <div class="drop-zone" style="background: var(--bg-surface); border-style: dashed; padding: var(--s-12); border-radius: var(--r-lg);" id="submission-dropzone">
                    <div style="font-size: 2rem; margin-bottom: 10px;">📤</div>
-                   <div style="font-weight: 600;">파일을 드래그하거나 클릭하여 업로드</div>
+                   <div style="font-weight: 600;">파일을 드래그하거나 클릭하여 업로드 · 붙여넣기(Ctrl+V)</div>
                    <div style="font-size: 0.85rem; color: var(--text-dim); margin-top: 5px;">${sub ? '새로 업로드하면 기존 파일이 대체됩니다.' : '여러 파일 업로드(HTML 등) 가능'}</div>
                    <div id="submission-file-list" style="margin-top: 15px; font-size: 0.9rem; color: var(--primary); font-weight: 500;"></div>
                    <input type="file" id="submission-file" class="hidden" multiple />
@@ -1704,6 +1751,17 @@ export function renderStudentDashboard(container) {
       }
     });
 
+    if (dropzone) {
+      submissionPasteUnsub = bindClipboardPasteZone({
+        zone: dropzone,
+        imagesOnly: false,
+        onPaste: (files) => {
+          submissionFilesQueue = [...submissionFilesQueue, ...Array.from(files)];
+          updateSubmissionFileListUI();
+        },
+      });
+    }
+
     function firebaseSubmitUserMessage(err) {
       const code = err && err.code ? String(err.code) : '';
       const msg = err && err.message ? String(err.message) : '';
@@ -1786,4 +1844,14 @@ export function renderStudentDashboard(container) {
   };
 
   init();
+
+  return () => {
+    removeQuizOverlay();
+    clipboardPasteUnsubs.forEach((u) => u());
+    clipboardPasteUnsubs.length = 0;
+    if (submissionPasteUnsub) {
+      submissionPasteUnsub();
+      submissionPasteUnsub = null;
+    }
+  };
 }
