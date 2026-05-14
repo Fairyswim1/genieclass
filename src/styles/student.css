@@ -1023,6 +1023,130 @@ html[data-app-shell="student"] .prob-main,
     gap: 0;
 }
 
+/** 참고용 문제 이미지 사이드 패널 · 칠판과 나란히 (팝업 없음) */
+html[data-app-shell="student"] .prob-board-stack,
+.prob-student-wb .prob-board-stack {
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+html[data-app-shell="student"] .prob-main--side-ref,
+.prob-student-wb .prob-main--side-ref {
+    flex-direction: row;
+    align-items: stretch;
+    gap: var(--s-3);
+    padding-top: var(--s-2);
+}
+
+html[data-app-shell="student"] .prob-side-reference,
+.prob-student-wb .prob-side-reference {
+    flex-shrink: 0;
+    width: min(40vw, 400px);
+    max-width: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--r-md);
+    background: var(--surface-raised, var(--bg-elevated, #f8f9fc));
+    box-shadow: 0 1px 0 rgba(15, 23, 42, 0.06);
+    overflow: hidden;
+}
+
+html[data-app-shell="student"] .prob-side-reference__top,
+.prob-student-wb .prob-side-reference__top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-2);
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+    background: rgba(99, 102, 241, 0.06);
+}
+
+html[data-app-shell="student"] .prob-side-reference__label,
+.prob-student-wb .prob-side-reference__label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    line-height: 1.35;
+}
+
+html[data-app-shell="student"] .prob-side-reference__scroll,
+.prob-student-wb .prob-side-reference__scroll {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: var(--s-2);
+}
+
+html[data-app-shell="student"] .prob-side-ref__fig,
+.prob-student-wb .prob-side-ref__fig {
+    margin: 0 0 var(--s-3);
+}
+
+html[data-app-shell="student"] .prob-side-ref__fig:last-child,
+.prob-student-wb .prob-side-ref__fig:last-child {
+    margin-bottom: 0;
+}
+
+html[data-app-shell="student"] .prob-side-ref__img,
+.prob-student-wb .prob-side-ref__img {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: none;
+    border-radius: var(--r-sm);
+    border: 1px solid var(--border-subtle);
+    background: #fff;
+    object-fit: contain;
+}
+
+html[data-app-shell="student"] .prob-side-ref__cap,
+.prob-student-wb .prob-side-ref__cap {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-2);
+    margin-top: 6px;
+    font-size: 0.68rem;
+    color: var(--text-muted);
+}
+
+html[data-app-shell="student"] .prob-side-ref__name,
+.prob-student-wb .prob-side-ref__name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+    text-align: right;
+}
+
+html[data-app-shell="student"] .prob-btn-side-ref--on,
+.prob-student-wb .prob-btn-side-ref--on {
+    color: var(--primary);
+    font-weight: 700;
+    background: rgba(99, 102, 241, 0.12);
+}
+
+@media (max-width: 720px) {
+    html[data-app-shell="student"] .prob-main--side-ref,
+    .prob-student-wb .prob-main--side-ref {
+        flex-direction: column;
+    }
+
+    html[data-app-shell="student"] .prob-side-reference,
+    .prob-student-wb .prob-side-reference {
+        width: 100%;
+        max-height: min(38vh, 320px);
+    }
+}
+
 
 /** 헤더 도구 띠: 버튼·슬라이더 크기 줄여 한 줄 확보 */
 html[data-app-shell="student"] .prob-toolbar__tools-band .prob-draw-tools .whiteboard-tool,

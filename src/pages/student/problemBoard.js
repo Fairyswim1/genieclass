@@ -64,6 +64,31 @@ export function renderStudentProblemBoard(container, params) {
   let attachedPhotoFile = null;
   let photoPreviewUrl = null;
 
+  const SIDE_REF_STORAGE_KEY = 'genie_prob_side_ref';
+
+  function setSideReferenceOpen(open, persist = true) {
+    const main = document.getElementById('prob-main-wrap');
+    const aside = document.getElementById('prob-side-reference');
+    const toggleBtn = document.getElementById('prob-btn-side-ref');
+    const hasImages = !!(aside?.querySelector?.('#prob-side-reference-images img'));
+    if (!main || !aside || !toggleBtn) return;
+    if (open && !hasImages) return;
+
+    aside.classList.toggle('hidden', !open);
+    aside.setAttribute('aria-hidden', open ? 'false' : 'true');
+    main.classList.toggle('prob-main--side-ref', open);
+    toggleBtn.classList.toggle('prob-btn-side-ref--on', open);
+    toggleBtn.setAttribute('aria-pressed', open ? 'true' : 'false');
+    toggleBtn.textContent = open ? '문제 접기' : '🖼 문제 분할';
+
+    if (persist) {
+      try {
+        sessionStorage.setItem(SIDE_REF_STORAGE_KEY, open ? '1' : '0');
+      } catch (_) {}
+    }
+    requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+  }
+
   async function fillToolbarProblemAttachments() {
     const imageRow = document.getElementById('prob-toolbar-image-row');
     const extraFilesEl = document.getElementById('prob-toolbar-extra-files');
@@ -101,18 +126,54 @@ export function renderStudentProblemBoard(container, params) {
       visual?.classList.add('prob-toolbar-problem-visual--has-images');
       imageRow.innerHTML = `<div class="prob-header-img-row" role="list">${images
         .map(
-          ({ meta, ref }) =>
-            `<button type="button" class="prob-header-thumb" data-url="${escapeAttr(meta.url)}" title="${escapeHtml(meta.name || ref.name || '')}" role="listitem">
+          ({ meta, ref }, idx) =>
+            `<button type="button" class="prob-header-thumb" data-url="${escapeAttr(meta.url)}" data-idx="${idx}" title="${escapeHtml(meta.name || ref.name || '')}" role="listitem">
               <img src="${escapeAttr(meta.url)}" alt="${escapeHtml(meta.name || '문제 이미지')}" loading="lazy" decoding="async" />
             </button>`,
         )
         .join('')}</div>`;
       imageRow.querySelectorAll('.prob-header-thumb').forEach((btn) => {
         btn.addEventListener('click', () => {
-          const u = btn.dataset.url;
-          if (u) window.open(u, '_blank', 'noopener,noreferrer');
+          const idx = btn.dataset.idx;
+          setSideReferenceOpen(true);
+          if (idx != null && idx !== '') {
+            requestAnimationFrame(() => {
+              document
+                .querySelector(`#prob-side-reference-images [data-img-idx="${idx}"]`)
+                ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            });
+          }
         });
       });
+    }
+
+    const sideSc = document.getElementById('prob-side-reference-images');
+    const sideTgl = document.getElementById('prob-btn-side-ref');
+    const mainWrap = document.getElementById('prob-main-wrap');
+    if (images.length > 0 && sideSc) {
+      sideSc.innerHTML = images
+        .map(
+          ({ meta, ref }, idx) =>
+            `<figure class="prob-side-ref__fig" data-img-idx="${idx}">
+              <img class="prob-side-ref__img" src="${escapeAttr(meta.url)}" alt="${escapeHtml(meta.name || ref.name || '문제 이미지')}" loading="lazy" decoding="async" />
+              <figcaption class="prob-side-ref__cap">
+                <a href="${escapeAttr(meta.url)}" target="_blank" rel="noopener noreferrer" class="prob-side-ref__tab">새 창</a>
+                <span class="prob-side-ref__name">${escapeHtml(meta.name || ref.name || '')}</span>
+              </figcaption>
+            </figure>`,
+        )
+        .join('');
+      sideTgl?.classList.remove('hidden');
+      try {
+        if (sessionStorage.getItem(SIDE_REF_STORAGE_KEY) === '1') {
+          setSideReferenceOpen(true, false);
+        }
+      } catch (_) {}
+    } else {
+      if (sideSc) sideSc.innerHTML = '';
+      sideTgl?.classList.add('hidden');
+      mainWrap?.classList.remove('prob-main--side-ref');
+      document.getElementById('prob-side-reference')?.classList.add('hidden');
     }
 
     if (others.length > 0 && extraFilesEl) {
@@ -166,6 +227,7 @@ export function renderStudentProblemBoard(container, params) {
                   <button type="button" class="prob-mode-tab prob-mode-seg__btn prob-mode-seg__btn--active" data-mode="board" id="tab-mode-board" role="tab" aria-selected="true">칠판</button>
                   <button type="button" class="prob-mode-tab prob-mode-seg__btn" data-mode="photo" id="tab-mode-photo" role="tab" aria-selected="false">사진</button>
                 </div>
+                <button type="button" class="btn btn-ghost btn-sm hidden prob-btn-side-ref" id="prob-btn-side-ref" aria-pressed="false">🖼 문제 분할</button>
                 <div id="board-only-tools" class="prob-draw-tools prob-draw-tools--toolbar-inline prob-draw-strip" aria-label="그리기 도구">
                   <div class="whiteboard-tools">
                     <button type="button" class="whiteboard-tool ${currentTool === 'pen' ? 'active' : ''}" data-tool="pen" title="펜">✏️</button>
@@ -198,7 +260,15 @@ export function renderStudentProblemBoard(container, params) {
         </header>
 
         <div class="prob-workspace">
-          <div class="prob-main">
+          <div class="prob-main" id="prob-main-wrap">
+            <aside id="prob-side-reference" class="prob-side-reference hidden" aria-hidden="true">
+              <div class="prob-side-reference__top">
+                <span class="prob-side-reference__label">문제 이미지 · 옆에서 보며 풀기</span>
+                <button type="button" class="btn btn-ghost btn-sm" id="prob-side-collapse">접기</button>
+              </div>
+              <div class="prob-side-reference__scroll" id="prob-side-reference-images"></div>
+            </aside>
+            <div class="prob-board-stack">
             <div id="prob-panel-board">
               <div class="whiteboard-canvas-wrap" style="background: #000; position: relative;">
                 <canvas id="whiteboard-canvas" style="position: absolute; top: 0; left: 0; z-index: 1; touch-action: none;"></canvas>
@@ -229,6 +299,7 @@ export function renderStudentProblemBoard(container, params) {
               이 모드에서는 칠판 화면 대신 <strong>사진 한 장</strong>이 풀이로 저장됩니다. 필요하면 위에서 <strong>음성으로 설명</strong>을 덧붙일 수 있어요.
             </p>
           </div>
+            </div>
             </div>
           </div>
         </div>
@@ -523,12 +594,21 @@ export function renderStudentProblemBoard(container, params) {
 
     document.getElementById('wb-record')?.addEventListener('click', handleRecordToggle);
     document.getElementById('wb-save')?.addEventListener('click', handleSaveProblem);
+
+    document.getElementById('prob-btn-side-ref')?.addEventListener('click', () => {
+      const on = document.getElementById('prob-main-wrap')?.classList.contains('prob-main--side-ref');
+      setSideReferenceOpen(!on);
+    });
+    document.getElementById('prob-side-collapse')?.addEventListener('click', () => setSideReferenceOpen(false));
   }
 
   function applySubmitMode() {
     const boardPanel = document.getElementById('prob-panel-board');
     const photoPanel = document.getElementById('prob-panel-photo');
     const boardTools = document.getElementById('board-only-tools');
+    const mainWrap = document.getElementById('prob-main-wrap');
+    const aside = document.getElementById('prob-side-reference');
+    const sideToggle = document.getElementById('prob-btn-side-ref');
     document.querySelectorAll('.prob-mode-tab').forEach((btn) => {
       const on = btn.dataset.mode === submitMode;
       btn.classList.toggle('prob-mode-seg__btn--active', on);
@@ -537,6 +617,19 @@ export function renderStudentProblemBoard(container, params) {
     if (boardPanel) boardPanel.classList.toggle('hidden', submitMode !== 'board');
     if (photoPanel) photoPanel.classList.toggle('hidden', submitMode !== 'photo');
     if (boardTools) boardTools.style.display = submitMode === 'board' ? '' : 'none';
+    if (sideToggle) sideToggle.style.display = submitMode === 'board' ? '' : 'none';
+
+    if (submitMode !== 'board') {
+      mainWrap?.classList.remove('prob-main--side-ref');
+      aside?.classList.add('hidden');
+      aside?.setAttribute('aria-hidden', 'true');
+    } else {
+      try {
+        if (sessionStorage.getItem(SIDE_REF_STORAGE_KEY) === '1' && sideToggle && !sideToggle.classList.contains('hidden')) {
+          setSideReferenceOpen(true, false);
+        }
+      } catch (_) {}
+    }
     updateWhiteboardUI();
     if (submitMode === 'board') {
       requestAnimationFrame(() => {
