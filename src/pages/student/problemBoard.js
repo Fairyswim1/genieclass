@@ -160,20 +160,13 @@ export function renderStudentProblemBoard(container, params) {
                 <div id="prob-toolbar-extra-files" class="prob-toolbar__extra-files"></div>
               </div>
             </div>
-          </div>
-          ${problemPromptHasModelAnswer(problemPrompt) ? `
-          <p class="prob-toolbar__hint">💡 선생님이 모범답안을 두었습니다. 저장 후 대시보드에서 <strong>✨ 피드백</strong>으로 비교해 보세요.</p>` : ''}
-        </header>
-
-        <div class="prob-workspace">
-          <div class="prob-main">
-            <div class="prob-canvas-strip card" aria-label="도구·저장">
-              <div class="prob-canvas-strip__inner">
-                <div class="prob-mode-seg prob-canvas-strip__modes" role="tablist" aria-label="풀이 방식">
+            <div class="prob-toolbar__tools-band" aria-label="도구·저장">
+              <div class="prob-header-tools-scroll">
+                <div class="prob-mode-seg prob-header-tools-scroll__modes" role="tablist" aria-label="풀이 방식">
                   <button type="button" class="prob-mode-tab prob-mode-seg__btn prob-mode-seg__btn--active" data-mode="board" id="tab-mode-board" role="tab" aria-selected="true">칠판</button>
                   <button type="button" class="prob-mode-tab prob-mode-seg__btn" data-mode="photo" id="tab-mode-photo" role="tab" aria-selected="false">사진</button>
                 </div>
-                <div id="board-only-tools" class="prob-board-tools prob-draw-tools" aria-label="그리기 도구">
+                <div id="board-only-tools" class="prob-draw-tools prob-draw-tools--toolbar-inline" aria-label="그리기 도구">
                   <div class="whiteboard-tools">
                     <button type="button" class="whiteboard-tool ${currentTool === 'pen' ? 'active' : ''}" data-tool="pen" title="펜">✏️</button>
                     <button type="button" class="whiteboard-tool ${currentTool === 'eraser' ? 'active' : ''}" data-tool="eraser" title="지우개">${WHITEBOARD_ERASER_ICON_HTML}</button>
@@ -191,7 +184,7 @@ export function renderStudentProblemBoard(container, params) {
                     <input type="range" id="pen-size-slider" min="1" max="10" value="${penSize}" />
                   </div>
                 </div>
-                <div class="prob-canvas-strip__actions">
+                <div class="prob-header-tools-scroll__actions">
                   <button type="button" class="btn ${isRecording ? 'btn-danger' : 'btn-primary'} btn-sm" id="wb-record">
                     ${isRecording ? '⏹ 중지' : '📽️ 녹화'}
                   </button>
@@ -199,6 +192,13 @@ export function renderStudentProblemBoard(container, params) {
                 </div>
               </div>
             </div>
+          </div>
+          ${problemPromptHasModelAnswer(problemPrompt) ? `
+          <p class="prob-toolbar__hint">💡 선생님이 모범답안을 두었습니다. 저장 후 대시보드에서 <strong>✨ 피드백</strong>으로 비교해 보세요.</p>` : ''}
+        </header>
+
+        <div class="prob-workspace">
+          <div class="prob-main">
             <div id="prob-panel-board">
               <div class="whiteboard-canvas-wrap" style="background: #000; position: relative;">
                 <canvas id="whiteboard-canvas" style="position: absolute; top: 0; left: 0; z-index: 1; touch-action: none;"></canvas>
