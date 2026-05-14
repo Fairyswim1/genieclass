@@ -39,6 +39,7 @@ export function renderAssignMode(container, params) {
   let resFilesQueue = []; // Array of File objects for NEW uploads
   let existingFilesQueue = []; // Array of {id, name} objects for EDITING
   let probFilesQueue = [];
+  let probModelFilesQueue = [];
 
   async function init() {
     cls = await getClassById(classId);
@@ -398,6 +399,24 @@ export function renderAssignMode(container, params) {
                 </div>
                 <div id="prob-file-list" class="file-queue-list"></div>
               </div>
+              <hr style="border: 0; border-top: 1px solid var(--border-subtle); margin: var(--s-6) 0;" />
+              <div class="form-group">
+                <label class="input-label">모범답안 · 해설 (선택)</label>
+                <p style="font-size: 0.8rem; color: var(--text-dim); margin: 0 0 var(--s-2); line-height: 1.45;">
+                  등록하면 학생에게 <strong>AI 피드백</strong> 버튼이 나타나며, 모범답안과 제출 이미지를 비교합니다. 텍스트로 적거나, 참고 이미지를 파일로 올릴 수 있습니다.
+                </p>
+                <textarea class="input-field" id="prob-model-text" rows="4" placeholder="예: 풀이 과정 요지, 검산 결과, 학생에게 강조할 포인트…"></textarea>
+              </div>
+              <div class="form-group">
+                <label class="input-label">모범답안 참고 파일 (선택)</label>
+                <div class="drop-zone" id="prob-model-dropzone">
+                  <div class="drop-zone-icon">✨</div>
+                  <div style="font-weight: 600;">모범 풀이 이미지·PDF 등</div>
+                  <input type="file" id="prob-model-files" multiple class="hidden" />
+                </div>
+                <div id="prob-model-file-list" class="file-queue-list"></div>
+                <p style="font-size: 0.75rem; color: var(--text-dim); margin: var(--s-2) 0 0;">이미지는 AI가 직접 볼 수 있어요. PDF 등은 파일명만 참고로 전달됩니다.</p>
+              </div>
               <div class="flex gap-md justify-end">
                 <button class="btn btn-ghost" id="btn-cancel-problem">취소</button>
                 <button class="btn btn-primary" id="btn-submit-problem">학생에게 게시</button>
@@ -417,7 +436,12 @@ export function renderAssignMode(container, params) {
                 return `
                 <div class="card" style="padding: var(--s-6); display: flex; flex-direction: column; gap: var(--s-4); border-top: 4px solid var(--accent-amber);">
                   <div class="flex justify-between items-start gap-sm">
-                    <h3 style="font-size: 1.1rem; font-weight: 700; line-height: 1.35;">${escapeHtml(pr.title)}</h3>
+                    <div>
+                      <h3 style="font-size: 1.1rem; font-weight: 700; line-height: 1.35;">${escapeHtml(pr.title)}</h3>
+                      ${(pr.modelAnswerText && String(pr.modelAnswerText).trim()) || (pr.modelAnswerFiles && pr.modelAnswerFiles.length)
+    ? '<span class="badge badge-green" style="font-size: 0.65rem; margin-top: 4px; display: inline-block;">✨ 모범답안 등록됨</span>'
+    : ''}
+                    </div>
                     <div class="flex gap-sm items-center">
                       <span class="badge badge-purple" style="font-size: 0.7rem;">${sols.length}명 제출</span>
                       <button class="btn btn-ghost btn-sm delete-btn" data-type="prob" data-id="${pr.id}" style="color: var(--error);">삭제</button>
@@ -626,7 +650,8 @@ export function renderAssignMode(container, params) {
     if (type === 'ann') { queue = annFilesQueue; listId = "ann-file-list"; }
     else if (type === 'assign') { queue = assignFilesQueue; existing = existingFilesQueue; listId = "assign-file-list"; }
     else if (type === 'res') { queue = resFilesQueue; listId = "res-file-list"; }
-    else if (type === 'prob') { queue = probFilesQueue; listId = "prob-file-list"; }
+    else if (type === 'prob') { queue = probFilesQueue; listId = 'prob-file-list'; }
+    else if (type === 'prob-model') { queue = probModelFilesQueue; listId = 'prob-model-file-list'; }
 
     const listContainer = document.getElementById(listId);
     if (!listContainer) return;
@@ -670,6 +695,7 @@ export function renderAssignMode(container, params) {
     }
     else if (type === 'res') resFilesQueue.splice(index, 1);
     else if (type === 'prob') probFilesQueue.splice(index, 1);
+    else if (type === 'prob-model') probModelFilesQueue.splice(index, 1);
     
     updateFileListUI(type);
   };
@@ -717,6 +743,7 @@ export function renderAssignMode(container, params) {
     else if (type === 'assign') assignFilesQueue = [...assignFilesQueue, ...filterDuplicates(assignFilesQueue, fileArray)];
     else if (type === 'res') resFilesQueue = [...resFilesQueue, ...filterDuplicates(resFilesQueue, fileArray)];
     else if (type === 'prob') probFilesQueue = [...probFilesQueue, ...filterDuplicates(probFilesQueue, fileArray)];
+    else if (type === 'prob-model') probModelFilesQueue = [...probModelFilesQueue, ...filterDuplicates(probModelFilesQueue, fileArray)];
     
     updateFileListUI(type);
   }
@@ -856,17 +883,23 @@ export function renderAssignMode(container, params) {
 
     document.getElementById('btn-new-problem')?.addEventListener('click', () => {
       probFilesQueue = [];
+      probModelFilesQueue = [];
       document.getElementById('prob-title').value = '';
       document.getElementById('prob-desc').value = '';
+      document.getElementById('prob-model-text').value = '';
       updateFileListUI('prob');
+      updateFileListUI('prob-model');
       document.getElementById('problem-form').classList.remove('hidden');
     });
     document.getElementById('btn-cancel-problem')?.addEventListener('click', () => {
+      probModelFilesQueue = [];
+      updateFileListUI('prob-model');
       document.getElementById('problem-form').classList.add('hidden');
     });
     document.getElementById('btn-submit-problem')?.addEventListener('click', async () => {
       const title = document.getElementById('prob-title').value.trim();
       const description = document.getElementById('prob-desc').value.trim();
+      const modelAnswerText = document.getElementById('prob-model-text').value.trim();
       if (!title) { showToast('문제 제목을 입력하세요.', 'error'); return; }
       try {
         const files = [];
@@ -874,9 +907,21 @@ export function renderAssignMode(container, params) {
           const saved = await saveFile(file);
           files.push({ id: saved.id, name: saved.name });
         }
-        await createProblemPrompt(classId, teacher.uid, { title, description, files });
+        const modelAnswerFiles = [];
+        for (const file of probModelFilesQueue) {
+          const saved = await saveFile(file);
+          modelAnswerFiles.push({ id: saved.id, name: saved.name });
+        }
+        await createProblemPrompt(classId, teacher.uid, {
+          title,
+          description,
+          files,
+          modelAnswerText,
+          modelAnswerFiles,
+        });
         showToast('한 문제가 게시되었습니다.');
         probFilesQueue = [];
+        probModelFilesQueue = [];
         document.getElementById('problem-form').classList.add('hidden');
         render();
       } catch (e) {
@@ -890,6 +935,7 @@ export function renderAssignMode(container, params) {
     setupDropZone('assign-dropzone', 'assign-files', 'assign');
     setupDropZone('res-dropzone', 'res-files', 'res');
     setupDropZone('prob-dropzone', 'prob-files', 'prob');
+    setupDropZone('prob-model-dropzone', 'prob-model-files', 'prob-model');
 
     // Submit Announcement
     document.getElementById('btn-submit-announcement')?.addEventListener('click', async () => {

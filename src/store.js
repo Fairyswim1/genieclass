@@ -514,6 +514,8 @@ export async function deletePresentationById(presentationId) {
 // ========== 한 문제 풀이 (선생 출제) ==========
 export async function createProblemPrompt(classId, teacherId, data) {
     const id = generateId();
+    const modelAnswerText = typeof data.modelAnswerText === 'string' ? data.modelAnswerText.trim() : '';
+    const modelAnswerFiles = Array.isArray(data.modelAnswerFiles) ? data.modelAnswerFiles : [];
     const prompt = {
         id,
         classId,
@@ -521,10 +523,80 @@ export async function createProblemPrompt(classId, teacherId, data) {
         title: data.title,
         description: data.description || '',
         files: data.files || [],
+        modelAnswerText: modelAnswerText || '',
+        modelAnswerFiles,
         createdAt: new Date().toISOString(),
     };
     await setDoc(doc(db, COLLECTIONS.PROBLEM_PROMPTS, id), prompt);
     return prompt;
+}
+
+/** 모범답안 텍스트·첨부 중 하나라도 있으면 true (선택 과제 기능용) */
+export function problemPromptHasModelAnswer(prompt) {
+    if (!prompt) return false;
+    const t = typeof prompt.modelAnswerText === 'string' ? prompt.modelAnswerText.trim() : '';
+    const files = Array.isArray(prompt.modelAnswerFiles) ? prompt.modelAnswerFiles : [];
+    return t.length > 0 || files.length > 0;
+}
+
+/** 문제 모범답안 참고 파일 중 이미지만 HTTP URL 목록으로 (Vision API용) */
+export async function collectImageUrlsFromModelAnswerFiles(modelAnswerFiles) {
+    const out = [];
+    for (const ref of Array.isArray(modelAnswerFiles) ? modelAnswerFiles : []) {
+        if (!ref?.id) continue;
+        const meta = await getFileById(ref.id);
+        const type = String(meta?.type || '');
+        const name = String(meta?.name || ref.name || '');
+        const img =
+            /^image\/(jpeg|jpg|png|gif|webp)/i.test(type)
+            || /\.(jpe?g|png|gif|webp)$/i.test(name);
+        if (img && meta?.url) out.push(meta.url);
+    }
+    return out;
+}
+
+/** PDF 등 비이미지 모범답안 참고물 이름 목록(AI에게 문맥용) */
+export async function collectNonImageModelAnswerFileNotes(modelAnswerFiles) {
+    const notes = [];
+    for (const ref of Array.isArray(modelAnswerFiles) ? modelAnswerFiles : []) {
+        if (!ref?.id) continue;
+        const meta = await getFileById(ref.id);
+        const type = String(meta?.type || '');
+        const name = String(meta?.name || ref.name || '');
+        const img =
+            /^image\/(jpeg|jpg|png|gif|webp)/i.test(type)
+            || /\.(jpe?g|png|gif|webp)$/i.test(name);
+        if (!img && name) notes.push(`[첨부·비이미지] ${name}`);
+    }
+    return notes;
+}
+
+/**
+ * 모범답안 대비 학생 풀이 AI 피드백 (/api/problem-feedback 또는 VITE_FEEDBACK_API_ORIGIN)
+ */
+export async function fetchProblemSolutionFeedback(payload) {
+    const origin =
+        typeof import.meta !== 'undefined' && import.meta.env?.VITE_FEEDBACK_API_ORIGIN
+            ? String(import.meta.env.VITE_FEEDBACK_API_ORIGIN).replace(/\/$/, '')
+            : '';
+    const url = `${origin}/api/problem-feedback`;
+    const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+    let data = {};
+    try {
+        data = await res.json();
+    } catch (_) {}
+    if (!res.ok) {
+        const msg = typeof data.error === 'string' ? data.error : `피드백 요청 실패 (${res.status})`;
+        throw new Error(msg);
+    }
+    if (typeof data.feedback !== 'string' || !data.feedback.trim()) {
+        throw new Error('피드백 결과가 비어 있습니다.');
+    }
+    return data.feedback.trim();
 }
 
 export async function getProblemPromptsByClass(classId) {

@@ -12,6 +12,7 @@ import {
   getPresentationsByStudent,
   saveFile,
   showToast,
+  problemPromptHasModelAnswer,
 } from '../../store.js';
 import { escapeHtml } from '../../utils/quizMath.js';
 
@@ -57,6 +58,10 @@ export function renderStudentProblemBoard(container, params) {
             <button type="button" class="btn btn-primary btn-sm prob-mode-tab" data-mode="board" id="tab-mode-board">✏️ 칠판에 풀기</button>
             <button type="button" class="btn btn-secondary btn-sm prob-mode-tab" data-mode="photo" id="tab-mode-photo">📷 풀이 사진 올리기</button>
           </div>
+          ${problemPromptHasModelAnswer(problemPrompt) ? `
+          <div style="width:100%; text-align:center; font-size:0.74rem; color: var(--text-muted); line-height: 1.5; padding: 2px 8px 0;">
+            💡 선생님이 모범답안을 두었습니다. 저장 후 대시보드에서 <strong>✨ 피드백</strong>으로 비교 검토할 수 있어요.
+          </div>` : ''}
 
           <div id="board-only-tools" style="width:100%; display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:8px;">
             <div class="whiteboard-tools">
