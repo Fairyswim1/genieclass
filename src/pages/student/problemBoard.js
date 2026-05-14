@@ -176,7 +176,7 @@ export function renderStudentProblemBoard(container, params) {
     container.innerHTML = `
       <div class="whiteboard-container page-enter" style="background: var(--bg-deep);">
         <header class="prob-toolbar card" style="border-radius: 0; border-top: 0; border-left: 0; border-right: 0;">
-          <div class="prob-toolbar__row">
+          <div class="prob-toolbar__row prob-toolbar__row--primary">
             <div class="prob-toolbar__start">
               <button type="button" class="btn btn-ghost btn-sm prob-toolbar__back" id="wb-back">← 대시보드</button>
               <div class="prob-toolbar__headline">
@@ -184,28 +184,10 @@ export function renderStudentProblemBoard(container, params) {
                 <h1 class="prob-toolbar__heading">${head}</h1>
               </div>
             </div>
-            <div class="prob-toolbar__end">
+            <div class="prob-toolbar__actions">
               <div class="prob-mode-seg" role="tablist" aria-label="풀이 방식">
                 <button type="button" class="prob-mode-tab prob-mode-seg__btn prob-mode-seg__btn--active" data-mode="board" id="tab-mode-board" role="tab" aria-selected="true">칠판</button>
                 <button type="button" class="prob-mode-tab prob-mode-seg__btn" data-mode="photo" id="tab-mode-photo" role="tab" aria-selected="false">사진</button>
-              </div>
-              <div id="board-only-tools" class="prob-draw-tools" aria-label="그리기 도구">
-                <div class="whiteboard-tools">
-                  <button type="button" class="whiteboard-tool ${currentTool === 'pen' ? 'active' : ''}" data-tool="pen" title="펜">✏️</button>
-                  <button type="button" class="whiteboard-tool ${currentTool === 'eraser' ? 'active' : ''}" data-tool="eraser" title="지우개">${WHITEBOARD_ERASER_ICON_HTML}</button>
-                  <button type="button" class="whiteboard-tool" data-tool="clear" title="전체 지우기">🗑️</button>
-                </div>
-                <div class="color-picker-group prob-draw-tools__colors">
-                  <div class="color-dot active" data-color="#FFFFFF" style="background:#FFFFFF" title="흰색"></div>
-                  <div class="color-dot" data-color="#FF6B6B" style="background:#FF6B6B" title="빨강"></div>
-                  <div class="color-dot" data-color="#FFD93D" style="background:#FFD93D" title="노랑"></div>
-                  <div class="color-dot" data-color="#6BCB77" style="background:#6BCB77" title="초록"></div>
-                  <div class="color-dot" data-color="#4F46E5" style="background:#4F46E5" title="파랑"></div>
-                </div>
-                <div class="pen-size-control prob-draw-tools__pen">
-                  <label for="pen-size-slider">두께</label>
-                  <input type="range" id="pen-size-slider" min="1" max="10" value="${penSize}" />
-                </div>
               </div>
               <div class="prob-toolbar__cta">
                 <button type="button" class="btn ${isRecording ? 'btn-danger' : 'btn-primary'} btn-sm" id="wb-record">
@@ -219,16 +201,16 @@ export function renderStudentProblemBoard(container, params) {
           <p class="prob-toolbar__hint">💡 선생님이 모범답안을 두었습니다. 저장 후 대시보드에서 <strong>✨ 피드백</strong>으로 비교해 보세요.</p>` : ''}
         </header>
 
-        ${problemStrip}
-
-        <div id="prob-panel-board">
-          <div class="whiteboard-canvas-wrap" style="background: #000; position: relative;">
-            <canvas id="whiteboard-canvas" style="position: absolute; top: 0; left: 0; z-index: 1; touch-action: none;"></canvas>
-            <canvas id="whiteboard-draft" style="position: absolute; top: 0; left: 0; z-index: 2; pointer-events: none; touch-action: none;"></canvas>
-          </div>
-        </div>
-
-        <div id="prob-panel-photo" class="hidden" style="padding: 12px 16px 24px;">
+        <div class="prob-workspace">
+          ${problemStrip}
+          <div class="prob-main">
+            <div id="prob-panel-board">
+              <div class="whiteboard-canvas-wrap" style="background: #000; position: relative;">
+                <canvas id="whiteboard-canvas" style="position: absolute; top: 0; left: 0; z-index: 1; touch-action: none;"></canvas>
+                <canvas id="whiteboard-draft" style="position: absolute; top: 0; left: 0; z-index: 2; pointer-events: none; touch-action: none;"></canvas>
+              </div>
+            </div>
+            <div id="prob-panel-photo" class="hidden prob-panel-photo-inner" style="padding: 12px 16px 24px;">
           <div class="card" style="padding: var(--s-5); max-width: 560px; margin: 0 auto;">
             <p style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.55; margin: 0 0 var(--s-3);">
               패드 없이 <strong>종이에 푼 풀이</strong>를 사진으로 찍거나, 갤러리에서 선택해 올릴 수 있어요. 드래그 앤 드롭도 됩니다.
@@ -252,7 +234,30 @@ export function renderStudentProblemBoard(container, params) {
               이 모드에서는 칠판 화면 대신 <strong>사진 한 장</strong>이 풀이로 저장됩니다. 필요하면 위에서 <strong>음성으로 설명</strong>을 덧붙일 수 있어요.
             </p>
           </div>
+            </div>
+          </div>
         </div>
+
+        <footer id="board-only-tools" class="prob-board-tools" aria-label="그리기 도구">
+          <div class="prob-draw-tools">
+            <div class="whiteboard-tools">
+              <button type="button" class="whiteboard-tool ${currentTool === 'pen' ? 'active' : ''}" data-tool="pen" title="펜">✏️</button>
+              <button type="button" class="whiteboard-tool ${currentTool === 'eraser' ? 'active' : ''}" data-tool="eraser" title="지우개">${WHITEBOARD_ERASER_ICON_HTML}</button>
+              <button type="button" class="whiteboard-tool" data-tool="clear" title="전체 지우기">🗑️</button>
+            </div>
+            <div class="color-picker-group prob-draw-tools__colors">
+              <div class="color-dot active" data-color="#FFFFFF" style="background:#FFFFFF" title="흰색"></div>
+              <div class="color-dot" data-color="#FF6B6B" style="background:#FF6B6B" title="빨강"></div>
+              <div class="color-dot" data-color="#FFD93D" style="background:#FFD93D" title="노랑"></div>
+              <div class="color-dot" data-color="#6BCB77" style="background:#6BCB77" title="초록"></div>
+              <div class="color-dot" data-color="#4F46E5" style="background:#4F46E5" title="파랑"></div>
+            </div>
+            <div class="pen-size-control prob-draw-tools__pen">
+              <label for="pen-size-slider">두께</label>
+              <input type="range" id="pen-size-slider" min="1" max="10" value="${penSize}" />
+            </div>
+          </div>
+        </footer>
 
         <div id="prob-saving-overlay" class="hidden" style="position: fixed; bottom: 0; left: 0; right: 0; padding: 14px 16px; background: rgba(0,0,0,0.88); color: #fff; text-align: center; z-index: 9998; font-size: 0.88rem; font-weight: 700; line-height: 1.5; box-shadow: 0 -4px 24px rgba(0,0,0,0.35);">
           ⏳ <span id="prob-saving-overlay-msg">저장 중…</span>
