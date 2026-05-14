@@ -117,6 +117,29 @@ async function fetchUrlAsGeminiInlineImage(url, labelContext) {
 function humanizeGeminiError(message, httpStatus) {
   const m = String(message || '');
 
+  /** 서버(Vercel)에서 호출 시 흔함: 키의 "애플리케이션 제한"이 HTTP 리퍼러 등으로만 열려 있을 때 */
+  if (
+    /API_KEY_HTTP_REFERRER_BLOCKED/i.test(m)
+    || (/generativelanguage\.googleapis\.com/i.test(m) && /\bare blocked\b|blocked/i.test(m))
+    || (/requests to this api/i.test(m) && /generatecontent/i.test(m) && /block/i.test(m))
+  ) {
+    return [
+      'Google이 이 API 키로 보낸 Gemini 요청을 차단했습니다. (키의 "제한" 때문에 서버 호출이 거부되는 경우가 많습니다.)',
+      '',
+      '이 앱의 피드백은 **브라우저가 아니라 Vercel 서버**에서 Gemini로 요청합니다.',
+      '',
+      '조치:',
+      '1) Google Cloud 콘솔 → APIs 및 서비스 → 사용자 인증 정보 → 사용 중인 API 키 열기',
+      '2) 「애플리케이션 제한」을 **없음**으로 두거나, **서버용으로 새 키**를 만드세요.',
+      '   (키를 "HTTP 리퍼러(웹)"만 허용하면 웹사이트 안에서만 동작하고, **서버에서는 막힙니다**.)',
+      '3) 「API 제한」에서 **Generative Language API**가 포함·허용돼 있는지 확인합니다.',
+      '4) 키를 수정·교체한 뒤 Vercel 환경 변수 `GEMINI_API_KEY`에 반영하고 재배포합니다.',
+      '',
+      '--- 원본 ---',
+      m.slice(0, 600),
+    ].join('\n');
+  }
+
   // API가 프로젝트에서 아직 활성화되지 않음 (자주 403 / SERVICE_DISABLED)
   if (
     /has not been used in project|it is disabled|Enable it by visiting|SERVICE_DISABLED|generativelanguage\.googleapis\.com\/overview/i.test(

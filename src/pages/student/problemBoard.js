@@ -172,43 +172,49 @@ export function renderStudentProblemBoard(container, params) {
     const problemStrip = buildProblemStripHtml();
     container.innerHTML = `
       <div class="whiteboard-container page-enter" style="background: var(--bg-deep);">
-        <div class="whiteboard-toolbar card" style="border-radius: 0; border-top: 0; border-left: 0; border-right: 0; flex-wrap: wrap; align-items: center; gap: 8px;">
-          <button class="btn btn-ghost btn-sm" id="wb-back">← 대시보드</button>
-          <div style="flex:1; text-align:center; font-weight:800; font-size:0.92rem; color: var(--primary-light); padding:0 6px; min-width:100px;">
-            ✏️ ${head}
-          </div>
-          <div style="width:100%; display:flex; justify-content:center; gap:8px; flex-wrap:wrap; padding:4px 0;">
-            <button type="button" class="btn btn-primary btn-sm prob-mode-tab" data-mode="board" id="tab-mode-board">✏️ 칠판에 풀기</button>
-            <button type="button" class="btn btn-secondary btn-sm prob-mode-tab" data-mode="photo" id="tab-mode-photo">📷 풀이 사진 올리기</button>
+        <header class="prob-toolbar card" style="border-radius: 0; border-top: 0; border-left: 0; border-right: 0;">
+          <div class="prob-toolbar__row">
+            <div class="prob-toolbar__start">
+              <button type="button" class="btn btn-ghost btn-sm prob-toolbar__back" id="wb-back">← 대시보드</button>
+              <div class="prob-toolbar__headline">
+                <span class="prob-toolbar__emoji" aria-hidden="true">✏️</span>
+                <h1 class="prob-toolbar__heading">${head}</h1>
+              </div>
+            </div>
+            <div class="prob-toolbar__end">
+              <div class="prob-mode-seg" role="tablist" aria-label="풀이 방식">
+                <button type="button" class="prob-mode-tab prob-mode-seg__btn prob-mode-seg__btn--active" data-mode="board" id="tab-mode-board" role="tab" aria-selected="true">칠판</button>
+                <button type="button" class="prob-mode-tab prob-mode-seg__btn" data-mode="photo" id="tab-mode-photo" role="tab" aria-selected="false">사진</button>
+              </div>
+              <div id="board-only-tools" class="prob-draw-tools" aria-label="그리기 도구">
+                <div class="whiteboard-tools">
+                  <button type="button" class="whiteboard-tool ${currentTool === 'pen' ? 'active' : ''}" data-tool="pen" title="펜">✏️</button>
+                  <button type="button" class="whiteboard-tool ${currentTool === 'eraser' ? 'active' : ''}" data-tool="eraser" title="지우개">🧹</button>
+                  <button type="button" class="whiteboard-tool" data-tool="clear" title="전체 지우기">🗑️</button>
+                </div>
+                <div class="color-picker-group prob-draw-tools__colors">
+                  <div class="color-dot active" data-color="#FFFFFF" style="background:#FFFFFF" title="흰색"></div>
+                  <div class="color-dot" data-color="#FF6B6B" style="background:#FF6B6B" title="빨강"></div>
+                  <div class="color-dot" data-color="#FFD93D" style="background:#FFD93D" title="노랑"></div>
+                  <div class="color-dot" data-color="#6BCB77" style="background:#6BCB77" title="초록"></div>
+                  <div class="color-dot" data-color="#4F46E5" style="background:#4F46E5" title="파랑"></div>
+                </div>
+                <div class="pen-size-control prob-draw-tools__pen">
+                  <label for="pen-size-slider">두께</label>
+                  <input type="range" id="pen-size-slider" min="1" max="10" value="${penSize}" />
+                </div>
+              </div>
+              <div class="prob-toolbar__cta">
+                <button type="button" class="btn ${isRecording ? 'btn-danger' : 'btn-primary'} btn-sm" id="wb-record">
+                  ${isRecording ? '⏹ 중지' : '📽️ 녹화'}
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" id="wb-save">💾 저장</button>
+              </div>
+            </div>
           </div>
           ${problemPromptHasModelAnswer(problemPrompt) ? `
-          <div style="width:100%; text-align:center; font-size:0.74rem; color: var(--text-muted); line-height: 1.5; padding: 2px 8px 0;">
-            💡 선생님이 모범답안을 두었습니다. 저장 후 대시보드에서 <strong>✨ 피드백</strong>으로 비교 검토할 수 있어요.
-          </div>` : ''}
-
-          <div id="board-only-tools" style="width:100%; display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:8px;">
-            <div class="whiteboard-tools">
-              <button class="whiteboard-tool ${currentTool === 'pen' ? 'active' : ''}" data-tool="pen">✏️</button>
-              <button class="whiteboard-tool ${currentTool === 'eraser' ? 'active' : ''}" data-tool="eraser">🧹</button>
-              <button class="whiteboard-tool" data-tool="clear">🗑️</button>
-            </div>
-            <div class="color-picker-group">
-              <div class="color-dot active" data-color="#FFFFFF" style="background:#FFFFFF"></div>
-              <div class="color-dot" data-color="#FF6B6B" style="background:#FF6B6B"></div>
-              <div class="color-dot" data-color="#FFD93D" style="background:#FFD93D"></div>
-              <div class="color-dot" data-color="#6BCB77" style="background:#6BCB77"></div>
-              <div class="color-dot" data-color="#4F46E5" style="background:#4F46E5"></div>
-            </div>
-            <div class="pen-size-control flex items-center gap-sm" style="margin: 0 10px;">
-              <label for="pen-size-slider" style="color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">두께:</label>
-              <input type="range" id="pen-size-slider" min="1" max="10" value="${penSize}" style="width: 80px; accent-color: var(--primary);">
-            </div>
-          </div>
-          <button class="btn ${isRecording ? 'btn-danger' : 'btn-primary'} btn-sm" id="wb-record">
-            ${isRecording ? '⏹ 중지' : '📽️ 풀이 녹화'}
-          </button>
-          <button class="btn btn-secondary btn-sm" id="wb-save">💾 풀이 저장</button>
-        </div>
+          <p class="prob-toolbar__hint">💡 선생님이 모범답안을 두었습니다. 저장 후 대시보드에서 <strong>✨ 피드백</strong>으로 비교해 보세요.</p>` : ''}
+        </header>
 
         ${problemStrip}
 
@@ -534,8 +540,8 @@ export function renderStudentProblemBoard(container, params) {
     const boardTools = document.getElementById('board-only-tools');
     document.querySelectorAll('.prob-mode-tab').forEach((btn) => {
       const on = btn.dataset.mode === submitMode;
-      btn.classList.toggle('btn-primary', on);
-      btn.classList.toggle('btn-secondary', !on);
+      btn.classList.toggle('prob-mode-seg__btn--active', on);
+      btn.setAttribute('aria-selected', on ? 'true' : 'false');
     });
     if (boardPanel) boardPanel.classList.toggle('hidden', submitMode !== 'board');
     if (photoPanel) photoPanel.classList.toggle('hidden', submitMode !== 'photo');
@@ -1013,7 +1019,7 @@ export function renderStudentProblemBoard(container, params) {
       if (isRecording) {
         recordBtn.textContent = '⏹ 중지';
       } else {
-        recordBtn.textContent = submitMode === 'photo' ? '🎙 풀이 녹음' : '📽️ 풀이 녹화';
+        recordBtn.textContent = submitMode === 'photo' ? '🎙 녹음' : '📽️ 녹화';
       }
       recordBtn.className = `btn ${isRecording ? 'btn-danger' : 'btn-primary'} btn-sm`;
     }
