@@ -161,24 +161,44 @@ export function renderStudentProblemBoard(container, params) {
               </div>
             </div>
           </div>
-          <div class="prob-toolbar__row prob-toolbar__row--controls">
-            <div class="prob-mode-seg" role="tablist" aria-label="풀이 방식">
-              <button type="button" class="prob-mode-tab prob-mode-seg__btn prob-mode-seg__btn--active" data-mode="board" id="tab-mode-board" role="tab" aria-selected="true">칠판</button>
-              <button type="button" class="prob-mode-tab prob-mode-seg__btn" data-mode="photo" id="tab-mode-photo" role="tab" aria-selected="false">사진</button>
-            </div>
-            <div class="prob-toolbar__cta">
-              <button type="button" class="btn ${isRecording ? 'btn-danger' : 'btn-primary'} btn-sm" id="wb-record">
-                ${isRecording ? '⏹ 중지' : '📽️ 녹화'}
-              </button>
-              <button type="button" class="btn btn-secondary btn-sm" id="wb-save">💾 저장</button>
-            </div>
-          </div>
           ${problemPromptHasModelAnswer(problemPrompt) ? `
           <p class="prob-toolbar__hint">💡 선생님이 모범답안을 두었습니다. 저장 후 대시보드에서 <strong>✨ 피드백</strong>으로 비교해 보세요.</p>` : ''}
         </header>
 
         <div class="prob-workspace">
           <div class="prob-main">
+            <div class="prob-canvas-strip card" aria-label="도구·저장">
+              <div class="prob-canvas-strip__inner">
+                <div class="prob-mode-seg prob-canvas-strip__modes" role="tablist" aria-label="풀이 방식">
+                  <button type="button" class="prob-mode-tab prob-mode-seg__btn prob-mode-seg__btn--active" data-mode="board" id="tab-mode-board" role="tab" aria-selected="true">칠판</button>
+                  <button type="button" class="prob-mode-tab prob-mode-seg__btn" data-mode="photo" id="tab-mode-photo" role="tab" aria-selected="false">사진</button>
+                </div>
+                <div id="board-only-tools" class="prob-board-tools prob-draw-tools" aria-label="그리기 도구">
+                  <div class="whiteboard-tools">
+                    <button type="button" class="whiteboard-tool ${currentTool === 'pen' ? 'active' : ''}" data-tool="pen" title="펜">✏️</button>
+                    <button type="button" class="whiteboard-tool ${currentTool === 'eraser' ? 'active' : ''}" data-tool="eraser" title="지우개">${WHITEBOARD_ERASER_ICON_HTML}</button>
+                    <button type="button" class="whiteboard-tool" data-tool="clear" title="전체 지우기">🗑️</button>
+                  </div>
+                  <div class="color-picker-group prob-draw-tools__colors">
+                    <div class="color-dot active" data-color="#FFFFFF" style="background:#FFFFFF" title="흰색"></div>
+                    <div class="color-dot" data-color="#FF6B6B" style="background:#FF6B6B" title="빨강"></div>
+                    <div class="color-dot" data-color="#FFD93D" style="background:#FFD93D" title="노랑"></div>
+                    <div class="color-dot" data-color="#6BCB77" style="background:#6BCB77" title="초록"></div>
+                    <div class="color-dot" data-color="#4F46E5" style="background:#4F46E5" title="파랑"></div>
+                  </div>
+                  <div class="pen-size-control prob-draw-tools__pen">
+                    <label for="pen-size-slider">두께</label>
+                    <input type="range" id="pen-size-slider" min="1" max="10" value="${penSize}" />
+                  </div>
+                </div>
+                <div class="prob-canvas-strip__actions">
+                  <button type="button" class="btn ${isRecording ? 'btn-danger' : 'btn-primary'} btn-sm" id="wb-record">
+                    ${isRecording ? '⏹ 중지' : '📽️ 녹화'}
+                  </button>
+                  <button type="button" class="btn btn-sm prob-save-btn" id="wb-save">💾 저장</button>
+                </div>
+              </div>
+            </div>
             <div id="prob-panel-board">
               <div class="whiteboard-canvas-wrap" style="background: #000; position: relative;">
                 <canvas id="whiteboard-canvas" style="position: absolute; top: 0; left: 0; z-index: 1; touch-action: none;"></canvas>
@@ -212,27 +232,6 @@ export function renderStudentProblemBoard(container, params) {
             </div>
           </div>
         </div>
-
-        <footer id="board-only-tools" class="prob-board-tools" aria-label="그리기 도구">
-          <div class="prob-draw-tools">
-            <div class="whiteboard-tools">
-              <button type="button" class="whiteboard-tool ${currentTool === 'pen' ? 'active' : ''}" data-tool="pen" title="펜">✏️</button>
-              <button type="button" class="whiteboard-tool ${currentTool === 'eraser' ? 'active' : ''}" data-tool="eraser" title="지우개">${WHITEBOARD_ERASER_ICON_HTML}</button>
-              <button type="button" class="whiteboard-tool" data-tool="clear" title="전체 지우기">🗑️</button>
-            </div>
-            <div class="color-picker-group prob-draw-tools__colors">
-              <div class="color-dot active" data-color="#FFFFFF" style="background:#FFFFFF" title="흰색"></div>
-              <div class="color-dot" data-color="#FF6B6B" style="background:#FF6B6B" title="빨강"></div>
-              <div class="color-dot" data-color="#FFD93D" style="background:#FFD93D" title="노랑"></div>
-              <div class="color-dot" data-color="#6BCB77" style="background:#6BCB77" title="초록"></div>
-              <div class="color-dot" data-color="#4F46E5" style="background:#4F46E5" title="파랑"></div>
-            </div>
-            <div class="pen-size-control prob-draw-tools__pen">
-              <label for="pen-size-slider">두께</label>
-              <input type="range" id="pen-size-slider" min="1" max="10" value="${penSize}" />
-            </div>
-          </div>
-        </footer>
 
         <div id="prob-saving-overlay" class="hidden" style="position: fixed; bottom: 0; left: 0; right: 0; padding: 14px 16px; background: rgba(0,0,0,0.88); color: #fff; text-align: center; z-index: 9998; font-size: 0.88rem; font-weight: 700; line-height: 1.5; box-shadow: 0 -4px 24px rgba(0,0,0,0.35);">
           ⏳ <span id="prob-saving-overlay-msg">저장 중…</span>

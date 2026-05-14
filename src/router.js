@@ -1,6 +1,7 @@
 // ========================================
 // Genie Class - SPA Router (Hash-based)
 // ========================================
+import { auth } from './firebase.js';
 
 const routes = {};
 let currentCleanup = null;
@@ -82,13 +83,26 @@ export function initRouter() {
             return;
         }
 
+        // 교사 빌드: 이미 로그인돼 있으면 로그인 페이지 대신 대시보드로
+        if (
+            !isStudentShell &&
+            hash === '/teacher/login' &&
+            auth.currentUser &&
+            !auth.currentUser.isAnonymous
+        ) {
+            window.location.hash = '/teacher/dashboard';
+            return;
+        }
+
         // Android(Capacitor) 또는 Electron 앱에서만 교사 모드 강제 진입
         // 웹 브라우저에서는 이 로직을 타지 않도록 확실히 체크
         const isCapacitor = window.Capacitor && window.Capacitor.isNativePlatform;
         const isElectron = navigator.userAgent.includes('ElectronApp');
         
         if (hash === '/' && path === '/' && (isCapacitor || isElectron) && !isStudentShell) {
-            window.location.hash = '/teacher/login';
+            const u = auth.currentUser;
+            window.location.hash =
+                u && !u.isAnonymous ? '/teacher/dashboard' : '/teacher/login';
             return;
         }
 

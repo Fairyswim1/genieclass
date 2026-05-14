@@ -22,5 +22,5 @@ export function eraseSegmentDisk(ctx, x1, y1, x2, y2, penSize) {
   ctx.restore();
 }
 
-/** 툴바 지우개 버튼용 (빗자루 이모지 대신) */
-export const WHITEBOARD_ERASER_ICON_HTML = `<svg class="wb-eraser-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path fill="currentColor" d="M16.24 3.56l2.83 2.83a2 2 0 010 2.83L8.65 19.64a2 2 0 01-1.42.59H4v-3.23c0-.53.21-1.04.59-1.42L13.41 3.56a2 2 0 012.83 0zM6.41 19h1.17l8.66-8.66-1.41-1.41L6.41 17.83V19z"/><path fill="currentColor" d="M3 20h18v2H3v-2" opacity=".4"/></svg>`;
+/** 툴바 지우개 버튼용 (Lucide 스타일 스트로크 실루엣 — 이모지 연필과 시각 무게 균형) */
+export const WHITEBOARD_ERASER_ICON_HTML = `<svg class="wb-eraser-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.5l9.6-9.6c1-1 2.6-1 3.6 0l5.8 5.8c1 1 1 2.5 0 3.5L13 21"/><path d="M22 21H7"/><path d="m13.6 12.9 8.9 9"/></svg>`;

@@ -9,8 +9,8 @@
  * - 생략(자동) → GEMINI_API_KEY가 있으면 Gemini, 아니면 OPENAI_API_KEY로 OpenAI
  *
  * Gemini: GEMINI_API_KEY (Google AI Studio)
- * 기본 모델: gemini-2.0-flash — `GEMINI_MODEL` 로 변경 가능 (계정·지역별 제공 모델이 다름)
- * ※ gemini-1.5-flash 는 많은 새 프로젝트에서 더 이상 노출되지 않음
+ * 기본 모델: gemini-2.5-flash — `GEMINI_MODEL` 로 변경 가능 (계정·지역별 제공 모델이 다름)
+ * ※ 구 gemini-2.0-flash 등은 신규 키에서 비활성화되는 안내가 자주 나옴 → 환경 변수로 최신 모델 교체
  * OpenAI: OPENAI_API_KEY
  */
 
@@ -169,6 +169,20 @@ function humanizeGeminiError(message, httpStatus) {
     ].join('\n');
   }
 
+  if (/no longer available to new users|update your code to use a newer model/i.test(m)) {
+    return [
+      '이 Gemini 모델은 Google이 신규 API 키·프로젝트에서는 더 이상 열어 두지 않는 경우가 많습니다.',
+      '(오류 원문에 따라 `gemini-2.0-flash` 같은 이름으로 호출했을 때 자주 발생합니다.)',
+      '',
+      '조치:',
+      '1) Vercel(또는 서버) 환경 변수 **`GEMINI_MODEL=gemini-2.5-flash`** 로 설정한 뒤 재배포합니다.',
+      '2) 그래도 실패하면 AI Studio 또는 `GET …/v1beta/models?key=…`로 키에 허용된 모델 ID를 확인해 같은 변수에 넣습니다.',
+      '',
+      '--- 원본 ---',
+      m.slice(0, 800),
+    ].join('\n');
+  }
+
   const is404Model =
     /not found for API version|is not supported for generateContent|models\/[^\s]+\s+is\s+not\s+found|\b404\b.*models\//i.test(
       m,
@@ -178,14 +192,14 @@ function humanizeGeminiError(message, httpStatus) {
     const modelHint =
       process.env.GEMINI_MODEL
       || process.env.PROBLEM_FEEDBACK_GEMINI_MODEL
-      || 'gemini-2.0-flash';
+      || 'gemini-2.5-flash';
     return [
       '지금 선택된 Gemini 모델이 이 API 버전에서 찾히지 않거나 `generateContent`를 지원하지 않습니다.',
-      '(신규 API 키·프로젝트에서는 `gemini-1.5-flash` 등 예전 이름이 목록에서 빠져 있는 경우가 많습니다.)',
+      '(신규 API 키·프로젝트에서는 일부 예전 모델명이 목록에서 빠져 있는 경우가 많습니다.)',
       '',
       '조치:',
       '1) Vercel 등 서버 환경 변수 **`GEMINI_MODEL`** 을 아래처럼 최신 모델로 바꾼 뒤 재배포합니다.',
-      '   예: **`gemini-2.0-flash`**, **`gemini-2.5-flash`**, 또는 AI Studio/API 문서에 나온 이름',
+      '   예: **`gemini-2.5-flash`**, 또는 AI Studio / `GET …/v1beta/models` 목록에 나온 모델 ID',
       '',
       `2) 현재 서버 기본값(미설정 시): \`${modelHint}\``,
       '',
@@ -209,7 +223,7 @@ function humanizeGeminiError(message, httpStatus) {
     '· 잠시 후(약 1분) 다시 눌러 보기 — 분당 제한이면 곧 풀립니다.',
     '· Google AI Studio / Cloud에서 같은 키의 사용량·할당량 확인',
     '· 무료 한도가 부족하면 Cloud 프로젝트에 결제(청구)를 연결하면 상한이 달라질 수 있음',
-    '· Vercel에 GEMINI_MODEL=gemini-2.0-flash 등 **현재 키에 열린 모델**을 넣어 보기',
+    '· Vercel에 GEMINI_MODEL=gemini-2.5-flash 등 **현재 키에 열린 모델**을 넣어 보기',
     '· OpenAI 키가 있다면 PROBLEM_FEEDBACK_PROVIDER=openai 로 전환',
     '',
     '--- 원본 ---',
@@ -221,7 +235,7 @@ async function generateWithGemini(body, geminiKey) {
   const model =
     process.env.GEMINI_MODEL
     || process.env.PROBLEM_FEEDBACK_GEMINI_MODEL
-    || 'gemini-2.0-flash';
+    || 'gemini-2.5-flash';
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(geminiKey)}`;
 

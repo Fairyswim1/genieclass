@@ -15,9 +15,10 @@ import { renderAssignMode } from './pages/teacher/assignMode.js';
 import { renderStudentLogin } from './pages/student/login.js';
 import { renderStudentDashboard } from './pages/student/dashboard.js';
 import { renderStudentProblemBoard } from './pages/student/problemBoard.js';
-import { auth } from './firebase.js';
+import { auth, ensureFirebaseAuthPersistence } from './firebase.js';
 import { onAuthStateChanged } from 'firebase/auth';
 import { Capacitor } from '@capacitor/core';
+import { trySilentNativeTeacherGoogleRestore } from './store.js';
 
 document.documentElement.dataset.appShell =
     import.meta.env.VITE_APP_SHELL === 'student' ? 'student' : 'teacher';
@@ -42,12 +43,23 @@ addRoute('/student/login', (container) => renderStudentLogin(container));
 addRoute('/student/dashboard', (container) => renderStudentDashboard(container));
 addRoute('/student/problem-board/:promptId', (container, params) => renderStudentProblemBoard(container, params));
 
-// 라우터는 Auth 리스너가 한 번 돌 때 초기화한다(초기 user는 null일 수 있음 — “로그인 완료”와 무관).
-let isInitialized = false;
-onAuthStateChanged(auth, (_user) => {
-    if (!isInitialized) {
+// 영속 설정 후 Auth 복구·(네이티브 교사만) 무음 구글 재연결까지 고려해 라우터는 한 번만 띄운다.
+void (async () => {
+    await ensureFirebaseAuthPersistence();
+    let routerStarted = false;
+    onAuthStateChanged(auth, async (user) => {
+        if (routerStarted) return;
+        const isTeacherShell = import.meta.env.VITE_APP_SHELL !== 'student';
+        if (
+            Capacitor.isNativePlatform?.() &&
+            isTeacherShell &&
+            (!user || user.isAnonymous)
+        ) {
+            await trySilentNativeTeacherGoogleRestore();
+        }
+        if (routerStarted) return;
+        routerStarted = true;
         initRouter();
-        isInitialized = true;
         console.log('✨ Genie Class initialized');
-    }
-});
+    });
+})();

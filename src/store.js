@@ -68,35 +68,69 @@ function generateStudentCode() {
 }
 
 // ========== Teacher Auth ==========
+
+const NATIVE_GOOGLE_WEB_CLIENT_ID =
+    '469620615366-2ibdumut7vci9v3ir8tv48cfjirr52j3.apps.googleusercontent.com';
+
+async function initializeNativeGoogleAuth() {
+    await GoogleAuth.initialize({
+        clientId: NATIVE_GOOGLE_WEB_CLIENT_ID,
+        scopes: ['profile', 'email'],
+        grantOfflineAccess: true,
+    });
+}
+
+async function ensureTeacherProfileInFirestore(user) {
+    const teacherDoc = await getDoc(doc(db, COLLECTIONS.TEACHERS, user.uid));
+    if (!teacherDoc.exists()) {
+        await setDoc(doc(db, COLLECTIONS.TEACHERS, user.uid), {
+            id: user.uid,
+            name: user.displayName,
+            email: user.email,
+            photoURL: user.photoURL,
+            createdAt: serverTimestamp(),
+        });
+    }
+}
+
+/**
+ * Capacitor: 앱 재실행 시 Firebase 사용자가 비어 있어도 기기의 Google 세션이 남아 있으면
+ * GoogleAuth.refresh()로 idToken만 받아 다시 로그인한다(UI 없음).
+ */
+export async function trySilentNativeTeacherGoogleRestore() {
+    if (!Capacitor.isNativePlatform()) return;
+    if (import.meta.env.VITE_APP_SHELL === 'student') return;
+    if (auth.currentUser && !auth.currentUser.isAnonymous) return;
+
+    try {
+        await initializeNativeGoogleAuth();
+        const authParts = await GoogleAuth.refresh();
+        if (!authParts?.idToken) return;
+        const credential = GoogleAuthProvider.credential(authParts.idToken);
+        const result = await signInWithCredential(auth, credential);
+        await ensureTeacherProfileInFirestore(result.user);
+    } catch (e) {
+        console.warn('[teacher] 무음 구글 복구 생략:', e?.message ?? e);
+    }
+}
+
 export async function loginWithGoogle() {
     try {
         let user;
         if (Capacitor.isNativePlatform()) {
-             GoogleAuth.initialize({
-                  clientId: '469620615366-2ibdumut7vci9v3ir8tv48cfjirr52j3.apps.googleusercontent.com',
-                  scopes: ['profile', 'email'],
-                  grantOfflineAccess: true,
-             });
-             const googleUser = await GoogleAuth.signIn();
-             const credential = GoogleAuthProvider.credential(googleUser.authentication.idToken);
-             const result = await signInWithCredential(auth, credential);
-             user = result.user;
+            await initializeNativeGoogleAuth();
+            const googleUser = await GoogleAuth.signIn();
+            const credential = GoogleAuthProvider.credential(
+                googleUser.authentication.idToken
+            );
+            const result = await signInWithCredential(auth, credential);
+            user = result.user;
         } else {
-             const result = await signInWithPopup(auth, googleProvider);
-             user = result.user;
+            const result = await signInWithPopup(auth, googleProvider);
+            user = result.user;
         }
 
-        // Check if teacher exists in Firestore, if not create
-        const teacherDoc = await getDoc(doc(db, COLLECTIONS.TEACHERS, user.uid));
-        if (!teacherDoc.exists()) {
-            await setDoc(doc(db, COLLECTIONS.TEACHERS, user.uid), {
-                id: user.uid,
-                name: user.displayName,
-                email: user.email,
-                photoURL: user.photoURL,
-                createdAt: serverTimestamp()
-            });
-        }
+        await ensureTeacherProfileInFirestore(user);
         return { data: user };
     } catch (error) {
         console.error('Login error:', error);

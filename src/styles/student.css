@@ -692,7 +692,7 @@ html[data-app-shell="student"] .whiteboard-container {
     min-height: 100vh;
 }
 
-/** 학생 「한 문제 풀이」 상단 — 뒤로·제목 / 모드·녹화·저장만 (펜 도구는 하단 바) */
+/** 학생 「한 문제 풀이」 상단 — 뒤로·문제 카드만 (펜 도구는 칠판 상단 단일 줄) */
 html[data-app-shell="student"] .whiteboard-container .prob-toolbar {
     flex-shrink: 0;
     margin: 0;
@@ -809,28 +809,6 @@ html[data-app-shell="student"] .prob-toolbar-att-empty {
     margin: 0;
 }
 
-html[data-app-shell="student"] .prob-toolbar__row--controls {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    padding-top: 10px;
-    margin-top: 8px;
-    border-top: 1px solid var(--border-subtle);
-}
-
-@media (max-width: 420px) {
-    html[data-app-shell="student"] .prob-toolbar__row--controls {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    html[data-app-shell="student"] .prob-toolbar__row--controls .prob-toolbar__cta {
-        justify-content: flex-end;
-    }
-}
-
 html[data-app-shell="student"] .prob-mode-seg {
     display: inline-flex;
     border-radius: 11px;
@@ -875,7 +853,7 @@ html[data-app-shell="student"] .prob-workspace {
     display: flex;
     flex-direction: column;
     align-items: stretch;
-    gap: 8px;
+    gap: 6px;
     padding: 0 var(--s-2);
 }
 
@@ -884,36 +862,77 @@ html[data-app-shell="student"] .prob-main {
     min-height: 0;
     display: flex;
     flex-direction: column;
+    gap: 6px;
 }
 
-/** 하단 그리기 도구 — 상단 헤더와 분리되어 칠판 세로 확보 */
-html[data-app-shell="student"] .prob-board-tools {
+/** 칠판 바로 위: 모드 · 그리기 · 녹화·저장 한 줄(좁으면 가로 스크롤) */
+html[data-app-shell="student"] .prob-canvas-strip.card {
     flex-shrink: 0;
-    padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
-    background: var(--bg-card);
-    border-top: 1px solid var(--border-subtle);
-    box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.1);
+    margin: 0;
+    padding: 6px 8px;
+    border-radius: var(--r-sm);
+    box-shadow: var(--shadow-sm);
 }
 
-html[data-app-shell="student"] .prob-draw-tools {
+html[data-app-shell="student"] .prob-canvas-strip__inner {
     display: flex;
     flex-wrap: nowrap;
     align-items: center;
-    justify-content: center;
-    gap: 10px 14px;
-    padding: 0;
-    margin: 0 auto;
-    max-width: 100%;
+    justify-content: flex-start;
+    gap: 10px;
+    min-width: 0;
     overflow-x: auto;
     overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;
-    background: transparent;
-    border: none;
 }
 
-html[data-app-shell="student"] .prob-board-tools .prob-draw-tools {
-    border-radius: 0;
+html[data-app-shell="student"] .prob-canvas-strip__modes {
+    flex-shrink: 0;
+}
+
+html[data-app-shell="student"] .prob-canvas-strip__actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    margin-left: auto;
+}
+
+/** 녹화(채움 보라)와 구별되는 강조 윤곽 저장 버튼 */
+html[data-app-shell="student"] .prob-save-btn {
+    font-weight: 700;
+    color: var(--primary) !important;
+    background: var(--bg-main) !important;
+    border: 2px solid var(--primary) !important;
+    box-shadow: 0 2px 8px rgba(79, 70, 229, 0.15);
+}
+
+html[data-app-shell="student"] .prob-save-btn:hover {
+    background: rgba(79, 70, 229, 0.1) !important;
+    transform: translateY(-1px);
+}
+
+html[data-app-shell="student"] .prob-save-btn:active {
+    transform: translateY(0);
+}
+
+html[data-app-shell="student"] .prob-canvas-strip #board-only-tools {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: inline-flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    padding: 0;
+    margin: 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
 }
 
 html[data-app-shell="student"] .prob-draw-tools .whiteboard-tools {
@@ -961,23 +980,24 @@ html[data-app-shell="student"] .prob-draw-tools .pen-size-control {
     margin: 0;
 }
 
+html[data-app-shell="student"] .prob-canvas-strip .prob-draw-tools .whiteboard-tool {
+    width: 34px;
+    height: 34px;
+    font-size: 0.94rem;
+}
+
 html[data-app-shell="student"] .prob-draw-tools .pen-size-control label {
-    font-size: 0.7rem;
+    font-size: 0.68rem;
     font-weight: 700;
     color: var(--text-muted);
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 html[data-app-shell="student"] .prob-draw-tools .pen-size-control input[type="range"] {
     width: clamp(76px, 22vw, 120px);
     max-width: 36vw;
     accent-color: var(--primary);
-}
-
-html[data-app-shell="student"] .prob-toolbar__cta {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    flex-shrink: 0;
 }
 
 html[data-app-shell="student"] .prob-toolbar__hint {
@@ -994,13 +1014,6 @@ html[data-app-shell="student"] .prob-toolbar__hint {
 html[data-app-shell="student"] .prob-toolbar__hint strong {
     color: var(--primary);
     font-weight: 700;
-}
-
-@media (max-width: 520px) {
-    html[data-app-shell="student"] .prob-toolbar__row--controls .prob-toolbar__cta {
-        width: 100%;
-        justify-content: flex-end;
-    }
 }
 
 /**
