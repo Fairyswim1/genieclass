@@ -1,11 +1,18 @@
 /**
- * destination-out + stroke() 는 안티앨리어싱으로 지운 듯한 잔상이 남는 경우가 있어,
- * 원형 fill로 경로를 따라 지웁니다. (ctx는 이미지 좌표계와 동일한 논리 좌표)
+ * 원형으로 경로를 따라 지웁니다. (ctx는 이미지 좌표계와 동일한 논리 좌표)
+ *
+ * - 기본(destination-out): 투명 처리. 어떤 WebView·모바일 GPU에서는 합성 시 흰/회색 잔상이 남을 수 있음.
+ * - solidFillColor: 칠판 배경색과 같은 불투명 색으로 source-over 채워 지움(검정 칠판 + 흰·컬러 필기에 권장).
  */
-export function eraseSegmentDisk(ctx, x1, y1, x2, y2, penSize) {
+export function eraseSegmentDisk(ctx, x1, y1, x2, y2, penSize, solidFillColor) {
   const radius = Math.max(3.5, penSize * 7.5);
   ctx.save();
-  ctx.globalCompositeOperation = 'destination-out';
+  if (typeof solidFillColor === 'string' && solidFillColor.length > 0) {
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = solidFillColor;
+  } else {
+    ctx.globalCompositeOperation = 'destination-out';
+  }
   const dx = x2 - x1;
   const dy = y2 - y1;
   const dist = Math.hypot(dx, dy);

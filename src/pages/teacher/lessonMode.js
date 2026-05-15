@@ -954,7 +954,7 @@ export function renderLessonMode(container, params) {
       if (isEraser) {
         const p1 = currentPoints[currentPoints.length - 2];
         const p2 = currentPoints[currentPoints.length - 1];
-        eraseSegmentDisk(wbCtx, p1[0], p1[1], p2[0], p2[1], penSize);
+        eraseSegmentDisk(wbCtx, p1[0], p1[1], p2[0], p2[1], penSize, '#000000');
         return;
       }
       
@@ -1044,7 +1044,7 @@ export function renderLessonMode(container, params) {
       if (isEraser) {
         const p1 = currentPoints[currentPoints.length - 2];
         const p2 = currentPoints[currentPoints.length - 1];
-        eraseSegmentDisk(wbCtx, p1[0], p1[1], p2[0], p2[1], penSize);
+        eraseSegmentDisk(wbCtx, p1[0], p1[1], p2[0], p2[1], penSize, '#000000');
       } else {
         const strokeSize = penSize * 2.5;
         const strokePolygon = getStroke(currentPoints, {
