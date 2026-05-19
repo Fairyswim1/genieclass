@@ -379,6 +379,11 @@
 }
 
 /* 수업 자료실 — 접이식 게시판 */
+.student-dashboard-resources-card.section-card {
+    height: auto;
+    overflow: visible;
+}
+
 .student-dashboard-resources-card {
     padding: var(--s-5) var(--s-6) !important;
 }
@@ -399,13 +404,16 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
-    max-height: min(280px, 32vh);
+    max-height: min(320px, 36vh);
     overflow-y: auto;
+    overflow-x: hidden;
     padding-right: 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-gutter: stable;
 }
 
 .student-dashboard--compact .student-resources-bbs {
-    max-height: min(260px, 30vh);
+    max-height: min(300px, 34vh);
 }
 
 .student-resources-bbs__empty {
@@ -418,7 +426,8 @@
     border: 1px solid var(--border-subtle);
     border-radius: var(--r-sm);
     background: rgba(255, 255, 255, 0.95);
-    overflow: hidden;
+    overflow: visible;
+    flex-shrink: 0;
 }
 
 .student-resources-bbs__summary {
@@ -481,6 +490,34 @@
     gap: 6px;
     padding: 10px 12px 12px;
     background: var(--bg-main);
+    max-height: min(320px, 38vh);
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-gutter: stable;
+}
+
+.student-resources-bbs__item[open] .student-resources-bbs__files {
+    max-height: min(360px, 44vh);
+}
+
+.student-dashboard--compact .student-resources-bbs__files {
+    max-height: min(280px, 34vh);
+}
+
+.student-dashboard--compact .student-resources-bbs__item[open] .student-resources-bbs__files {
+    max-height: min(320px, 40vh);
+}
+
+.student-resources-bbs__files::-webkit-scrollbar,
+.student-resources-bbs::-webkit-scrollbar {
+    width: 6px;
+}
+
+.student-resources-bbs__files::-webkit-scrollbar-thumb,
+.student-resources-bbs::-webkit-scrollbar-thumb {
+    background: rgba(100, 116, 139, 0.45);
+    border-radius: 3px;
 }
 
 .student-resources-bbs__nofiles {
