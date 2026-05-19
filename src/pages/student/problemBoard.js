@@ -243,6 +243,7 @@ export function renderStudentProblemBoard(container, params) {
                   </div>
                   <div class="color-picker-group prob-draw-tools__colors">
                     <div class="color-dot active" data-color="#FFFFFF" style="background:#FFFFFF" title="흰색"></div>
+                    <div class="color-dot" data-color="#000000" style="background:#000000" title="검정"></div>
                     <div class="color-dot" data-color="#FF6B6B" style="background:#FF6B6B" title="빨강"></div>
                     <div class="color-dot" data-color="#FFD93D" style="background:#FFD93D" title="노랑"></div>
                     <div class="color-dot" data-color="#6BCB77" style="background:#6BCB77" title="초록"></div>

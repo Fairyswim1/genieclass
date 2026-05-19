@@ -378,19 +378,126 @@
     line-height: 1.35;
 }
 
-.student-dashboard-resources-scroll {
-    max-height: min(110px, 13vh);
+/* 수업 자료실 — 접이식 게시판 */
+.student-dashboard-resources-card {
+    padding: var(--s-5) var(--s-6) !important;
+}
+
+.student-dashboard-resources-card__head {
+    margin-bottom: var(--s-2) !important;
+    padding-bottom: var(--s-2) !important;
+}
+
+.student-dashboard-resources-card__hint {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    margin: 0 0 var(--s-3);
+    line-height: 1.4;
+}
+
+.student-resources-bbs {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: min(280px, 32vh);
     overflow-y: auto;
     padding-right: 4px;
 }
 
-.student-dashboard-resources-scroll .interactive-item {
-    padding: var(--s-2) var(--s-3) !important;
-    margin-bottom: var(--s-2) !important;
+.student-dashboard--compact .student-resources-bbs {
+    max-height: min(260px, 30vh);
 }
 
-.student-dashboard-resources-scroll .interactive-item > div:first-child {
-    font-size: 0.85rem !important;
+.student-resources-bbs__empty {
+    color: var(--text-dim);
+    padding: 16px 8px;
+    font-size: 0.88rem;
+}
+
+.student-resources-bbs__item {
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--r-sm);
+    background: rgba(255, 255, 255, 0.95);
+    overflow: hidden;
+}
+
+.student-resources-bbs__summary {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 8px 10px;
+    align-items: center;
+    padding: 10px 12px;
+    cursor: pointer;
+    list-style: none;
+    font-size: 0.88rem;
+    user-select: none;
+}
+
+.student-resources-bbs__summary::-webkit-details-marker {
+    display: none;
+}
+
+.student-resources-bbs__summary::marker {
+    content: '';
+}
+
+.student-resources-bbs__title {
+    font-weight: 700;
+    color: var(--text-main);
+    line-height: 1.35;
+    min-width: 0;
+    word-break: break-word;
+}
+
+.student-resources-bbs__meta {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    white-space: nowrap;
+}
+
+.student-resources-bbs__chev {
+    width: 8px;
+    height: 8px;
+    border-right: 2px solid var(--text-muted);
+    border-bottom: 2px solid var(--text-muted);
+    transform: rotate(45deg);
+    transition: transform 0.2s var(--ease-out);
+    margin-left: 2px;
+}
+
+.student-resources-bbs__item[open] .student-resources-bbs__chev {
+    transform: rotate(-135deg);
+    margin-top: 4px;
+}
+
+.student-resources-bbs__item[open] .student-resources-bbs__summary {
+    background: rgba(99, 102, 241, 0.06);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.student-resources-bbs__files {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 12px 12px;
+    background: var(--bg-main);
+}
+
+.student-resources-bbs__nofiles {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+}
+
+.student-resources-bbs__file-btn {
+    width: 100%;
+    justify-content: flex-start;
+    text-align: left;
+    font-size: 0.8rem !important;
+    white-space: normal;
+    word-break: break-all;
+    line-height: 1.35;
+    padding: 8px 10px !important;
 }
 
 .student-dashboard-self-record-card .form-group {

@@ -489,21 +489,35 @@ export function renderStudentDashboard(container) {
                 </div>
               </div>
 
-              <div class="section-card card student-dashboard-compact-card student-dashboard-resources-card">
-                <div class="section-card-header student-dashboard-compact-card__head">
+              <div class="section-card card student-dashboard-resources-card">
+                <div class="section-card-header student-dashboard-resources-card__head">
                   <span style="font-size: 1.2rem;">📁</span>
                   <h2 class="section-card-title">수업 자료실</h2>
                 </div>
-                <div class="flex flex-col gap-sm student-dashboard-resources-scroll">
-                  ${resources.length === 0 ? '<p class="text-center" style="color: var(--text-dim); padding: 20px;">공유된 자료가 없습니다.</p>' : resources.map(res => `
-                    <div class="interactive-item" style="flex-direction: column; align-items: flex-start; gap: 8px;">
-                      <div style="font-weight: 600; font-size: 0.95rem;">${res.title}</div>
-                      <div class="flex gap-sm" style="width: 100%; flex-wrap: wrap;">
-                        ${res.files.map(f => `<button class="btn btn-secondary btn-sm" style="font-size: 0.75rem;" onclick="window.downloadFile('${f.id}')">📎 ${f.name}</button>`).join('')}
+                <p class="student-dashboard-resources-card__hint">제목을 누르면 파일 목록이 열립니다.</p>
+                ${resources.length === 0
+    ? '<p class="text-center student-resources-bbs__empty">공유된 자료가 없습니다.</p>'
+    : `<div class="student-resources-bbs">${resources.map((res) => {
+      const files = Array.isArray(res.files) ? res.files : [];
+      const title = escapeHtml(res.title || '제목 없음');
+      return `
+                    <details class="student-resources-bbs__item">
+                      <summary class="student-resources-bbs__summary">
+                        <span class="student-resources-bbs__title">${title}</span>
+                        <span class="student-resources-bbs__meta">${files.length}개 파일</span>
+                        <span class="student-resources-bbs__chev" aria-hidden="true"></span>
+                      </summary>
+                      <div class="student-resources-bbs__files">
+                        ${files.length === 0
+        ? '<p class="student-resources-bbs__nofiles">첨부 파일이 없습니다.</p>'
+        : files.map((f) => {
+          const fid = escapeHtml(String(f.id || ''));
+          const fname = escapeHtml(f.name || '파일');
+          return `<button type="button" class="btn btn-secondary btn-sm student-resources-bbs__file-btn" onclick="window.downloadFile('${fid}')">📎 ${fname}</button>`;
+        }).join('')}
                       </div>
-                    </div>
-                  `).join('')}
-                </div>
+                    </details>`;
+    }).join('')}</div>`}
               </div>
             </div>
 
