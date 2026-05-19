@@ -9,7 +9,8 @@ import {
   listenToActiveQuiz, listenToQuizSubmissions, submitQuizSolution,
   showToast, downloadFile, getStudentByCode,
   submitAssignment, saveFile, updateStudentCharacterType,
-  getPresentationsByClass, toggleSharePresentation,
+  getPresentationsByClass,   toggleSharePresentation,
+  addStudentPoints,
   createStudentSelfRecord, getStudentSelfRecords,
   createStudentNote, getStudentNotesByStudent,
   getFileById, getProblemPromptsByClass,
@@ -28,6 +29,31 @@ import { bindClipboardPasteZone } from '../../utils/clipboardPaste.js';
 import { renderCharacter, getLevelConfig, PLANT_TYPES, getLevelProgress } from '../../components/characterAvatar.js';
 import { Capacitor } from '@capacitor/core';
 import { VoiceRecorder } from 'capacitor-voice-recorder';
+
+/** 칠판 URL · 음성/영상 URL로 재생 버튼 data 속성 생성 */
+function buildPlaybackButtonAttrs(p) {
+  const wbUrl = typeof p.whiteboardImage?.url === 'string' ? p.whiteboardImage.url.trim() : '';
+  const mediaUrl = typeof p.audioData?.url === 'string' ? p.audioData.url.trim() : '';
+  const mode = p.recordingMode === 'video' ? 'video' : 'audio';
+  const parts = [];
+  if (mediaUrl) parts.push(`data-url="${escapeHtml(mediaUrl)}"`);
+  if (wbUrl) parts.push(`data-wb-url="${escapeHtml(wbUrl)}"`);
+  parts.push(`data-recording-mode="${escapeHtml(mode)}"`);
+  return parts.join(' ');
+}
+
+function renderPresentationPlayButton(p, labelOverride = '') {
+  const wbUrl = typeof p.whiteboardImage?.url === 'string' ? p.whiteboardImage.url.trim() : '';
+  const mediaUrl = typeof p.audioData?.url === 'string' ? p.audioData.url.trim() : '';
+  if (!wbUrl && !mediaUrl) {
+    return '<span class="student-pres-noasset">—</span>';
+  }
+  const label = labelOverride
+    || (mediaUrl
+      ? (p.recordingMode === 'video' ? '🎬 영상' : '🔊 풀이 듣기')
+      : '🖼️ 보기');
+  return `<button type="button" class="btn btn-secondary btn-sm btn-play-video" ${buildPlaybackButtonAttrs(p)}>${label}</button>`;
+}
 
 export function renderStudentDashboard(container) {
   const student = getCurrentStudent();
@@ -319,19 +345,15 @@ export function renderStudentDashboard(container) {
             </div>
           </section>
 
-          <!-- 한 문제 풀이 (항상 상단에 표시) -->
-          <div class="section-card card" style="margin-bottom: var(--s-6);">
-            <div class="section-card-header">
+          <!-- 한 문제 풀이 -->
+          <div class="section-card card student-bulletin-card student-problem-board-card">
+            <div class="section-card-header student-bulletin-card__head">
               <span style="font-size: 1.2rem;">✏️</span>
               <h2 class="section-card-title">한 문제 풀이</h2>
+              <span class="student-bulletin-card__hint">저장 +1P · 공유 +1P</span>
             </div>
-            <p style="font-size: 0.82rem; color: var(--text-muted); margin: 0 0 var(--s-3); line-height: 1.45;">
-              선생님이 올린 문제에 <strong>칠판</strong>으로 쓰거나, <strong>종이 풀이 사진</strong>을 올리고 필요하면 <strong>음성</strong>도 덧붙일 수 있어요.
-              <span style="display: block; margin-top: 6px; font-size: 0.78rem; color: var(--text-dim);">
-                ✨ 피드백 버튼은 선생님이 문제를 올릴 때 <strong>「모범답안·해설」</strong> 칸(텍스트 또는 파일)을 넣은 문제에서만 보여요. (문제 본문·문제 첨부만으로는 피드백이 켜지지 않습니다.)
-              </span>
-            </p>
-            <div class="flex flex-col gap-sm">
+            <p class="student-bulletin-card__desc">칠판 필기 또는 사진을 칠판에 올린 뒤 덧그릴 수 있어요. 음성 설명은 칠판과 함께 재생됩니다.</p>
+            <div class="student-bulletin-table student-problem-board-table">
               ${problemPrompts.length === 0
     ? '<p class="text-center" style="color: var(--text-dim); padding: 12px;">출제된 한 문제가 없습니다.</p>'
     : problemPrompts.map((pr) => {
@@ -357,7 +379,7 @@ export function renderStudentDashboard(container) {
       ).slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 
       return `
-                    <div class="interactive-item" style="flex-direction: column; align-items: stretch; gap: 10px;">
+                    <article class="student-problem-row interactive-item">
                       <div>
                         <div style="font-weight: 700; font-size: 0.95rem;">${escapeHtml(pr.title || '제목 없음')}</div>
                         ${pr.description ? `<div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px; white-space: pre-line;">${escapeHtml(pr.description)}</div>` : ''}
@@ -386,87 +408,56 @@ export function renderStudentDashboard(container) {
                       ${friendSols.length > 0 ? `
                       <div style="border-top: 1px solid var(--border-subtle); padding-top: 8px; margin-top: 2px;">
                         <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); margin-bottom: 6px;">친구들의 풀이 (${friendSols.length})</div>
-                        <div style="display:flex;flex-direction:column;gap:5px;max-height:180px;overflow-y:auto;padding-right:4px;">
-                          ${friendSols.map(fs => {
-                            const fname = escapeHtml(fs.studentName || '친구');
-                            const imgUrl = typeof fs.whiteboardImage?.url === 'string' ? escapeHtml(fs.whiteboardImage.url) : '';
-                            const avUrl = typeof fs.audioData?.url === 'string' ? escapeHtml(fs.audioData.url) : '';
-                            return `
-                              <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:6px 10px;background:var(--bg-main);border-radius:var(--r-sm);border:1px solid var(--border-subtle);">
-                                <span style="font-size:0.82rem;font-weight:700;color:var(--primary);">${fname}</span>
-                                <span style="font-size:0.7rem;color:var(--text-dim);">${formatDate(fs.createdAt)}</span>
-                                ${imgUrl ? `<button type="button" class="btn btn-ghost btn-sm btn-open-pres-img" data-img-url="${imgUrl}" style="font-size:0.7rem;">🖼️ 칠판</button>` : ''}
-                                ${avUrl ? `<button type="button" class="btn btn-secondary btn-sm btn-play-video" data-url="${avUrl}" style="font-size:0.7rem;">${fs.recordingMode === 'video' ? '🎬 영상' : '🔊 음성'}</button>` : ''}
-                              </div>`;
-                          }).join('')}
+                        <div class="student-problem-friends__list">
+                          ${friendSols.map((fs) => `
+                              <div class="student-bbs-row">
+                                <span class="student-bbs-row__who">${escapeHtml(fs.studentName || '친구')}</span>
+                                <span class="student-bbs-row__when">${formatDate(fs.createdAt)}</span>
+                                <span class="student-bbs-row__act">${renderPresentationPlayButton(fs, '보기')}</span>
+                              </div>`).join('')}
                         </div>
                       </div>` : ''}
-                    </div>`;
+                    </article>`;
     }).join('')}
             </div>
           </div>
 
-          <div class="student-grid-37 student-dashboard-presentations-grid">
+          <div class="student-grid-37 student-dashboard-presentations-grid student-bulletin-grid">
             <!-- My Presentations -->
-            <div class="section-card card">
-              <div class="section-card-header">
+            <div class="section-card card student-bulletin-card">
+              <div class="section-card-header student-bulletin-card__head">
                 <span style="font-size: 1.2rem;">🎤</span>
                 <h2 class="section-card-title">나의 발표 기록</h2>
               </div>
-              <div class="student-pres-list-wrap">
+              <div class="student-pres-list-wrap student-bulletin-scroll">
                 ${presentations.length === 0 ? '<p class="text-center" style="color: var(--text-dim); padding: 14px;">발표 기록이 없습니다.</p>' : presentations.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map((p) => {
-      const imgUrl = typeof p.whiteboardImage?.url === 'string' && p.whiteboardImage.url.trim() ? p.whiteboardImage.url.trim() : '';
-      const vidUrl = typeof p.audioData?.url === 'string' && p.audioData.url.trim() ? p.audioData.url.trim() : '';
       return `
-                  <div class="student-pres-row">
-                    <div class="student-pres-row-meta">
-                      <span class="badge badge-main">${formatDate(p.createdAt)}</span>
-                      ${p.shared ? '<span class="student-pres-mini-badge shared">공유 중</span>' : '<span class="student-pres-mini-badge">비공유</span>'}
-                    </div>
-                    <div class="student-pres-row-actions">
-                      ${imgUrl
-      ? `<button type="button" class="btn btn-ghost btn-sm btn-open-pres-img" title="발표판 이미지" data-img-url="${escapeHtml(imgUrl)}">🖼️ 화면</button>`
-      : '<span class="student-pres-noasset">판 없음</span>'}
-                      ${vidUrl
-      ? `<button type="button" class="btn btn-secondary btn-sm btn-play-video" data-url="${escapeHtml(vidUrl)}">${p.recordingMode === 'video' ? '🎬 영상' : '🔊 음성'}</button>`
-      : '<span class="student-pres-noasset">미디어 없음</span>'}
-                      <button type="button" class="btn btn-sm ${p.shared ? 'btn-danger' : 'btn-primary'} btn-toggle-share" data-id="${escapeHtml(String(p.id))}" data-shared="${p.shared ? 'true' : 'false'}">${p.shared ? '공유 끄기' : '친구와 공유'}</button>
-                    </div>
+                  <div class="student-pres-row student-bbs-row">
+                    <span class="student-bbs-row__when">${formatDate(p.createdAt)}</span>
+                    <span class="student-bbs-row__meta">${p.shared ? '<span class="student-pres-mini-badge shared">공유</span>' : '<span class="student-pres-mini-badge">비공유</span>'}</span>
+                    <span class="student-bbs-row__act">${renderPresentationPlayButton(p)}</span>
+                    <button type="button" class="btn btn-sm ${p.shared ? 'btn-danger' : 'btn-primary'} btn-toggle-share" data-id="${escapeHtml(String(p.id))}" data-shared="${p.shared ? 'true' : 'false'}">${p.shared ? '끄기' : '공유'}</button>
                   </div>`;
     }).join('')}
               </div>
             </div>
 
             <!-- Shared Presentations -->
-            <div class="section-card card">
-              <div class="section-card-header">
+            <div class="section-card card student-bulletin-card">
+              <div class="section-card-header student-bulletin-card__head">
                 <span style="font-size: 1.2rem;">👀</span>
                 <h2 class="section-card-title">친구들의 멋진 발표</h2>
               </div>
-              <div class="student-pres-list-wrap">
+              <div class="student-pres-list-wrap student-bulletin-scroll">
                 ${sharedPresentations.length === 0 ? '<p class="text-center" style="color: var(--text-dim); padding: 14px;">공유된 발표가 없습니다.</p>' : sharedPresentations.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map((p) => {
       const title = escapeHtml(p.title || '제목 없는 발표');
-      const vidUrl = typeof p.audioData?.url === 'string' && p.audioData.url.trim() ? p.audioData.url.trim() : '';
-      const wbUrl = typeof p.whiteboardImage?.url === 'string' && p.whiteboardImage.url.trim() ? p.whiteboardImage.url.trim() : '';
-      const friendName = p._studentName ? escapeHtml(p._studentName) : null;
+      const friendName = p._studentName ? escapeHtml(p._studentName) : '친구';
       return `
-                  <div class="student-pres-row student-pres-row--compact">
-                    <div class="student-pres-row-meta">
-                      ${friendName
-                        ? `<span class="badge badge-purple">${friendName}</span>`
-                        : `<span class="badge badge-purple">친구</span>`}
-                      <span class="student-pres-friend-title">${title}</span>
-                    </div>
-                    <div class="student-pres-tail">
-                      <span class="student-pres-inline-date">${formatDate(p.createdAt)}</span>
-                      <div class="student-pres-row-actions student-pres-row-actions--narrow">
-                        ${vidUrl
-      ? `<button type="button" class="btn btn-secondary btn-sm btn-play-video" data-url="${escapeHtml(vidUrl)}">${p.recordingMode === 'video' ? '🎬 영상' : '🔊 음성'}</button>`
-      : (wbUrl
-        ? `<button type="button" class="btn btn-ghost btn-sm btn-open-pres-img" data-img-url="${escapeHtml(wbUrl)}">🖼️ 보기</button>`
-        : '<span class="student-pres-noasset">—</span>')}
-                      </div>
-                    </div>
+                  <div class="student-bbs-row student-bbs-row--friend">
+                    <span class="student-bbs-row__who">${friendName}</span>
+                    <span class="student-bbs-row__title student-pres-friend-title">${title}</span>
+                    <span class="student-bbs-row__when">${formatDate(p.createdAt)}</span>
+                    <span class="student-bbs-row__act">${renderPresentationPlayButton(p, '보기')}</span>
                   </div>`;
     }).join('')}
               </div>
@@ -618,10 +609,14 @@ export function renderStudentDashboard(container) {
       <div class="modal-backdrop" id="video-modal" style="z-index: 2000;">
         <div class="modal-content" style="max-width: 1000px; width: 90%; background: #000; padding: 0;">
           <div class="modal-header" style="background: rgba(0,0,0,0.5); position: absolute; top: 0; left: 0; right: 0; z-index: 10;">
-             <h3 class="modal-title" style="color: #fff;">발표 영상</h3>
+             <h3 class="modal-title" style="color: #fff;" id="video-modal-title">발표 보기</h3>
              <button class="modal-close" style="color: #fff; background: rgba(255,255,255,0.1);" id="close-video-modal">✕</button>
           </div>
-          <video id="player" controls style="width: 100%; aspect-ratio: 16/9; display: block; border-radius: var(--r-lg);">소스가 없습니다.</video>
+          <div class="student-playback-stage">
+            <img id="playback-wb" class="student-playback-wb hidden" alt="칠판·풀이 화면" />
+            <video id="player" controls class="student-playback-video">소스가 없습니다.</video>
+            <audio id="playback-audio" controls class="student-playback-audio hidden"></audio>
+          </div>
         </div>
       </div>
 
@@ -1007,27 +1002,94 @@ export function renderStudentDashboard(container) {
     clipboardPasteUnsubs.forEach((u) => u());
     clipboardPasteUnsubs.length = 0;
 
-    // Media Playback Modal
+    const closePlaybackModal = () => {
+      const videoModal = document.getElementById('video-modal');
+      const player = document.getElementById('player');
+      const audioEl = document.getElementById('playback-audio');
+      const wbImg = document.getElementById('playback-wb');
+      player?.pause();
+      if (player) player.src = '';
+      audioEl?.pause();
+      if (audioEl) audioEl.src = '';
+      if (wbImg) {
+        wbImg.src = '';
+        wbImg.classList.add('hidden');
+      }
+      if (player) player.classList.remove('hidden');
+      if (audioEl) audioEl.classList.add('hidden');
+      videoModal?.classList.remove('active');
+    };
+
+    const openPlayback = (btn) => {
+      const videoModal = document.getElementById('video-modal');
+      const player = document.getElementById('player');
+      const audioEl = document.getElementById('playback-audio');
+      const wbImg = document.getElementById('playback-wb');
+      const modalTitle = document.getElementById('video-modal-title');
+      if (!videoModal || !player) return;
+
+      const mediaUrl = btn.dataset.url || '';
+      const wbUrl = btn.dataset.wbUrl || '';
+      const mode = btn.dataset.recordingMode || 'audio';
+
+      player.pause();
+      player.src = '';
+      audioEl?.pause();
+      if (audioEl) audioEl.src = '';
+      if (wbImg) {
+        wbImg.src = '';
+        wbImg.classList.add('hidden');
+      }
+      player.classList.remove('hidden');
+      audioEl?.classList.add('hidden');
+
+      if (mode === 'video' && mediaUrl) {
+        if (modalTitle) modalTitle.textContent = '발표 영상';
+        player.src = mediaUrl;
+        videoModal.classList.add('active');
+        void player.play();
+        return;
+      }
+
+      if (wbUrl && wbImg) {
+        wbImg.src = wbUrl;
+        wbImg.classList.remove('hidden');
+      }
+
+      if (mediaUrl && wbUrl && audioEl) {
+        if (modalTitle) modalTitle.textContent = '풀이 화면 + 설명';
+        player.classList.add('hidden');
+        audioEl.classList.remove('hidden');
+        audioEl.src = mediaUrl;
+        videoModal.classList.add('active');
+        void audioEl.play();
+        return;
+      }
+
+      if (mediaUrl) {
+        if (modalTitle) modalTitle.textContent = '발표 듣기';
+        player.src = mediaUrl;
+        videoModal.classList.add('active');
+        void player.play();
+        return;
+      }
+
+      if (wbUrl && wbImg) {
+        if (modalTitle) modalTitle.textContent = '풀이 화면';
+        player.classList.add('hidden');
+        videoModal.classList.add('active');
+      }
+    };
+
     const videoModal = document.getElementById('video-modal');
-    const player = document.getElementById('player');
-    if (videoModal && player) {
-        document.querySelectorAll('.btn-play-video').forEach(btn => {
-            btn.addEventListener('click', () => {
-                player.src = btn.dataset.url;
-                videoModal.classList.add('active');
-                player.play();
-            });
-        });
-        document.getElementById('close-video-modal')?.addEventListener('click', () => {
-            player.pause(); player.src = '';
-            videoModal.classList.remove('active');
-        });
-        videoModal.addEventListener('click', (e) => {
-            if (e.target === videoModal) {
-                player.pause(); player.src = '';
-                videoModal.classList.remove('active');
-            }
-        });
+    if (videoModal) {
+      document.querySelectorAll('.btn-play-video').forEach((btn) => {
+        btn.addEventListener('click', () => openPlayback(btn));
+      });
+      document.getElementById('close-video-modal')?.addEventListener('click', closePlaybackModal);
+      videoModal.addEventListener('click', (e) => {
+        if (e.target === videoModal) closePlaybackModal();
+      });
     }
 
     document.getElementById('btn-toggle-student-note')?.addEventListener('click', () => {
@@ -1185,11 +1247,21 @@ export function renderStudentDashboard(container) {
           closeModal();
           try {
             await toggleSharePresentation(presentationId, title, selectedClassIds);
-            showToast(
-              selectedClassIds.length > 0
-                ? `공유했어요 — ${selectedClassIds.length}개 클래스에 추가로 보여요`
-                : '공유 완료!',
-            );
+            const pres = allPresentations.find((p) => String(p.id) === String(presentationId));
+            if (pres?.type === 'problem_solution') {
+              await addStudentPoints(freshStudent.id, 1);
+              showToast(
+                selectedClassIds.length > 0
+                  ? `공유했어요! +1P · ${selectedClassIds.length}개 클래스에도 보여요`
+                  : '공유 완료! +1P',
+              );
+            } else {
+              showToast(
+                selectedClassIds.length > 0
+                  ? `공유했어요 — ${selectedClassIds.length}개 클래스에 추가로 보여요`
+                  : '공유 완료!',
+              );
+            }
             render();
           } catch (err) {
             showToast('오류가 발생했습니다.', 'error');

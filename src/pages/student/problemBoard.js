@@ -8,6 +8,7 @@ import {
   getCurrentStudent,
   getProblemPromptById,
   addPresentation,
+  addStudentPoints,
   deletePresentationById,
   getPresentationsByStudent,
   saveFile,
@@ -64,6 +65,8 @@ export function renderStudentProblemBoard(container, params) {
   let submitMode = 'board';
   let attachedPhotoFile = null;
   let photoPreviewUrl = null;
+  /** 사진 모드: 칠판 배경에 깔리는 이미지 */
+  let photoBgImage = null;
 
   const SIDE_REF_STORAGE_KEY = 'genie_prob_side_ref';
 
@@ -277,36 +280,25 @@ export function renderStudentProblemBoard(container, params) {
               <div class="prob-side-reference__scroll" id="prob-side-reference-images"></div>
             </aside>
             <div class="prob-board-stack">
+            <div id="prob-photo-bar" class="prob-photo-bar hidden" aria-label="풀이 사진 올리기">
+              <p class="prob-photo-bar__hint">종이 풀이 사진을 올리면 <strong>칠판 위</strong>에 깔리고, 그 위에 필기할 수 있어요.</p>
+              <div class="prob-photo-bar__controls">
+                <div class="drop-zone prob-photo-bar__drop" id="prob-photo-dropzone">
+                  <span id="prob-photo-status">사진 선택 · 드래그 · 붙여넣기</span>
+                </div>
+                <button type="button" class="btn btn-primary btn-sm" id="prob-photo-camera">📷 촬영</button>
+                <button type="button" class="btn btn-secondary btn-sm" id="prob-photo-gallery">🖼 앨범</button>
+                <button type="button" class="btn btn-ghost btn-sm hidden" id="prob-photo-clear">✕ 제거</button>
+              </div>
+              <input type="file" id="prob-photo-input-cam" accept="image/*" capture="environment" class="hidden" />
+              <input type="file" id="prob-photo-input-gal" accept="image/*" class="hidden" />
+            </div>
             <div id="prob-panel-board">
               <div class="whiteboard-canvas-wrap" style="background: #000; position: relative;">
+                <canvas id="whiteboard-photo-bg" style="position: absolute; top: 0; left: 0; z-index: 0; pointer-events: none; touch-action: none;"></canvas>
                 <canvas id="whiteboard-canvas" style="position: absolute; top: 0; left: 0; z-index: 1; touch-action: none;"></canvas>
                 <canvas id="whiteboard-draft" style="position: absolute; top: 0; left: 0; z-index: 2; pointer-events: none; touch-action: none;"></canvas>
               </div>
-            </div>
-            <div id="prob-panel-photo" class="hidden prob-panel-photo-inner" style="padding: 12px 16px 24px;">
-          <div class="card" style="padding: var(--s-5); max-width: 560px; margin: 0 auto;">
-            <p style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.55; margin: 0 0 var(--s-3);">
-              패드 없이 <strong>종이에 푼 풀이</strong>를 사진으로 찍거나, 갤러리에서 선택해 올릴 수 있어요. 드래그 앤 드롭도 됩니다.
-            </p>
-            <div class="drop-zone" id="prob-photo-dropzone" style="min-height: 120px; cursor: pointer;">
-              <span style="font-size: 2rem;">🖼️</span>
-              <p id="prob-photo-status" style="font-weight: 600; margin: 6px 0 4px;">드래그·클릭·붙여넣기(Ctrl+V)</p>
-              <p style="font-size: 0.78rem; opacity: 0.7; margin: 0;">JPG, PNG 등 이미지 한 장</p>
-            </div>
-            <div class="flex flex-wrap gap-sm justify-center" style="margin-top: var(--s-3);">
-              <button type="button" class="btn btn-primary btn-sm" id="prob-photo-camera">📷 카메라로 촬영</button>
-              <button type="button" class="btn btn-secondary btn-sm" id="prob-photo-gallery">🖼 앨범에서 선택</button>
-              <button type="button" class="btn btn-ghost btn-sm hidden" id="prob-photo-clear">✕ 사진 제거</button>
-            </div>
-            <input type="file" id="prob-photo-input-cam" accept="image/*" capture="environment" class="hidden" />
-            <input type="file" id="prob-photo-input-gal" accept="image/*" class="hidden" />
-            <div id="prob-photo-preview-wrap" class="hidden" style="margin-top: var(--s-4); text-align: center;">
-              <img id="prob-photo-preview" alt="미리보기" style="max-width: 100%; max-height: 42vh; border-radius: var(--r-sm); border: 1px solid var(--border-subtle); object-fit: contain;" />
-            </div>
-            <p style="font-size: 0.78rem; color: var(--text-dim); margin: var(--s-3) 0 0; line-height: 1.45;">
-              이 모드에서는 칠판 화면 대신 <strong>사진 한 장</strong>이 풀이로 저장됩니다. 필요하면 위에서 <strong>음성으로 설명</strong>을 덧붙일 수 있어요.
-            </p>
-          </div>
             </div>
             </div>
           </div>
@@ -352,11 +344,15 @@ export function renderStudentProblemBoard(container, params) {
       wbCtx.lineJoin = 'round';
       draftCtx.lineCap = 'round';
       draftCtx.lineJoin = 'round';
+
+      if (submitMode === 'photo') paintPhotoBackground();
     }
     setSize();
 
-    wbCtx.fillStyle = '#000';
-    wbCtx.fillRect(0, 0, wrap.clientWidth, wrap.clientHeight);
+    if (submitMode === 'board') {
+      wbCtx.fillStyle = '#000';
+      wbCtx.fillRect(0, 0, wrap.clientWidth, wrap.clientHeight);
+    }
 
     let currentPoints = [];
 
@@ -395,16 +391,22 @@ export function renderStudentProblemBoard(container, params) {
         return;
       }
 
+      if (submitMode === 'photo') {
+        paintPhotoBackground();
+      }
+
       wbCtx.save();
       wbCtx.setTransform(1, 0, 0, 1, 0, 0);
       if (tempCanvas) {
         try {
           wbCtx.drawImage(tempCanvas, 0, 0);
         } catch (_) {
-          wbCtx.fillStyle = '#000';
-          wbCtx.fillRect(0, 0, wbCanvas.width, wbCanvas.height);
+          if (submitMode === 'board') {
+            wbCtx.fillStyle = '#000';
+            wbCtx.fillRect(0, 0, wbCanvas.width, wbCanvas.height);
+          }
         }
-      } else {
+      } else if (submitMode === 'board') {
         wbCtx.fillStyle = '#000';
         wbCtx.fillRect(0, 0, wbCanvas.width, wbCanvas.height);
       }
@@ -451,7 +453,8 @@ export function renderStudentProblemBoard(container, params) {
       if (isEraser) {
         const p1 = currentPoints[currentPoints.length - 2];
         const p2 = currentPoints[currentPoints.length - 1];
-        eraseSegmentDisk(wbCtx, p1[0], p1[1], p2[0], p2[1], penSize, '#000000');
+        const eraserFill = submitMode === 'photo' ? undefined : '#000000';
+        eraseSegmentDisk(wbCtx, p1[0], p1[1], p2[0], p2[1], penSize, eraserFill);
         return;
       }
 
@@ -516,10 +519,9 @@ export function renderStudentProblemBoard(container, params) {
     document.querySelectorAll('.whiteboard-tool').forEach((btn) => {
       btn.addEventListener('click', () => {
         if (btn.dataset.tool === 'clear') {
-          if (confirm('전체 필기를 지우시겠습니까?')) {
-            wbCtx.fillStyle = '#000';
-            const wrap = wbCanvas.parentElement;
-            wbCtx.fillRect(0, 0, wrap.clientWidth, wrap.clientHeight);
+          if (confirm(submitMode === 'photo' ? '사진 위 필기를 모두 지울까요?' : '전체 필기를 지우시겠습니까?')) {
+            clearStrokeLayer();
+            if (submitMode === 'photo') paintPhotoBackground();
           }
           return;
         }
@@ -559,9 +561,142 @@ export function renderStudentProblemBoard(container, params) {
     });
   }
 
+  function getPhotoBgCanvas() {
+    return document.getElementById('whiteboard-photo-bg');
+  }
+
+  function clearStrokeLayer() {
+    if (!wbCanvas || !wbCtx) return;
+    const wrap = wbCanvas.parentElement;
+    const cw = wrap?.clientWidth || 0;
+    const ch = wrap?.clientHeight || 0;
+    wbCtx.save();
+    wbCtx.setTransform(1, 0, 0, 1, 0, 0);
+    wbCtx.clearRect(0, 0, wbCanvas.width, wbCanvas.height);
+    wbCtx.restore();
+    if (submitMode === 'board' && cw > 0 && ch > 0) {
+      wbCtx.fillStyle = '#000';
+      wbCtx.fillRect(0, 0, cw, ch);
+    }
+    const draftCanvas = document.getElementById('whiteboard-draft');
+    const draftCtx = draftCanvas?.getContext('2d');
+    if (draftCanvas && draftCtx) {
+      draftCtx.save();
+      draftCtx.setTransform(1, 0, 0, 1, 0, 0);
+      draftCtx.clearRect(0, 0, draftCanvas.width, draftCanvas.height);
+      draftCtx.restore();
+    }
+  }
+
+  function paintPhotoBackground() {
+    const bgCanvas = getPhotoBgCanvas();
+    if (!bgCanvas || !wbCanvas) return;
+    const wrap = wbCanvas.parentElement;
+    const cw = wrap?.clientWidth || 0;
+    const ch = wrap?.clientHeight || 0;
+    if (cw < 2 || ch < 2) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    bgCanvas.width = cw * dpr;
+    bgCanvas.height = ch * dpr;
+    bgCanvas.style.width = `${cw}px`;
+    bgCanvas.style.height = `${ch}px`;
+
+    const bgCtx = bgCanvas.getContext('2d');
+    bgCtx.setTransform(1, 0, 0, 1, 0, 0);
+    bgCtx.scale(dpr, dpr);
+    bgCtx.fillStyle = '#000';
+    bgCtx.fillRect(0, 0, cw, ch);
+
+    if (photoBgImage && photoBgImage.naturalWidth > 0) {
+      const iw = photoBgImage.naturalWidth;
+      const ih = photoBgImage.naturalHeight;
+      const scale = Math.min(cw / iw, ch / ih);
+      const dw = iw * scale;
+      const dh = ih * scale;
+      const ox = (cw - dw) / 2;
+      const oy = (ch - dh) / 2;
+      bgCtx.drawImage(photoBgImage, ox, oy, dw, dh);
+    }
+  }
+
+  async function loadPhotoBackgroundFromFile(file) {
+    if (!file || !file.type.startsWith('image/')) {
+      showToast('이미지 파일만 올릴 수 있습니다.', 'error');
+      return false;
+    }
+    attachedPhotoFile = file;
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    await new Promise((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error('이미지 로드 실패'));
+      img.src = url;
+    });
+    photoBgImage = img;
+    clearStrokeLayer();
+    paintPhotoBackground();
+    const st = document.getElementById('prob-photo-status');
+    if (st) st.textContent = `선택됨: ${file.name}`;
+    document.getElementById('prob-photo-clear')?.classList.remove('hidden');
+    showToast('사진을 칠판에 올렸어요. 위에 필기해 보세요!', 'info', 3500);
+    requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+    return true;
+  }
+
+  async function loadPhotoBackgroundFromUrl(url) {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    await new Promise((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error('이미지 로드 실패'));
+      img.src = url;
+    });
+    photoBgImage = img;
+    clearStrokeLayer();
+    paintPhotoBackground();
+    requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+  }
+
+  async function exportCompositePngBlob() {
+    const wrap = wbCanvas?.parentElement;
+    const cw = wrap?.clientWidth || 0;
+    const ch = wrap?.clientHeight || 0;
+    if (!wbCanvas || cw < 2 || ch < 2) throw new Error('캔버스 캡처 실패');
+
+    const dpr = window.devicePixelRatio || 1;
+    const out = document.createElement('canvas');
+    out.width = Math.floor(cw * dpr);
+    out.height = Math.floor(ch * dpr);
+    const ctx = out.getContext('2d');
+    ctx.scale(dpr, dpr);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, cw, ch);
+
+    const bgCanvas = getPhotoBgCanvas();
+    if (bgCanvas && bgCanvas.width > 0) {
+      ctx.drawImage(bgCanvas, 0, 0, cw, ch);
+    } else if (photoBgImage) {
+      const iw = photoBgImage.naturalWidth;
+      const ih = photoBgImage.naturalHeight;
+      const scale = Math.min(cw / iw, ch / ih);
+      const dw = iw * scale;
+      const dh = ih * scale;
+      ctx.drawImage(photoBgImage, (cw - dw) / 2, (ch - dh) / 2, dw, dh);
+    }
+
+    ctx.drawImage(wbCanvas, 0, 0, cw, ch);
+    const draftCanvas = document.getElementById('whiteboard-draft');
+    if (draftCanvas) ctx.drawImage(draftCanvas, 0, 0, cw, ch);
+
+    return new Promise((resolve, reject) => {
+      out.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('이미지 생성 실패'))), 'image/png');
+    });
+  }
+
   function applySubmitMode() {
     const boardPanel = document.getElementById('prob-panel-board');
-    const photoPanel = document.getElementById('prob-panel-photo');
+    const photoBar = document.getElementById('prob-photo-bar');
     const boardTools = document.getElementById('board-only-tools');
     const mainWrap = document.getElementById('prob-main-wrap');
     const aside = document.getElementById('prob-side-reference');
@@ -571,17 +706,23 @@ export function renderStudentProblemBoard(container, params) {
       btn.classList.toggle('prob-mode-seg__btn--active', on);
       btn.setAttribute('aria-selected', on ? 'true' : 'false');
     });
-    if (boardPanel) boardPanel.classList.toggle('hidden', submitMode !== 'board');
-    if (photoPanel) photoPanel.classList.toggle('hidden', submitMode !== 'photo');
-    if (boardTools) boardTools.style.display = submitMode === 'board' ? '' : 'none';
+    if (boardPanel) boardPanel.classList.remove('hidden');
+    if (photoBar) photoBar.classList.toggle('hidden', submitMode !== 'photo');
+    if (boardTools) boardTools.style.display = '';
     if (sideToggle) sideToggle.style.display = submitMode === 'board' ? '' : 'none';
-    document.getElementById('prob-pan-strip')?.classList.toggle('hidden', submitMode !== 'board');
+    document.getElementById('prob-pan-strip')?.classList.toggle('hidden', false);
 
-    if (submitMode !== 'board') {
+    if (submitMode === 'photo') {
       mainWrap?.classList.remove('prob-main--side-ref');
       aside?.classList.add('hidden');
       aside?.setAttribute('aria-hidden', 'true');
+      clearStrokeLayer();
+      paintPhotoBackground();
     } else {
+      photoBgImage = null;
+      attachedPhotoFile = null;
+      clearPhotoAttachment();
+      clearStrokeLayer();
       try {
         if (sessionStorage.getItem(SIDE_REF_STORAGE_KEY) === '1' && sideToggle && !sideToggle.classList.contains('hidden')) {
           setSideReferenceOpen(true, false);
@@ -589,25 +730,25 @@ export function renderStudentProblemBoard(container, params) {
       } catch (_) {}
     }
     updateWhiteboardUI();
-    if (submitMode === 'board') {
-      requestAnimationFrame(() => {
-        window.dispatchEvent(new Event('resize'));
-      });
-    }
+    requestAnimationFrame(() => {
+      window.dispatchEvent(new Event('resize'));
+    });
   }
 
   function clearPhotoAttachment() {
     attachedPhotoFile = null;
+    photoBgImage = null;
     if (photoPreviewUrl) {
       URL.revokeObjectURL(photoPreviewUrl);
       photoPreviewUrl = null;
     }
-    const prev = document.getElementById('prob-photo-preview');
-    if (prev) prev.removeAttribute('src');
-    document.getElementById('prob-photo-preview-wrap')?.classList.add('hidden');
     const st = document.getElementById('prob-photo-status');
-    if (st) st.textContent = '드래그·클릭·붙여넣기(Ctrl+V)';
+    if (st) st.textContent = '사진 선택 · 드래그 · 붙여넣기';
     document.getElementById('prob-photo-clear')?.classList.add('hidden');
+    if (submitMode === 'photo') {
+      clearStrokeLayer();
+      paintPhotoBackground();
+    }
   }
 
   function bindPhotoMode() {
@@ -616,19 +757,7 @@ export function renderStudentProblemBoard(container, params) {
     const inGal = document.getElementById('prob-photo-input-gal');
 
     const onFile = (file) => {
-      if (!file || !file.type.startsWith('image/')) {
-        showToast('이미지 파일만 올릴 수 있습니다.', 'error');
-        return;
-      }
-      attachedPhotoFile = file;
-      if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
-      photoPreviewUrl = URL.createObjectURL(file);
-      const imgEl = document.getElementById('prob-photo-preview');
-      if (imgEl) imgEl.src = photoPreviewUrl;
-      document.getElementById('prob-photo-preview-wrap')?.classList.remove('hidden');
-      const st = document.getElementById('prob-photo-status');
-      if (st) st.textContent = `선택됨: ${file.name}`;
-      document.getElementById('prob-photo-clear')?.classList.remove('hidden');
+      void loadPhotoBackgroundFromFile(file);
     };
 
     document.getElementById('prob-photo-camera')?.addEventListener('click', () => inCam?.click());
@@ -676,7 +805,10 @@ export function renderStudentProblemBoard(container, params) {
           showToast('모드를 바꾸려면 녹음·녹화를 먼저 중지해 주세요.', 'error');
           return;
         }
-        if (submitMode === 'photo' && mode === 'board') clearPhotoAttachment();
+        if (submitMode === 'photo' && mode === 'board') {
+          photoBgImage = null;
+          clearPhotoAttachment();
+        }
         submitMode = mode;
         applySubmitMode();
       });
@@ -699,6 +831,10 @@ export function renderStudentProblemBoard(container, params) {
     recordingCtx.fillRect(0, 0, recordingCanvas.width, recordingCanvas.height);
     recordingCtx.restore();
 
+    const bgCanvas = getPhotoBgCanvas();
+    if (bgCanvas && bgCanvas.width > 0) {
+      recordingCtx.drawImage(bgCanvas, 0, 0);
+    }
     recordingCtx.drawImage(wbCanvas, 0, 0);
     recordingCtx.drawImage(draftCanvas, 0, 0);
 
@@ -736,8 +872,8 @@ export function renderStudentProblemBoard(container, params) {
         const hasMediaDevices = !!(navigator.mediaDevices?.getUserMedia);
         const hasMediaRecorder = typeof MediaRecorder !== 'undefined';
 
-        /** 사진 모드: 음성 설명만 녹음. 칠판 모드: 캔버스+마이크 비디오 가능 시 우선 */
-        if (submitMode === 'photo' && hasMediaDevices && hasMediaRecorder) {
+        /** 사진만 있고 칠판 미사용 시 음성만. 사진+필기는 칠판 녹화와 동일 */
+        if (submitMode === 'photo' && !photoBgImage && hasMediaDevices && hasMediaRecorder) {
           try {
             const rawAudioStream = await navigator.mediaDevices.getUserMedia({
               audio: {
@@ -770,7 +906,7 @@ export function renderStudentProblemBoard(container, params) {
             console.warn('[풀이 녹음] 사진 모드 음성 녹음 실패:', e);
             mediaRecorder = null;
           }
-        } else if (submitMode === 'board' && hasMediaDevices && hasMediaRecorder) {
+        } else if ((submitMode === 'board' || (submitMode === 'photo' && photoBgImage)) && hasMediaDevices && hasMediaRecorder) {
           let rawAudioStream = null;
           let audioStream = null;
           let combinedAttempt = null;
@@ -975,7 +1111,7 @@ export function renderStudentProblemBoard(container, params) {
       return;
     }
     if (!problemPrompt) return;
-    if (submitMode === 'photo' && !attachedPhotoFile) {
+    if (submitMode === 'photo' && !photoBgImage && !attachedPhotoFile) {
       showToast('풀이 사진을 선택하거나 촬영해 주세요.', 'error');
       return;
     }
@@ -1015,7 +1151,9 @@ export function renderStudentProblemBoard(container, params) {
     try {
       let savedImage;
       if (submitMode === 'photo') {
-        savedImage = await saveFile(attachedPhotoFile);
+        const canvasBlob = await exportCompositePngBlob();
+        const imageFile = new File([canvasBlob], `problem_photo_${Date.now()}.png`, { type: 'image/png' });
+        savedImage = await saveFile(imageFile);
       } else {
         const canvasBlob = await new Promise((resolve) => wbCanvas.toBlob(resolve, 'image/png'));
         if (!canvasBlob) throw new Error('캔버스 캡처 실패');
@@ -1056,7 +1194,9 @@ export function renderStudentProblemBoard(container, params) {
         solutionSource: submitMode === 'photo' ? 'photo' : 'whiteboard',
       });
 
-      showToast('✨ 풀이가 저장되었습니다!', 'success', 4000);
+      await addStudentPoints(student.id, 1);
+
+      showToast('✨ 풀이가 저장되었습니다! +1P', 'success', 4000);
       window.location.hash = '/student/dashboard';
     } catch (err) {
       console.error(err);
@@ -1118,26 +1258,17 @@ export function renderStudentProblemBoard(container, params) {
       applySubmitMode();
 
       if (isPhoto) {
-        let blob;
+        await waitBoardWrapReady();
         try {
-          const res = await fetch(wbUrl);
-          blob = await res.blob();
+          await loadPhotoBackgroundFromUrl(wbUrl);
         } catch (_) {
           showToast('이전 사진 풀이를 불러오지 못했습니다. 새 이미지로 다시 선택해 주세요.', 'info', 4500);
           return;
         }
-        const nm = pres.whiteboardImage?.name || 'solution.jpg';
-        const mime = blob.type?.startsWith('image/') ? blob.type : 'image/jpeg';
-        attachedPhotoFile = new File([blob], nm, { type: mime });
-        if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
-        photoPreviewUrl = URL.createObjectURL(blob);
-        const pv = document.getElementById('prob-photo-preview');
-        if (pv) pv.src = photoPreviewUrl;
-        document.getElementById('prob-photo-preview-wrap')?.classList.remove('hidden');
-        document.getElementById('prob-photo-clear')?.classList.remove('hidden');
         const st = document.getElementById('prob-photo-status');
-        if (st) st.textContent = '저장했던 사진입니다. 교체하려면 새 이미지를 선택하세요.';
-        showToast('이전 사진을 불러왔습니다. 바꾸거나 음성만 추가한 뒤 저장할 수 있어요.', 'info', 4000);
+        if (st) st.textContent = '저장했던 풀이입니다. 사진 교체·필기 추가 후 저장하세요.';
+        document.getElementById('prob-photo-clear')?.classList.remove('hidden');
+        showToast('이전 풀이를 칠판에 불러왔습니다. 이어서 수정하거나 음성을 추가할 수 있어요.', 'info', 4000);
         return;
       }
 
