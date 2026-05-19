@@ -5,7 +5,7 @@ import {
   getCurrentStudent, logoutStudent, ensureStudentFirestoreAuth, getClassById,
   getPresentationsByStudent, getAssignmentsByClass,
   getSubmissionsByStudent, getAnnouncementsByClass,
-  getResourcesByClass, getStudentById, formatDate,
+  getResourcesByClass, enrichItemsWithValidFiles, getStudentById, formatDate,
   listenToActiveQuiz, listenToQuizSubmissions, submitQuizSolution,
   showToast, downloadFile, getStudentByCode,
   submitAssignment, saveFile, updateStudentCharacterType,
@@ -151,7 +151,7 @@ export function renderStudentDashboard(container) {
 
       try {
         if (cls) {
-          assignments = await getAssignmentsByClass(cls.id);
+          assignments = await getAssignmentsByClass(cls.id).then((arr) => enrichItemsWithValidFiles(arr));
         } else {
           assignments = [];
         }
@@ -168,9 +168,9 @@ export function renderStudentDashboard(container) {
         subRes, annRes, resRes, presRes, selfRes, noteRes, promptRes,
         crossPresRes, classStudentsRes,
       ] = await Promise.all([
-        loadOr('제출물', getSubmissionsByStudent(freshStudent.id), []),
-        loadOr('공지', cls ? getAnnouncementsByClass(cls.id) : Promise.resolve([]), []),
-        loadOr('자료', cls ? getResourcesByClass(cls.id) : Promise.resolve([]), []),
+        loadOr('제출물', getSubmissionsByStudent(freshStudent.id).then((arr) => enrichItemsWithValidFiles(arr)), []),
+        loadOr('공지', cls ? getAnnouncementsByClass(cls.id).then((arr) => enrichItemsWithValidFiles(arr)) : Promise.resolve([]), []),
+        loadOr('자료', cls ? getResourcesByClass(cls.id).then((arr) => enrichItemsWithValidFiles(arr)) : Promise.resolve([]), []),
         loadOr(
           '발표',
           cls
@@ -178,9 +178,9 @@ export function renderStudentDashboard(container) {
             : Promise.resolve([]),
           [],
         ),
-        loadOr('자기기록', getStudentSelfRecords(freshStudent.id), []),
+        loadOr('자기기록', getStudentSelfRecords(freshStudent.id).then((arr) => enrichItemsWithValidFiles(arr)), []),
         loadOr('쪽지', getStudentNotesByStudent(freshStudent.id), []),
-        loadOr('한문제', cls ? getProblemPromptsByClass(cls.id) : Promise.resolve([]), []),
+        loadOr('한문제', cls ? getProblemPromptsByClass(cls.id).then((arr) => enrichItemsWithValidFiles(arr)) : Promise.resolve([]), []),
         loadOr('크로스공유발표', cls ? getSharedPresentationsByClassId(cls.id) : Promise.resolve([]), []),
         loadOr('반학생목록', cls ? getStudentsByClass(cls.id) : Promise.resolve([]), []),
       ]);

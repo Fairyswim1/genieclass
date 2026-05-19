@@ -503,29 +503,123 @@ export async function getSharedPresentationsByClassId(classId) {
         .filter(p => p.shared === true && p.type !== 'observation');
 }
 
-async function deleteFileByIdMaybe(fileLike) {
-    if (!fileLike || typeof fileLike !== 'object') return;
+/** Firestore에 배열·맵으로 저장된 첨부 목록 통일 */
+function normalizeFileRefs(raw) {
+    if (Array.isArray(raw)) return raw;
+    if (raw && typeof raw === 'object') {
+        try {
+            return Object.values(raw);
+        } catch (_) {
+            return [];
+        }
+    }
+    return [];
+}
 
-    try {
-        if (fileLike.id) {
-            try {
-                await deleteDoc(doc(db, COLLECTIONS.FILES, fileLike.id));
-            } catch (_) {
-                // ignore file metadata delete failures
+function normalizeModelAnswerFileRefs(raw) {
+    return normalizeFileRefs(raw);
+}
+
+/** 다른 문서가 같은 fileId를 아직 참조하는지 (부모 문서 삭제 후 고아만 지울 때) */
+async function countFileReferences(fileId) {
+    if (fileId == null || fileId === '') return 0;
+    const sid = String(fileId);
+    let count = 0;
+
+    const bumpIfHas = (refs) => {
+        if (normalizeFileRefs(refs).some((f) => f?.id != null && String(f.id) === sid)) {
+            count += 1;
+        }
+    };
+
+    const collNames = [
+        COLLECTIONS.RESOURCES,
+        COLLECTIONS.ASSIGNMENTS,
+        COLLECTIONS.ANNOUNCEMENTS,
+        COLLECTIONS.PROBLEM_PROMPTS,
+        COLLECTIONS.SUBMISSIONS,
+        COLLECTIONS.STUDENT_SELF_RECORDS,
+    ];
+    for (const collName of collNames) {
+        const snap = await getDocs(collection(db, collName));
+        for (const d of snap.docs) {
+            const data = d.data();
+            bumpIfHas(data.files);
+            if (collName === COLLECTIONS.PROBLEM_PROMPTS) {
+                bumpIfHas(data.modelAnswerFiles);
             }
         }
+    }
 
-        let storagePath = fileLike.storagePath;
-        const id = fileLike.id;
-        if (!storagePath && id && typeof fileLike.name === 'string') {
-            storagePath = `files/${id}_${fileLike.name}`;
-        }
+    const presSnap = await getDocs(collection(db, COLLECTIONS.PRESENTATIONS));
+    for (const d of presSnap.docs) {
+        const data = d.data();
+        if (data.whiteboardImage?.id != null && String(data.whiteboardImage.id) === sid) count += 1;
+        if (data.audioData?.id != null && String(data.audioData.id) === sid) count += 1;
+    }
 
-        if (storagePath) {
-            await deleteObject(ref(storage, storagePath)).catch(() => {});
+    const quizSnap = await getDocs(collection(db, COLLECTIONS.QUIZZES));
+    for (const d of quizSnap.docs) {
+        const img = d.data().problemImage;
+        if (img?.id != null && String(img.id) === sid) count += 1;
+    }
+
+    return count;
+}
+
+/** Firestore FILES + Storage 객체 삭제 */
+export async function deleteStoredFile(fileLike) {
+    if (!fileLike || typeof fileLike !== 'object') return false;
+
+    const id = fileLike.id ?? fileLike.fileId;
+    if (!id) return false;
+
+    let meta = { ...fileLike, id: String(id) };
+    if (!meta.storagePath || !meta.url) {
+        try {
+            const fetched = await getFileById(String(id));
+            if (fetched) meta = { ...meta, ...fetched };
+        } catch (e) {
+            console.warn('[deleteStoredFile] 메타 조회 실패:', id, e);
         }
+    }
+
+    let firestoreOk = true;
+    try {
+        await deleteDoc(doc(db, COLLECTIONS.FILES, String(id)));
     } catch (e) {
-        console.warn('[deletePresentation] Attachment cleanup skipped:', e);
+        console.error('[deleteStoredFile] Firestore FILES 삭제 실패:', id, e);
+        firestoreOk = false;
+    }
+
+    let storagePath = meta.storagePath;
+    if (!storagePath && meta.name) {
+        storagePath = `files/${id}_${meta.name}`;
+    }
+    if (storagePath) {
+        try {
+            await deleteObject(ref(storage, storagePath));
+        } catch (e) {
+            console.warn('[deleteStoredFile] Storage 삭제 실패:', storagePath, e);
+        }
+    }
+
+    return firestoreOk;
+}
+
+/** 부모 문서 삭제·첨부 교체 후, 어디에서도 안 쓰는 fileId만 FILES/Storage에서 제거 */
+async function deleteOrphanFilesFromRefs(fileRefs) {
+    const refs = normalizeFileRefs(fileRefs);
+    for (const f of refs) {
+        if (f?.id == null) continue;
+        try {
+            const n = await countFileReferences(f.id);
+            if (n === 0) {
+                await deleteStoredFile(f);
+            }
+        } catch (e) {
+            console.warn('[deleteOrphanFiles] 건너뜀:', f.id, e);
+        }
     }
 }
 
@@ -537,11 +631,10 @@ export async function deletePresentationById(presentationId) {
     if (!snap.exists()) return false;
 
     const data = snap.data();
-
-    await deleteFileByIdMaybe(data.whiteboardImage);
-    await deleteFileByIdMaybe(data.audioData);
+    const fileRefs = [data.whiteboardImage, data.audioData].filter(Boolean);
 
     await deleteDoc(refDoc);
+    await deleteOrphanFilesFromRefs(fileRefs);
     return true;
 }
 
@@ -563,18 +656,6 @@ export async function createProblemPrompt(classId, teacherId, data) {
     };
     await setDoc(doc(db, COLLECTIONS.PROBLEM_PROMPTS, id), prompt);
     return prompt;
-}
-
-function normalizeModelAnswerFileRefs(raw) {
-    if (Array.isArray(raw)) return raw;
-    if (raw && typeof raw === 'object') {
-        try {
-            return Object.values(raw);
-        } catch (_) {
-            return [];
-        }
-    }
-    return [];
 }
 
 /** 모범답안 텍스트·첨부 중 하나라도 있으면 true (선택 과제 기능용) */
@@ -667,7 +748,16 @@ export async function getProblemPromptById(promptId) {
 
 export async function deleteProblemPrompt(promptId) {
     if (!promptId) return;
-    await deleteDoc(doc(db, COLLECTIONS.PROBLEM_PROMPTS, promptId));
+    const refDoc = doc(db, COLLECTIONS.PROBLEM_PROMPTS, promptId);
+    const snap = await getDoc(refDoc);
+    if (!snap.exists()) return;
+    const data = snap.data();
+    const files = [
+        ...normalizeFileRefs(data.files),
+        ...normalizeFileRefs(data.modelAnswerFiles),
+    ];
+    await deleteDoc(refDoc);
+    await deleteOrphanFilesFromRefs(files);
 }
 
 // ========== Assignments ==========
@@ -699,11 +789,26 @@ export async function getAssignmentById(assignmentId) {
 }
 
 export async function deleteAssignment(assignmentId) {
-    await deleteDoc(doc(db, COLLECTIONS.ASSIGNMENTS, assignmentId));
+    if (!assignmentId) return;
+    const refDoc = doc(db, COLLECTIONS.ASSIGNMENTS, assignmentId);
+    const snap = await getDoc(refDoc);
+    if (!snap.exists()) return;
+    const files = normalizeFileRefs(snap.data().files);
+    await deleteDoc(refDoc);
+    await deleteOrphanFilesFromRefs(files);
 }
 
 export async function updateAssignment(assignmentId, data) {
-    const ref = doc(db, COLLECTIONS.ASSIGNMENTS, assignmentId);
+    const refDoc = doc(db, COLLECTIONS.ASSIGNMENTS, assignmentId);
+    const snap = await getDoc(refDoc);
+    let removedRefs = [];
+    if (snap.exists() && data.files) {
+        const oldFiles = normalizeFileRefs(snap.data().files);
+        const newIds = new Set(
+            normalizeFileRefs(data.files).map((f) => (f?.id != null ? String(f.id) : '')),
+        );
+        removedRefs = oldFiles.filter((f) => f?.id != null && !newIds.has(String(f.id)));
+    }
     const updates = {
         title: data.title,
         description: data.description || '',
@@ -713,7 +818,8 @@ export async function updateAssignment(assignmentId, data) {
     if (data.files) {
         updates.files = data.files;
     }
-    await updateDoc(ref, updates);
+    await updateDoc(refDoc, updates);
+    await deleteOrphanFilesFromRefs(removedRefs);
 }
 
 function submissionNewer(a, b) {
@@ -931,7 +1037,13 @@ export async function getAnnouncementsByClass(classId) {
 }
 
 export async function deleteAnnouncement(announcementId) {
-    await deleteDoc(doc(db, COLLECTIONS.ANNOUNCEMENTS, announcementId));
+    if (!announcementId) return;
+    const refDoc = doc(db, COLLECTIONS.ANNOUNCEMENTS, announcementId);
+    const snap = await getDoc(refDoc);
+    if (!snap.exists()) return;
+    const files = normalizeFileRefs(snap.data().files);
+    await deleteDoc(refDoc);
+    await deleteOrphanFilesFromRefs(files);
 }
 
 // ========== Resources (Materials) ==========
@@ -959,7 +1071,13 @@ export async function getResourcesByClass(classId) {
 }
 
 export async function deleteResource(resourceId) {
-    await deleteDoc(doc(db, COLLECTIONS.RESOURCES, resourceId));
+    if (!resourceId) return;
+    const refDoc = doc(db, COLLECTIONS.RESOURCES, resourceId);
+    const snap = await getDoc(refDoc);
+    if (!snap.exists()) return;
+    const files = normalizeFileRefs(snap.data().files);
+    await deleteDoc(refDoc);
+    await deleteOrphanFilesFromRefs(files);
 }
 
 // ========== Real-time Quiz ==========
@@ -1139,6 +1257,42 @@ export async function getFileById(fileId) {
     if (!fileId) return null;
     const docSnap = await getDoc(doc(db, COLLECTIONS.FILES, fileId));
     return docSnap.exists() ? docSnap.data() : null;
+}
+
+/** FILES 컬렉션에 실제로 남아 있는 첨부만 반환 (삭제된 id는 제외) */
+export async function filterExistingFileRefs(refs) {
+    const list = normalizeFileRefs(refs);
+    if (list.length === 0) return [];
+    const checked = await Promise.all(
+        list.map(async (ref) => {
+            if (!ref?.id) return null;
+            try {
+                const meta = await getFileById(String(ref.id));
+                if (!meta?.url) return null;
+                return {
+                    ...ref,
+                    name: meta.name || ref.name || '파일',
+                    url: meta.url,
+                    type: meta.type || ref.type,
+                };
+            } catch {
+                return null;
+            }
+        }),
+    );
+    return checked.filter(Boolean);
+}
+
+/** 자료·공지 등 items 배열의 files 필드를 유효한 첨부만 남기도록 보강 */
+export async function enrichItemsWithValidFiles(items, filesKey = 'files') {
+    if (!Array.isArray(items) || items.length === 0) return [];
+    return Promise.all(
+        items.map(async (item) => {
+            if (!item || typeof item !== 'object') return item;
+            const valid = await filterExistingFileRefs(item[filesKey]);
+            return { ...item, [filesKey]: valid };
+        }),
+    );
 }
 
 /** 발표·풀이에 붙은 칠판 이미지 공개 URL (동기). */
