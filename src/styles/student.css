@@ -175,7 +175,37 @@
     margin-top: 0;
     margin-bottom: var(--s-6);
     gap: var(--s-6);
-    grid-template-columns: 1.15fr 1.85fr;
+    grid-template-columns: 0.85fr 2.15fr;
+}
+
+/* 상단: 한 문제 풀이 + 발표 — 넓게 */
+.student-problem-board-card .student-problem-board-table {
+    max-height: min(380px, 42vh);
+}
+
+.student-dashboard--compact .student-problem-board-card .student-problem-board-table {
+    max-height: min(340px, 38vh);
+}
+
+.student-problem-board-card .student-problem-friends__list {
+    max-height: 140px;
+}
+
+.student-dashboard-focus-presentations {
+    min-height: min(280px, 32vh);
+}
+
+.student-dashboard-focus-presentations .student-dashboard-friend-pres-card {
+    min-height: min(260px, 30vh);
+}
+
+.student-dashboard-friend-pres-card {
+    display: flex;
+    flex-direction: column;
+}
+
+.student-dashboard-friend-pres-card .student-bulletin-scroll--featured {
+    flex: 1 1 auto;
 }
 
 /* 발표 기록 · 친구 발표 — 목록만(대형 미리보기 없음), 길 경우 카드 안 스크롤 */
@@ -215,13 +245,8 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
-    max-height: min(240px, 28vh);
     overflow-y: auto;
     padding-right: 4px;
-}
-
-.student-dashboard--compact .student-problem-board-table {
-    max-height: min(200px, 26vh);
 }
 
 .student-problem-row {
@@ -309,8 +334,109 @@
     max-height: min(168px, 22vh) !important;
 }
 
-.student-dashboard--compact .student-bulletin-scroll {
-    max-height: min(148px, 20vh) !important;
+.student-bulletin-scroll--featured {
+    max-height: min(320px, 36vh) !important;
+    flex: 1;
+    min-height: min(200px, 24vh);
+}
+
+.student-bulletin-scroll--compact {
+    max-height: min(120px, 14vh) !important;
+}
+
+.student-dashboard--compact .student-bulletin-scroll--featured {
+    max-height: min(280px, 32vh) !important;
+}
+
+.student-dashboard--compact .student-bulletin-scroll--compact {
+    max-height: min(100px, 12vh) !important;
+}
+
+/* 하단 보조: 수업 자료실 · 나의 기록 — 컴팩트 */
+.student-dashboard-compact-card {
+    padding: var(--s-4) var(--s-5) !important;
+    box-shadow: 3px 3px 0 0 var(--border-subtle);
+}
+
+.student-dashboard-compact-card::before {
+    display: none;
+}
+
+.student-dashboard-compact-card__head {
+    margin-bottom: var(--s-2) !important;
+    padding-bottom: var(--s-2) !important;
+}
+
+.student-dashboard-compact-card__head .section-card-title {
+    font-size: 1.1rem !important;
+}
+
+.student-dashboard-compact-card__hint {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    margin: 0 0 var(--s-2);
+    line-height: 1.35;
+}
+
+.student-dashboard-resources-scroll {
+    max-height: min(110px, 13vh);
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.student-dashboard-resources-scroll .interactive-item {
+    padding: var(--s-2) var(--s-3) !important;
+    margin-bottom: var(--s-2) !important;
+}
+
+.student-dashboard-resources-scroll .interactive-item > div:first-child {
+    font-size: 0.85rem !important;
+}
+
+.student-dashboard-self-record-card .form-group {
+    margin-bottom: var(--s-2) !important;
+}
+
+.student-dashboard-self-record-card .input-field {
+    padding: 8px 10px;
+    font-size: 0.88rem;
+}
+
+.student-dashboard-self-record-card #self-record-content {
+    min-height: 52px;
+}
+
+.student-dashboard-self-record-card #self-record-dropzone,
+.student-dashboard--compact #self-record-dropzone {
+    height: 52px !important;
+    min-height: 52px;
+    padding: 8px !important;
+    margin-bottom: var(--s-2) !important;
+}
+
+.student-dashboard-self-record-card #btn-save-self-record {
+    min-height: 38px !important;
+    font-size: 0.88rem;
+    padding: 8px 12px;
+}
+
+.student-dashboard-self-record-divider {
+    margin: var(--s-2) 0 !important;
+}
+
+.student-dashboard-self-record-list-scroll {
+    max-height: min(100px, 12vh);
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.student-dashboard-self-record-list-scroll .interactive-item {
+    padding: var(--s-2) var(--s-3) !important;
+    margin-bottom: var(--s-2) !important;
+}
+
+.student-dashboard-self-record-list-scroll .interactive-item > div:first-child > div:first-child {
+    font-size: 0.82rem !important;
 }
 
 .student-dashboard-presentations-grid.student-bulletin-grid {

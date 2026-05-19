@@ -422,14 +422,14 @@ export function renderStudentDashboard(container) {
             </div>
           </div>
 
-          <div class="student-grid-37 student-dashboard-presentations-grid student-bulletin-grid">
+          <div class="student-grid-37 student-dashboard-presentations-grid student-bulletin-grid student-dashboard-focus-presentations">
             <!-- My Presentations -->
-            <div class="section-card card student-bulletin-card">
+            <div class="section-card card student-bulletin-card student-dashboard-my-pres-card">
               <div class="section-card-header student-bulletin-card__head">
                 <span style="font-size: 1.2rem;">🎤</span>
                 <h2 class="section-card-title">나의 발표 기록</h2>
               </div>
-              <div class="student-pres-list-wrap student-bulletin-scroll">
+              <div class="student-pres-list-wrap student-bulletin-scroll student-bulletin-scroll--compact">
                 ${presentations.length === 0 ? '<p class="text-center" style="color: var(--text-dim); padding: 14px;">발표 기록이 없습니다.</p>' : presentations.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map((p) => {
       return `
                   <div class="student-pres-row student-bbs-row">
@@ -443,12 +443,12 @@ export function renderStudentDashboard(container) {
             </div>
 
             <!-- Shared Presentations -->
-            <div class="section-card card student-bulletin-card">
+            <div class="section-card card student-bulletin-card student-dashboard-friend-pres-card">
               <div class="section-card-header student-bulletin-card__head">
                 <span style="font-size: 1.2rem;">👀</span>
                 <h2 class="section-card-title">친구들의 멋진 발표</h2>
               </div>
-              <div class="student-pres-list-wrap student-bulletin-scroll">
+              <div class="student-pres-list-wrap student-bulletin-scroll student-bulletin-scroll--featured">
                 ${sharedPresentations.length === 0 ? '<p class="text-center" style="color: var(--text-dim); padding: 14px;">공유된 발표가 없습니다.</p>' : sharedPresentations.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map((p) => {
       const title = escapeHtml(p.title || '제목 없는 발표');
       const friendName = p._studentName ? escapeHtml(p._studentName) : '친구';
@@ -489,12 +489,12 @@ export function renderStudentDashboard(container) {
                 </div>
               </div>
 
-              <div class="section-card card">
-                <div class="section-card-header">
+              <div class="section-card card student-dashboard-compact-card student-dashboard-resources-card">
+                <div class="section-card-header student-dashboard-compact-card__head">
                   <span style="font-size: 1.2rem;">📁</span>
                   <h2 class="section-card-title">수업 자료실</h2>
                 </div>
-                <div class="flex flex-col gap-sm">
+                <div class="flex flex-col gap-sm student-dashboard-resources-scroll">
                   ${resources.length === 0 ? '<p class="text-center" style="color: var(--text-dim); padding: 20px;">공유된 자료가 없습니다.</p>' : resources.map(res => `
                     <div class="interactive-item" style="flex-direction: column; align-items: flex-start; gap: 8px;">
                       <div style="font-weight: 600; font-size: 0.95rem;">${res.title}</div>
@@ -531,12 +531,12 @@ export function renderStudentDashboard(container) {
               </div>
 
               <!-- Student Self Records -->
-              <div class="section-card card">
-                <div class="section-card-header" style="margin-bottom: var(--s-2); padding-bottom: var(--s-2);">
+              <div class="section-card card student-dashboard-compact-card student-dashboard-self-record-card">
+                <div class="section-card-header student-dashboard-compact-card__head">
                   <span style="font-size: 1.1rem;">📌</span>
-                  <h2 class="section-card-title" style="font-size: 1.25rem;">나의 기록</h2>
+                  <h2 class="section-card-title">나의 기록</h2>
                 </div>
-                <p style="font-size: 0.8rem; color: var(--text-dim); margin: 0 0 var(--s-3); line-height: 1.4;">제목 없이 내용만 적어도 됩니다.</p>
+                <p class="student-dashboard-compact-card__hint">제목 없이 내용만 적어도 됩니다.</p>
                 <div class="form-group" style="margin-bottom: var(--s-2);">
                   <input type="text" class="input-field" id="self-record-title" placeholder="제목 (선택)" />
                 </div>
@@ -552,7 +552,7 @@ export function renderStudentDashboard(container) {
                 <button class="btn btn-primary w-full" id="btn-save-self-record" style="min-height: 44px;">기록 저장</button>
 
                 <div class="divider" style="margin: var(--s-4) 0;"></div>
-                <div class="flex flex-col gap-sm" id="self-record-list">
+                <div id="self-record-list" class="flex flex-col gap-sm student-dashboard-self-record-list-scroll">
                   ${selfRecords.length === 0 ? '<p class="text-center" style="color: var(--text-dim); padding: 10px;">아직 작성한 기록이 없습니다.</p>' : selfRecords.map(record => `
                     <div class="interactive-item" style="flex-direction: column; align-items: flex-start; gap: 6px; padding: var(--s-3);">
                       <div class="flex justify-between items-center" style="width: 100%; gap: 10px;">
