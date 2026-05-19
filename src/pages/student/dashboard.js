@@ -170,7 +170,7 @@ export function renderStudentDashboard(container) {
       ] = await Promise.all([
         loadOr('제출물', getSubmissionsByStudent(freshStudent.id).then((arr) => enrichItemsWithValidFiles(arr)), []),
         loadOr('공지', cls ? getAnnouncementsByClass(cls.id).then((arr) => enrichItemsWithValidFiles(arr)) : Promise.resolve([]), []),
-        loadOr('자료', cls ? getResourcesByClass(cls.id).then((arr) => enrichItemsWithValidFiles(arr)) : Promise.resolve([]), []),
+        loadOr('자료', cls ? getResourcesByClass(cls.id) : Promise.resolve([]), []),
         loadOr(
           '발표',
           cls

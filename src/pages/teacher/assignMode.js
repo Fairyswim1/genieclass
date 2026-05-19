@@ -2,7 +2,7 @@ import {
   getCurrentTeacher, getClassById, getStudentsByClass,
   createAssignment, getAssignmentsByClass, deleteAssignment, updateAssignment,
   createAnnouncement, getAnnouncementsByClass, deleteAnnouncement,
-  addResource, getResourcesByClass, deleteResource, enrichItemsWithValidFiles,
+  addResource, getResourcesByClass, deleteResource,
   getSubmissionsByAssignment, saveFile, showToast, formatDate,
   getStudentById, downloadFile as storeDownloadFile, getObservationsByClass,
   getStudentSelfRecordsByClass,
@@ -61,7 +61,7 @@ export function renderAssignMode(container, params) {
   async function render() {
     const assignments = await getAssignmentsByClass(classId);
     const announcements = await getAnnouncementsByClass(classId);
-    const resources = await getResourcesByClass(classId).then((arr) => enrichItemsWithValidFiles(arr));
+    const resources = await getResourcesByClass(classId);
     const students = await getStudentsByClass(classId);
     const observations = await getObservationsByClass(classId);
     const selfRecords = await getStudentSelfRecordsByClass(classId);

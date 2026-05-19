@@ -1065,9 +1065,29 @@ export async function getResourcesByClass(classId) {
     const q = query(collection(db, COLLECTIONS.RESOURCES),
         where('classId', '==', classId));
     const snapshot = await getDocs(q);
-    return snapshot.docs
+    const list = snapshot.docs
         .map(doc => doc.data())
         .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    const enriched = await enrichItemsWithValidFiles(list);
+    const withFiles = [];
+    const emptyIds = [];
+    for (const res of enriched) {
+        if (res.files?.length > 0) {
+            withFiles.push(res);
+        } else if (res.id) {
+            emptyIds.push(res.id);
+        }
+    }
+    if (emptyIds.length > 0) {
+        await Promise.all(
+            emptyIds.map((id) =>
+                deleteResource(id).catch((e) => {
+                    console.warn('[getResourcesByClass] 빈 자료 제거 실패:', id, e);
+                }),
+            ),
+        );
+    }
+    return withFiles;
 }
 
 export async function deleteResource(resourceId) {
