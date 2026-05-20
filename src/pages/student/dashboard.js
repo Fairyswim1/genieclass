@@ -636,7 +636,7 @@ export function renderStudentDashboard(container) {
             <img id="playback-wb" class="student-playback-wb hidden" alt="칠판·풀이 화면" />
             <video id="player" controls class="student-playback-video">소스가 없습니다.</video>
             <audio id="playback-audio" controls class="student-playback-audio hidden"></audio>
-            <button type="button" class="student-playback-fs-float hidden" id="playback-fullscreen" title="전체화면" aria-label="전체화면">⛶ 전체화면</button>
+            <button type="button" class="student-playback-fs-float hidden" id="playback-fullscreen" title="전체화면으로 크게 보기" aria-label="전체화면으로 크게 보기">🔍 전체화면으로 보기</button>
           </div>
         </div>
       </div>
@@ -1033,8 +1033,24 @@ export function renderStudentDashboard(container) {
       }
     };
 
+    const syncPlaybackStageLayout = () => {
+      const stage = playbackStage();
+      const audioEl = document.getElementById('playback-audio');
+      const wbImg = document.getElementById('playback-wb');
+      if (!stage) return;
+      stage.classList.toggle(
+        'student-playback-stage--has-audio',
+        !!(audioEl && !audioEl.classList.contains('hidden')),
+      );
+      stage.classList.toggle(
+        'student-playback-stage--has-image',
+        !!(wbImg && !wbImg.classList.contains('hidden')),
+      );
+    };
+
     const setPlaybackFullscreenVisible = (show) => {
       playbackFsBtn()?.classList.toggle('hidden', !show);
+      if (show) syncPlaybackStageLayout();
     };
 
     const closePlaybackModal = () => {
@@ -1044,6 +1060,7 @@ export function renderStudentDashboard(container) {
       const wbImg = document.getElementById('playback-wb');
       exitPlaybackFullscreen();
       setPlaybackFullscreenVisible(false);
+      playbackStage()?.classList.remove('student-playback-stage--has-audio', 'student-playback-stage--has-image');
       player?.pause();
       if (player) player.src = '';
       audioEl?.pause();
@@ -1141,8 +1158,8 @@ export function renderStudentDashboard(container) {
         const fsBtn = playbackFsBtn();
         if (!stage || !fsBtn || fsBtn.classList.contains('hidden')) return;
         const inFs = document.fullscreenElement === stage;
-        fsBtn.textContent = inFs ? '⛶ 전체화면 끄기' : '⛶ 전체화면';
-        fsBtn.title = inFs ? '전체화면 끄기' : '전체화면';
+        fsBtn.textContent = inFs ? '✕ 전체화면 끄기' : '🔍 전체화면으로 보기';
+        fsBtn.title = inFs ? '전체화면 끄기' : '전체화면으로 크게 보기';
         fsBtn.setAttribute('aria-label', fsBtn.title);
       });
       videoModal.addEventListener('click', (e) => {
