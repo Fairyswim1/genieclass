@@ -7,7 +7,7 @@ import {
   getStudentById, downloadFile as storeDownloadFile, getObservationsByClass,
   getStudentSelfRecordsByClass,
   createProblemPrompt, getProblemPromptsByClass, deleteProblemPrompt,
-  getPresentationsByClass,
+  getPresentationsByClass, toggleSharePresentation, addStudentPoints,
 } from '../../store.js';
 import { escapeHtml } from '../../utils/quizMath.js';
 import { bindClipboardPasteZone } from '../../utils/clipboardPaste.js';
@@ -476,6 +476,7 @@ export function renderAssignMode(container, params) {
                                 ${sol.solutionSource === 'photo' ? '<span class="badge badge-blue" style="font-size:0.62rem;">📷사진</span>' : ''}
                                 ${wbUrl ? `<button type="button" class="btn btn-ghost btn-sm" style="font-size:0.72rem;" onclick="window.open('${wbUrl}','_blank')">🖼️ 칠판 보기</button>` : ''}
                                 ${avUrl ? `<button type="button" class="btn btn-secondary btn-sm prob-play-btn" style="font-size:0.72rem;" data-url="${avUrl}" data-mode="${sol.recordingMode || ''}">${isVideo ? '🎬 영상' : '🔊 음성'}</button>` : ''}
+                                <button type="button" class="btn btn-sm ${sol.shared ? 'btn-danger' : 'btn-primary'} btn-toggle-prob-share" data-id="${escapeAttr(sol.id)}" data-shared="${sol.shared ? 'true' : 'false'}" data-student-id="${escapeAttr(sol.studentId || '')}">${sol.shared ? '공유 끄기' : '공유하기'}</button>
                               </div>
                             `;
                           }).join('')}
@@ -834,6 +835,104 @@ export function renderAssignMode(container, params) {
       btn.addEventListener('click', () => {
         const fid = btn.getAttribute('data-file-id');
         if (fid) window.downloadFile(fid);
+      });
+    });
+
+    // 한 문제 풀이 — 교사가 학생 풀이 공유/해제
+    document.querySelectorAll('.btn-toggle-prob-share').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const presentationId = btn.dataset.id;
+        const isShared = btn.dataset.shared === 'true';
+        const studentId = btn.dataset.studentId;
+
+        if (isShared) {
+          try {
+            await toggleSharePresentation(presentationId, null, []);
+            showToast('공유가 해제되었습니다.');
+            render();
+          } catch (err) {
+            showToast('오류가 발생했습니다.', 'error');
+          }
+          return;
+        }
+
+        const crossClasses = otherClasses.filter((c) => c.id !== classId);
+        if (crossClasses.length === 0) {
+          try {
+            await toggleSharePresentation(presentationId, null, []);
+            if (studentId) {
+              await addStudentPoints(studentId, 1);
+            }
+            showToast('공유 완료! 학생 +1P');
+            render();
+          } catch (err) {
+            showToast('오류가 발생했습니다.', 'error');
+          }
+          return;
+        }
+
+        const modalId = `teacher-prob-share-${Date.now()}`;
+        const modal = document.createElement('div');
+        modal.className = 'modal-backdrop active';
+        modal.id = modalId;
+        modal.innerHTML = `
+          <div class="modal-content" style="max-width: 480px;">
+            <div class="modal-header">
+              <h3 class="modal-title">📤 풀이 공유</h3>
+              <button type="button" class="modal-close" id="${modalId}-close" aria-label="닫기">✕</button>
+            </div>
+            <p style="font-size: 0.88rem; color: var(--text-muted); margin: 0 0 var(--s-4); line-height: 1.45;">
+              문제 제목이 그대로 공유됩니다. 반 전체와 친구들에게 풀이가 보이게 할 수 있어요.
+            </p>
+            ${crossClasses.length > 0 ? `
+            <div class="form-group" style="margin-bottom: var(--s-6);">
+              <label class="input-label" style="margin-bottom: var(--s-2);">다른 클래스에도 공유 (선택)</label>
+              <div style="display: flex; flex-direction: column; gap: 8px; background: var(--bg-main); border-radius: var(--r-sm); padding: var(--s-3);">
+                ${crossClasses.map((c) => `
+                  <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 0.9rem;">
+                    <input type="checkbox" class="share-class-check" value="${escapeAttr(c.id)}" style="width:16px; height:16px; cursor:pointer;" />
+                    <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${escapeAttr(c.color || 'var(--primary)')}; flex-shrink:0;"></span>
+                    ${escapeHtml(c.name || '클래스')}
+                  </label>
+                `).join('')}
+              </div>
+            </div>
+            ` : ''}
+            <div class="flex gap-sm">
+              <button type="button" class="btn btn-primary flex-1" id="${modalId}-confirm">✨ 공유하기</button>
+              <button type="button" class="btn btn-ghost" id="${modalId}-cancel">취소</button>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(modal);
+
+        const closeModal = () => modal.remove();
+        document.getElementById(`${modalId}-close`)?.addEventListener('click', closeModal);
+        document.getElementById(`${modalId}-cancel`)?.addEventListener('click', closeModal);
+        modal.addEventListener('click', (e) => {
+          if (e.target === modal) closeModal();
+        });
+
+        document.getElementById(`${modalId}-confirm`)?.addEventListener('click', async () => {
+          const selectedClassIds = [...modal.querySelectorAll('.share-class-check:checked')].map(
+            (cb) => cb.value,
+          );
+          closeModal();
+          try {
+            await toggleSharePresentation(presentationId, null, selectedClassIds);
+            if (studentId) {
+              await addStudentPoints(studentId, 1);
+            }
+            showToast(
+              selectedClassIds.length > 0
+                ? `공유했어요! 학생 +1P · ${selectedClassIds.length}개 클래스에도 보여요`
+                : '공유 완료! 학생 +1P',
+            );
+            render();
+          } catch (err) {
+            showToast('오류가 발생했습니다.', 'error');
+          }
+        });
       });
     });
 

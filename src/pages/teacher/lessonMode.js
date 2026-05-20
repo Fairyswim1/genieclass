@@ -1595,10 +1595,9 @@ export function renderLessonMode(container, params) {
               <h3 class="modal-title">📤 발표 공유 설정</h3>
               <button class="modal-close" id="${modalId}-close">✕</button>
             </div>
-            <div class="form-group" style="margin-bottom: var(--s-4);">
-              <label class="input-label">공유 제목 <span style="color:var(--error)">*</span></label>
-              <input type="text" class="input-field" id="${modalId}-title" placeholder="예: 1번 문제 풀이" />
-            </div>
+            <p style="font-size: 0.88rem; color: var(--text-muted); margin: 0 0 var(--s-4); line-height: 1.45;">
+              저장된 제목으로 공유됩니다.
+            </p>
             ${otherClasses.length > 0 ? `
             <div class="form-group" style="margin-bottom: var(--s-6);">
               <label class="input-label" style="margin-bottom: var(--s-2);">다른 클래스에도 공유 (선택)</label>
@@ -1627,13 +1626,11 @@ export function renderLessonMode(container, params) {
         modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
 
         document.getElementById(`${modalId}-confirm`).addEventListener('click', async () => {
-          const title = document.getElementById(`${modalId}-title`).value.trim();
-          if (!title) { showToast('제목을 입력해 주세요.', 'error'); return; }
           const selectedClassIds = [...document.querySelectorAll(`#${modalId} .share-class-check:checked`)]
             .map(cb => cb.value);
           closeModal();
           try {
-            await toggleSharePresentation(presentationId, title, selectedClassIds);
+            await toggleSharePresentation(presentationId, null, selectedClassIds);
             showToast(`✨ 공유 완료! (2P 획득)${selectedClassIds.length > 0 ? ` — ${selectedClassIds.length}개 클래스 추가 공유` : ''}`);
             const updated = await addStudentPoints(selectedStudent.id, 2);
             if (updated) selectedStudent = updated;

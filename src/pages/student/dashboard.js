@@ -32,7 +32,7 @@ import { VoiceRecorder } from 'capacitor-voice-recorder';
 
 /** 칠판 URL · 음성/영상 URL로 재생 버튼 data 속성 생성 */
 function buildPlaybackButtonAttrs(p) {
-  const wbUrl = typeof p.whiteboardImage?.url === 'string' ? p.whiteboardImage.url.trim() : '';
+  const wbUrl = presentationWhiteboardImageUrl(p);
   const mediaUrl = typeof p.audioData?.url === 'string' ? p.audioData.url.trim() : '';
   const mode = p.recordingMode === 'video' ? 'video' : 'audio';
   const parts = [];
@@ -43,7 +43,7 @@ function buildPlaybackButtonAttrs(p) {
 }
 
 function renderPresentationPlayButton(p, labelOverride = '') {
-  const wbUrl = typeof p.whiteboardImage?.url === 'string' ? p.whiteboardImage.url.trim() : '';
+  const wbUrl = presentationWhiteboardImageUrl(p);
   const mediaUrl = typeof p.audioData?.url === 'string' ? p.audioData.url.trim() : '';
   if (!wbUrl && !mediaUrl) {
     return '<span class="student-pres-noasset">—</span>';
@@ -51,7 +51,7 @@ function renderPresentationPlayButton(p, labelOverride = '') {
   const label = labelOverride
     || (mediaUrl
       ? (p.recordingMode === 'video' ? '🎬 영상' : '🔊 풀이 듣기')
-      : '🖼️ 보기');
+      : (p.solutionSource === 'photo' ? '🖼️ 사진 보기' : '🖼️ 보기'));
   return `<button type="button" class="btn btn-secondary btn-sm btn-play-video" ${buildPlaybackButtonAttrs(p)}>${label}</button>`;
 }
 
@@ -181,7 +181,13 @@ export function renderStudentDashboard(container) {
         loadOr('자기기록', getStudentSelfRecords(freshStudent.id).then((arr) => enrichItemsWithValidFiles(arr)), []),
         loadOr('쪽지', getStudentNotesByStudent(freshStudent.id), []),
         loadOr('한문제', cls ? getProblemPromptsByClass(cls.id).then((arr) => enrichItemsWithValidFiles(arr)) : Promise.resolve([]), []),
-        loadOr('크로스공유발표', cls ? getSharedPresentationsByClassId(cls.id) : Promise.resolve([]), []),
+        loadOr(
+          '크로스공유발표',
+          cls
+            ? getSharedPresentationsByClassId(cls.id).then((arr) => enrichPresentationsWithImageUrls(arr))
+            : Promise.resolve([]),
+          [],
+        ),
         loadOr('반학생목록', cls ? getStudentsByClass(cls.id) : Promise.resolve([]), []),
       ]);
       [submissions, announcements, resources, allPresentations, selfRecords, studentNotes, problemPrompts] =
@@ -466,13 +472,13 @@ export function renderStudentDashboard(container) {
 
           <div class="student-grid-73 student-dashboard-main-grid">
             <!-- Assignments & Records -->
-            <div class="flex flex-col student-dashboard-col-gap">
-              <div class="section-card card">
-                <div class="section-card-header">
+            <div class="flex flex-col student-dashboard-col-gap student-dashboard-main-col">
+              <div class="section-card card student-dashboard-assignments-card">
+                <div class="section-card-header student-dashboard-assignments-card__head">
                   <span style="font-size: 1.2rem;">📝</span>
                   <h2 class="section-card-title">과제 목록</h2>
                 </div>
-                <div class="flex flex-col gap-sm">
+                <div class="flex flex-col gap-sm student-dashboard-assignments-list">
                   ${assignmentSectionBanner}
                   ${assignments.length === 0 ? assignmentEmptyMessage : assignments.map(a => {
       const sub = submissions.find(s => String(s.assignmentId) === String(a.id));
@@ -622,8 +628,9 @@ export function renderStudentDashboard(container) {
       <!-- Video Modal -->
       <div class="modal-backdrop" id="video-modal" style="z-index: 2000;">
         <div class="modal-content" style="max-width: 1000px; width: 90%; background: #000; padding: 0;">
-          <div class="modal-header" style="background: rgba(0,0,0,0.5); position: absolute; top: 0; left: 0; right: 0; z-index: 10;">
+          <div class="modal-header student-playback-modal-header" style="background: rgba(0,0,0,0.5); position: absolute; top: 0; left: 0; right: 0; z-index: 10;">
              <h3 class="modal-title" style="color: #fff;" id="video-modal-title">발표 보기</h3>
+             <button type="button" class="btn btn-ghost btn-sm student-playback-fs-btn hidden" id="playback-fullscreen" title="전체화면" aria-label="전체화면">⛶</button>
              <button class="modal-close" style="color: #fff; background: rgba(255,255,255,0.1);" id="close-video-modal">✕</button>
           </div>
           <div class="student-playback-stage">
@@ -1016,11 +1023,27 @@ export function renderStudentDashboard(container) {
     clipboardPasteUnsubs.forEach((u) => u());
     clipboardPasteUnsubs.length = 0;
 
+    const playbackStage = () => document.querySelector('#video-modal .student-playback-stage');
+    const playbackFsBtn = () => document.getElementById('playback-fullscreen');
+
+    const exitPlaybackFullscreen = () => {
+      const stage = playbackStage();
+      if (stage && document.fullscreenElement === stage) {
+        void document.exitFullscreen?.();
+      }
+    };
+
+    const setPlaybackFullscreenVisible = (show) => {
+      playbackFsBtn()?.classList.toggle('hidden', !show);
+    };
+
     const closePlaybackModal = () => {
       const videoModal = document.getElementById('video-modal');
       const player = document.getElementById('player');
       const audioEl = document.getElementById('playback-audio');
       const wbImg = document.getElementById('playback-wb');
+      exitPlaybackFullscreen();
+      setPlaybackFullscreenVisible(false);
       player?.pause();
       if (player) player.src = '';
       audioEl?.pause();
@@ -1056,6 +1079,7 @@ export function renderStudentDashboard(container) {
       }
       player.classList.remove('hidden');
       audioEl?.classList.add('hidden');
+      setPlaybackFullscreenVisible(false);
 
       if (mode === 'video' && mediaUrl) {
         if (modalTitle) modalTitle.textContent = '발표 영상';
@@ -1075,6 +1099,7 @@ export function renderStudentDashboard(container) {
         player.classList.add('hidden');
         audioEl.classList.remove('hidden');
         audioEl.src = mediaUrl;
+        setPlaybackFullscreenVisible(true);
         videoModal.classList.add('active');
         void audioEl.play();
         return;
@@ -1091,6 +1116,7 @@ export function renderStudentDashboard(container) {
       if (wbUrl && wbImg) {
         if (modalTitle) modalTitle.textContent = '풀이 화면';
         player.classList.add('hidden');
+        setPlaybackFullscreenVisible(true);
         videoModal.classList.add('active');
       }
     };
@@ -1101,8 +1127,30 @@ export function renderStudentDashboard(container) {
         btn.addEventListener('click', () => openPlayback(btn));
       });
       document.getElementById('close-video-modal')?.addEventListener('click', closePlaybackModal);
+      document.getElementById('playback-fullscreen')?.addEventListener('click', () => {
+        const stage = playbackStage();
+        if (!stage) return;
+        if (document.fullscreenElement === stage) {
+          void document.exitFullscreen?.();
+        } else {
+          void stage.requestFullscreen?.();
+        }
+      });
+      document.addEventListener('fullscreenchange', () => {
+        const stage = playbackStage();
+        const fsBtn = playbackFsBtn();
+        if (!stage || !fsBtn || fsBtn.classList.contains('hidden')) return;
+        const inFs = document.fullscreenElement === stage;
+        fsBtn.title = inFs ? '전체화면 끄기' : '전체화면';
+        fsBtn.setAttribute('aria-label', fsBtn.title);
+      });
       videoModal.addEventListener('click', (e) => {
         if (e.target === videoModal) closePlaybackModal();
+      });
+      document.getElementById('playback-wb')?.addEventListener('dblclick', () => {
+        if (!playbackFsBtn()?.classList.contains('hidden')) {
+          playbackFsBtn()?.click();
+        }
       });
     }
 
@@ -1202,7 +1250,24 @@ export function renderStudentDashboard(container) {
             otherClasses = (await getClassesByTeacher(cls.teacherId)).filter(
               (c) => c.id !== freshStudent.classId,
             );
-          } catch (_) { /* 무시 — 제목만으로 공유 */ }
+          } catch (_) { /* 무시 */ }
+        }
+
+        const sharingPres = allPresentations.find((p) => String(p.id) === String(presentationId));
+        if (otherClasses.length === 0) {
+          try {
+            await toggleSharePresentation(presentationId, null, []);
+            if (sharingPres?.type === 'problem_solution') {
+              await addStudentPoints(freshStudent.id, 1);
+              showToast('공유 완료! +1P');
+            } else {
+              showToast('공유 완료!');
+            }
+            render();
+          } catch (err) {
+            showToast('오류가 발생했습니다.', 'error');
+          }
+          return;
         }
 
         const modalId = `student-share-${Date.now()}`;
@@ -1215,10 +1280,9 @@ export function renderStudentDashboard(container) {
               <h3 class="modal-title">📤 발표 공유 설정</h3>
               <button type="button" class="modal-close" id="${modalId}-close" aria-label="닫기">✕</button>
             </div>
-            <div class="form-group" style="margin-bottom: var(--s-4);">
-              <label class="input-label">공유 제목 <span style="color:var(--error)">*</span></label>
-              <input type="text" class="input-field" id="${modalId}-title" placeholder="예: 기하 프린트 1번 문제" />
-            </div>
+            <p style="font-size: 0.88rem; color: var(--text-muted); margin: 0 0 var(--s-4); line-height: 1.45;">
+              등록된 문제·발표 제목으로 공유됩니다.
+            </p>
             ${otherClasses.length > 0 ? `
             <div class="form-group" style="margin-bottom: var(--s-6);">
               <label class="input-label" style="margin-bottom: var(--s-2);">다른 클래스에도 공유 (선택)</label>
@@ -1249,18 +1313,12 @@ export function renderStudentDashboard(container) {
         });
 
         document.getElementById(`${modalId}-confirm`)?.addEventListener('click', async () => {
-          const titleInput = document.getElementById(`${modalId}-title`);
-          const title = String(titleInput?.value || '').trim();
-          if (!title) {
-            showToast('제목을 입력해 주세요.', 'error');
-            return;
-          }
           const selectedClassIds = [...modal.querySelectorAll('.share-class-check:checked')].map(
             (cb) => cb.value,
           );
           closeModal();
           try {
-            await toggleSharePresentation(presentationId, title, selectedClassIds);
+            await toggleSharePresentation(presentationId, null, selectedClassIds);
             const pres = allPresentations.find((p) => String(p.id) === String(presentationId));
             if (pres?.type === 'problem_solution') {
               await addStudentPoints(freshStudent.id, 1);
