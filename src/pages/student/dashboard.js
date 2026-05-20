@@ -630,13 +630,13 @@ export function renderStudentDashboard(container) {
         <div class="modal-content" style="max-width: 1000px; width: 90%; background: #000; padding: 0;">
           <div class="modal-header student-playback-modal-header" style="background: rgba(0,0,0,0.5); position: absolute; top: 0; left: 0; right: 0; z-index: 10;">
              <h3 class="modal-title" style="color: #fff;" id="video-modal-title">발표 보기</h3>
-             <button type="button" class="btn btn-ghost btn-sm student-playback-fs-btn hidden" id="playback-fullscreen" title="전체화면" aria-label="전체화면">⛶</button>
              <button class="modal-close" style="color: #fff; background: rgba(255,255,255,0.1);" id="close-video-modal">✕</button>
           </div>
           <div class="student-playback-stage">
             <img id="playback-wb" class="student-playback-wb hidden" alt="칠판·풀이 화면" />
             <video id="player" controls class="student-playback-video">소스가 없습니다.</video>
             <audio id="playback-audio" controls class="student-playback-audio hidden"></audio>
+            <button type="button" class="student-playback-fs-float hidden" id="playback-fullscreen" title="전체화면" aria-label="전체화면">⛶ 전체화면</button>
           </div>
         </div>
       </div>
@@ -1141,6 +1141,7 @@ export function renderStudentDashboard(container) {
         const fsBtn = playbackFsBtn();
         if (!stage || !fsBtn || fsBtn.classList.contains('hidden')) return;
         const inFs = document.fullscreenElement === stage;
+        fsBtn.textContent = inFs ? '⛶ 전체화면 끄기' : '⛶ 전체화면';
         fsBtn.title = inFs ? '전체화면 끄기' : '전체화면';
         fsBtn.setAttribute('aria-label', fsBtn.title);
       });
