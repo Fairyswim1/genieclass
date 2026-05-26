@@ -912,6 +912,28 @@
     margin-bottom: 6px;
 }
 
+.student-note-reply {
+    margin-top: var(--s-3);
+    padding: var(--s-3);
+    border-radius: var(--r-sm);
+    background: rgba(79, 70, 229, 0.08);
+    border: 1px solid rgba(79, 70, 229, 0.18);
+}
+
+.student-note-reply-meta {
+    margin-bottom: 6px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--primary-dark, #4338ca);
+}
+
+.student-note-reply-text {
+    font-size: 0.86rem;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
 .student-dashboard-announce-scroll {
     max-height: 220px;
     overflow-y: auto;

@@ -5,7 +5,7 @@ import {
   getCurrentTeacher, logoutTeacher, getClassesByTeacher,
   createClass, getStudentsByClass, deleteClass, addStudent,
   addStudentsBatch, showToast, formatDate,
-  getStudentNotesForTeacher, markStudentNoteRead, deleteStudentNote
+  getStudentNotesForTeacher, markStudentNoteRead, replyToStudentNote, deleteStudentNote
 } from '../../store.js';
 import { parseExcelFile, downloadSampleExcel, exportStudentsToExcel } from '../../utils/excelImport.js';
 import { renderCharacter, deriveCharacterLevelFromPoints } from '../../components/characterAvatar.js';
@@ -178,6 +178,7 @@ export function renderTeacherDashboard(container) {
                     <th align="left">학생</th>
                     <th align="left">내용</th>
                     <th align="center" style="width: 88px;">상태</th>
+                    <th align="left" style="width: 240px;">답장</th>
                     <th align="center" style="width: 72px;">삭제</th>
                   </tr>
                 </thead>
@@ -200,6 +201,18 @@ export function renderTeacherDashboard(container) {
                         ${n.read
                           ? '<span class="badge badge-green">읽음</span>'
                           : `<button type="button" class="btn btn-secondary btn-sm btn-mark-note-read" data-note-id="${n.id}">읽음</button>`}
+                      </td>
+                      <td class="notes-inbox-td-reply">
+                        ${n.replyMessage ? `
+                          <div class="notes-inbox-reply-existing">
+                            <div class="notes-inbox-reply-meta">답장됨 · ${formatDate(n.repliedAt)}</div>
+                            <div class="notes-inbox-reply-text">${esc(n.replyMessage)}</div>
+                          </div>
+                        ` : ''}
+                        <textarea class="input-field notes-inbox-reply-input" data-note-id="${n.id}" rows="2" placeholder="${n.replyMessage ? '답장 수정' : '학생에게 답장'}">${n.replyMessage ? esc(n.replyMessage) : ''}</textarea>
+                        <button type="button" class="btn btn-primary btn-sm btn-reply-student-note" data-note-id="${n.id}">
+                          ${n.replyMessage ? '수정' : '답장'}
+                        </button>
                       </td>
                       <td align="center">
                         <button type="button" class="btn btn-ghost btn-sm btn-delete-student-note" data-note-id="${n.id}" title="쪽지 삭제" style="color: var(--error);">🗑</button>
@@ -284,6 +297,35 @@ export function renderTeacherDashboard(container) {
         } catch (err) {
           console.error(err);
           showToast('처리 중 오류가 발생했습니다.', 'error');
+        }
+      });
+    });
+
+    document.querySelectorAll('.btn-reply-student-note').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const id = btn.dataset.noteId;
+        const textarea = document.querySelector(`.notes-inbox-reply-input[data-note-id="${id}"]`);
+        const message = textarea?.value?.trim() || '';
+        if (!id) return;
+        if (!message) {
+          showToast('답장 내용을 입력해 주세요.', 'error');
+          return;
+        }
+        btn.disabled = true;
+        const originalText = btn.textContent;
+        btn.textContent = '전송 중...';
+        try {
+          await replyToStudentNote(id, message);
+          showToast('학생에게 답장을 보냈습니다.');
+          await render();
+          openModal('notes-inbox-modal');
+        } catch (err) {
+          console.error(err);
+          showToast('답장 전송 중 오류가 발생했습니다.', 'error');
+          btn.disabled = false;
+          btn.textContent = originalText;
         }
       });
     });

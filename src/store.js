@@ -1008,6 +1008,21 @@ export async function markStudentNoteRead(noteId, read = true) {
     await updateDoc(doc(db, COLLECTIONS.STUDENT_NOTES, noteId), { read });
 }
 
+export async function replyToStudentNote(noteId, message) {
+    const trimmed = String(message || '').trim();
+    if (!noteId) {
+        throw new Error('쪽지를 찾을 수 없습니다.');
+    }
+    if (!trimmed) {
+        throw new Error('답장 내용이 비었습니다.');
+    }
+    await updateDoc(doc(db, COLLECTIONS.STUDENT_NOTES, noteId), {
+        replyMessage: trimmed,
+        repliedAt: new Date().toISOString(),
+        read: true,
+    });
+}
+
 export async function deleteStudentNote(noteId) {
     await deleteDoc(doc(db, COLLECTIONS.STUDENT_NOTES, noteId));
 }

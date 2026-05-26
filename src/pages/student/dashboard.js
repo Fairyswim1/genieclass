@@ -617,7 +617,13 @@ export function renderStudentDashboard(container) {
               ${studentNotes.length === 0 ? '<p class="text-center" style="color: var(--text-dim); padding: 6px;">아직 보낸 쪽지가 없습니다.</p>' : studentNotes.slice(0, 12).map((n) => `
                 <div class="student-note-sent-item">
                   <div class="student-note-sent-meta">${formatDate(n.createdAt)}</div>
-                  <div style="font-size: 0.88rem; line-height: 1.45; white-space: pre-wrap;">${(n.message || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+                  <div style="font-size: 0.88rem; line-height: 1.45; white-space: pre-wrap;">${escapeHtml(n.message || '')}</div>
+                  ${n.replyMessage ? `
+                    <div class="student-note-reply">
+                      <div class="student-note-reply-meta">선생님 답장 · ${formatDate(n.repliedAt)}</div>
+                      <div class="student-note-reply-text">${escapeHtml(n.replyMessage)}</div>
+                    </div>
+                  ` : ''}
                 </div>
               `).join('')}
             </div>
