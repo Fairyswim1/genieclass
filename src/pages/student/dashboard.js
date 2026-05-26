@@ -528,6 +528,34 @@ export function renderStudentDashboard(container) {
             </div>
 
             <div class="flex flex-col student-dashboard-col-gap">
+              <!-- Student Notes Mailbox -->
+              <div class="section-card card student-dashboard-compact-card student-mailbox-card">
+                <div class="section-card-header student-dashboard-compact-card__head">
+                  <span style="font-size: 1.1rem;">💬</span>
+                  <h2 class="section-card-title">쪽지함</h2>
+                </div>
+                <p class="student-dashboard-compact-card__hint">선생님께 궁금한 점이나 하고 싶은 말을 바로 보낼 수 있어요.</p>
+                ${cls && cls.teacherId ? `
+                  <textarea class="input-field student-mailbox-input" id="student-mailbox-message" rows="3" placeholder="선생님께 보낼 쪽지를 적어 주세요"></textarea>
+                  <button type="button" class="btn btn-primary w-full" id="btn-send-student-mailbox-note">쪽지 보내기</button>
+                ` : '<p style="font-size: 0.88rem; color: var(--text-dim);">클래스에 연결되어 있지 않아 쪽지를 보낼 수 없습니다.</p>'}
+                <div class="divider" style="margin: var(--s-4) 0;"></div>
+                <div class="student-mailbox-list">
+                  ${studentNotes.length === 0 ? '<p class="text-center" style="color: var(--text-dim); padding: 10px;">아직 주고받은 쪽지가 없습니다.</p>' : studentNotes.slice(0, 8).map((n) => `
+                    <div class="student-note-sent-item student-mailbox-thread">
+                      <div class="student-note-sent-meta">나 · ${formatDate(n.createdAt)}</div>
+                      <div class="student-mailbox-message-text">${escapeHtml(n.message || '')}</div>
+                      ${n.replyMessage ? `
+                        <div class="student-note-reply">
+                          <div class="student-note-reply-meta">선생님 답장 · ${formatDate(n.repliedAt)}</div>
+                          <div class="student-note-reply-text">${escapeHtml(n.replyMessage)}</div>
+                        </div>
+                      ` : '<div class="student-mailbox-waiting">선생님 답장을 기다리는 중</div>'}
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+
               <!-- Announcements -->
               <div class="section-card card">
                 <div class="section-card-header">
@@ -1198,12 +1226,13 @@ export function renderStudentDashboard(container) {
       }
     });
 
-    document.getElementById('btn-send-student-note')?.addEventListener('click', async () => {
-      const ta = document.getElementById('student-note-message');
+    async function sendStudentNoteFrom(textareaId, buttonId) {
+      const ta = document.getElementById(textareaId);
       if (!cls?.teacherId || !ta) return;
       const message = ta.value.trim();
       if (!message) { showToast('내용을 입력해 주세요.', 'error'); return; }
-      const sendBtn = document.getElementById('btn-send-student-note');
+      const sendBtn = document.getElementById(buttonId);
+      const originalText = sendBtn?.textContent || '보내기';
       if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = '보내는 중...'; }
       try {
         await createStudentNote({
@@ -1219,8 +1248,16 @@ export function renderStudentDashboard(container) {
       } catch (err) {
         console.error(err);
         showToast('전송에 실패했습니다.', 'error');
-        if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = '보내기'; }
+        if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = originalText; }
       }
+    }
+
+    document.getElementById('btn-send-student-note')?.addEventListener('click', async () => {
+      await sendStudentNoteFrom('student-note-message', 'btn-send-student-note');
+    });
+
+    document.getElementById('btn-send-student-mailbox-note')?.addEventListener('click', async () => {
+      await sendStudentNoteFrom('student-mailbox-message', 'btn-send-student-mailbox-note');
     });
 
     document.querySelectorAll('.btn-open-pres-img').forEach((btn) => {
