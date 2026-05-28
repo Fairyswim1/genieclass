@@ -67,6 +67,10 @@ function generateStudentCode() {
     return code;
 }
 
+function currentAuthUid() {
+    return auth.currentUser?.uid || null;
+}
+
 // ========== Teacher Auth ==========
 
 const NATIVE_GOOGLE_WEB_CLIENT_ID =
@@ -307,6 +311,7 @@ export async function setupStudentAuth(studentId, loginId, password) {
     await updateDoc(ref, {
         loginId: loginId.trim(),
         password: password,
+        authUid: currentAuthUid(),
         updatedAt: new Date().toISOString()
     });
 }
@@ -335,7 +340,16 @@ export async function loginStudentByIdPw(loginId, password) {
         where('password', '==', password));
     const snapshot = await getDocs(q);
     if (!snapshot.empty) {
-        const student = snapshot.docs[0].data();
+        const studentDoc = snapshot.docs[0];
+        const student = studentDoc.data();
+        const uid = currentAuthUid();
+        if (uid && student.authUid !== uid) {
+            await updateDoc(studentDoc.ref, {
+                authUid: uid,
+                updatedAt: new Date().toISOString()
+            });
+            student.authUid = uid;
+        }
         localStorage.setItem('genie_current_student', JSON.stringify(student));
         return student;
     }
@@ -437,6 +451,7 @@ export async function addPresentation(studentId, classId, data) {
         audioData: data.audioData || null,
         shared: false,
         feedback: '',
+        authUid: currentAuthUid(),
         createdAt: new Date().toISOString(),
     };
     if (data.recordingMode) presentation.recordingMode = data.recordingMode;
@@ -849,14 +864,22 @@ export async function submitAssignment(assignmentId, studentId, data) {
         const refs = existing.docs.map((d) => ({ ref: d.ref, snap: d }));
         refs.sort((x, y) => submissionNewer(y.snap.data(), x.snap.data()));
         const keep = refs[0];
-        id = keep.snap.id;
-        prev = keep.snap.data();
-        for (let i = 1; i < refs.length; i++) {
-            try {
-                await deleteDoc(refs[i].ref);
-            } catch (e) {
-                console.warn('[submitAssignment] 중복 제출 문서 삭제 실패:', e);
+        const keepData = keep.snap.data();
+        const uid = currentAuthUid();
+        if (keepData.authUid && keepData.authUid === uid) {
+            id = keep.snap.id;
+            prev = keepData;
+            for (let i = 1; i < refs.length; i++) {
+                try {
+                    await deleteDoc(refs[i].ref);
+                } catch (e) {
+                    console.warn('[submitAssignment] 중복 제출 문서 삭제 실패:', e);
+                }
             }
+        } else {
+            // 예전 제출에는 authUid가 없어 새 보안 규칙에서 업데이트할 수 없다.
+            // 새 문서를 만들어 최신 제출로 사용하고, 교사용 목록은 updatedAt 기준으로 최신만 보여준다.
+            id = generateId();
         }
     }
 
@@ -868,6 +891,7 @@ export async function submitAssignment(assignmentId, studentId, data) {
         textAnswer: 'textAnswer' in data ? data.textAnswer : (prev.textAnswer ?? ''),
         audioData: 'audioData' in data ? data.audioData : (prev.audioData ?? null),
         shared: 'shared' in data ? data.shared : (prev.shared ?? false),
+        authUid: prev.authUid || currentAuthUid(),
         createdAt: prev.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
     };
@@ -925,6 +949,7 @@ export async function createStudentSelfRecord(studentId, classId, data) {
         title: data.title,
         content: data.content || '',
         files: data.files || [],
+        authUid: currentAuthUid(),
         createdAt: new Date().toISOString(),
     };
     await setDoc(doc(db, COLLECTIONS.STUDENT_SELF_RECORDS, id), record);
@@ -976,6 +1001,7 @@ export async function createStudentNote({
         studentName,
         message: trimmed,
         read: false,
+        authUid: currentAuthUid(),
         createdAt: new Date().toISOString(),
     };
     await setDoc(doc(db, COLLECTIONS.STUDENT_NOTES, id), note);
@@ -1167,6 +1193,7 @@ export async function submitQuizSolution(quizId, studentId, studentName, solutio
         image: solutionImageFile || null,
         solutionText,
         shared: true,
+        authUid: currentAuthUid(),
         createdAt: new Date().toISOString(),
     };
     await setDoc(doc(db, COLLECTIONS.QUIZ_SUBMISSIONS, id), sub);
@@ -1270,7 +1297,11 @@ export async function saveFile(file) {
     const storageRef = ref(storage, `files/${id}_${file.name}`);
 
     // Upload to Firebase Storage
-    await uploadBytes(storageRef, file);
+    await uploadBytes(storageRef, file, {
+        customMetadata: {
+            authUid: currentAuthUid() || '',
+        },
+    });
     const downloadURL = await getDownloadURL(storageRef);
 
     // Store metadata in Firestore (without the actual file data)
@@ -1281,6 +1312,7 @@ export async function saveFile(file) {
         size: file.size,
         url: downloadURL, // Store the public URL
         storagePath: `files/${id}_${file.name}`,
+        authUid: currentAuthUid(),
         createdAt: new Date().toISOString(),
     };
 

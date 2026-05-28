@@ -1,10 +1,186 @@
 rules_version = '2';
-// 배포: 프로젝트 연결 후 `firebase deploy --only firestore:rules,storage:rules`
-// 학생 앱은 익명 로그인(Authentication → 익명 사용) 후 request.auth != null 이 된다.
+// 배포: 프로젝트 연결 후 `firebase deploy --only firestore:rules`
 service cloud.firestore {
   match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isTeacherUid(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function classRef(classId) {
+      return /databases/$(database)/documents/classes/$(classId);
+    }
+
+    function studentRef(studentId) {
+      return /databases/$(database)/documents/students/$(studentId);
+    }
+
+    function classExists(classId) {
+      return exists(classRef(classId));
+    }
+
+    function isClassTeacher(classId) {
+      return signedIn()
+        && classId is string
+        && classExists(classId)
+        && get(classRef(classId)).data.teacherId == request.auth.uid;
+    }
+
+    function isStudentOwner(studentId) {
+      return signedIn()
+        && studentId is string
+        && exists(studentRef(studentId))
+        && get(studentRef(studentId)).data.authUid == request.auth.uid;
+    }
+
+    function ownsIncomingDoc() {
+      return signedIn()
+        && request.resource.data.authUid is string
+        && request.resource.data.authUid == request.auth.uid;
+    }
+
+    function ownsExistingDoc() {
+      return signedIn()
+        && resource.data.authUid is string
+        && resource.data.authUid == request.auth.uid;
+    }
+
+    function changedOnly(keys) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
+    }
+
+    function studentInitialClaim() {
+      return signedIn()
+        && resource.data.loginId == ''
+        && resource.data.password == ''
+        && changedOnly(['loginId', 'password', 'authUid', 'updatedAt'])
+        && request.resource.data.authUid == request.auth.uid
+        && request.resource.data.classId == resource.data.classId
+        && request.resource.data.uniqueCode == resource.data.uniqueCode;
+    }
+
+    function studentAuthRefresh() {
+      return signedIn()
+        && changedOnly(['authUid', 'updatedAt'])
+        && request.resource.data.authUid == request.auth.uid
+        && request.resource.data.classId == resource.data.classId
+        && request.resource.data.loginId == resource.data.loginId
+        && request.resource.data.password == resource.data.password;
+    }
+
+    function studentSelfProfileUpdate() {
+      return ownsExistingDoc()
+        && changedOnly(['characterType', 'totalPoints', 'characterLevel', 'praiseCount', 'updatedAt'])
+        && request.resource.data.classId == resource.data.classId
+        && request.resource.data.authUid == resource.data.authUid;
+    }
+
+    function classScopedRead() {
+      return signedIn();
+    }
+
+    function classScopedCreate() {
+      return isClassTeacher(request.resource.data.classId)
+        || (ownsIncomingDoc() && isStudentOwner(request.resource.data.studentId));
+    }
+
+    function classScopedUpdate() {
+      return isClassTeacher(resource.data.classId) || ownsExistingDoc();
+    }
+
+    match /teachers/{teacherId} {
+      allow read, write: if isTeacherUid(teacherId);
+    }
+
+    match /classes/{classId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.teacherId == request.auth.uid;
+      allow update, delete: if isTeacherUid(resource.data.teacherId);
+    }
+
+    match /students/{studentId} {
+      // 기존 학생 로그인 방식(학생코드/아이디 조회) 때문에 읽기는 당장 유지한다.
+      // 쓰기는 교사 소유 학급 또는 학생 본인 인증 UID로 제한한다.
+      allow read: if signedIn();
+      allow create: if isClassTeacher(request.resource.data.classId);
+      allow update: if isClassTeacher(resource.data.classId)
+        || studentInitialClaim()
+        || studentAuthRefresh()
+        || studentSelfProfileUpdate();
+      allow delete: if isClassTeacher(resource.data.classId);
+    }
+
+    match /assignments/{assignmentId} {
+      allow read: if classScopedRead();
+      allow create: if isClassTeacher(request.resource.data.classId);
+      allow update, delete: if isClassTeacher(resource.data.classId);
+    }
+
+    match /announcements/{announcementId} {
+      allow read: if classScopedRead();
+      allow create: if isClassTeacher(request.resource.data.classId);
+      allow update, delete: if isClassTeacher(resource.data.classId);
+    }
+
+    match /resources/{resourceId} {
+      allow read: if classScopedRead();
+      allow create: if isClassTeacher(request.resource.data.classId);
+      allow update, delete: if isClassTeacher(resource.data.classId);
+    }
+
+    match /problem_prompts/{promptId} {
+      allow read: if classScopedRead();
+      allow create: if isClassTeacher(request.resource.data.classId);
+      allow update, delete: if isClassTeacher(resource.data.classId);
+    }
+
+    match /quizzes/{quizId} {
+      allow read: if classScopedRead();
+      allow create: if isClassTeacher(request.resource.data.classId);
+      allow update, delete: if isClassTeacher(resource.data.classId);
+    }
+
+    match /presentations/{presentationId} {
+      allow read: if classScopedRead();
+      allow create: if classScopedCreate();
+      allow update, delete: if classScopedUpdate();
+    }
+
+    match /submissions/{submissionId} {
+      allow read: if classScopedRead();
+      allow create: if ownsIncomingDoc() && isStudentOwner(request.resource.data.studentId);
+      allow update, delete: if ownsExistingDoc();
+    }
+
+    match /student_self_records/{recordId} {
+      allow read: if classScopedRead();
+      allow create: if classScopedCreate();
+      allow update, delete: if classScopedUpdate();
+    }
+
+    match /student_notes/{noteId} {
+      allow read: if classScopedRead();
+      allow create: if classScopedCreate();
+      allow update, delete: if classScopedUpdate();
+    }
+
+    match /quiz_submissions/{submissionId} {
+      allow read: if classScopedRead();
+      allow create: if ownsIncomingDoc() && isStudentOwner(request.resource.data.studentId);
+      allow update, delete: if ownsExistingDoc();
+    }
+
+    match /files/{fileId} {
+      allow read: if signedIn();
+      allow create: if ownsIncomingDoc();
+      allow update, delete: if ownsExistingDoc();
+    }
+
     match /{document=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if false;
     }
   }
 }
