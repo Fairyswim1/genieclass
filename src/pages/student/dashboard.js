@@ -8,7 +8,7 @@ import {
   getResourcesByClass, enrichItemsWithValidFiles, getStudentById, formatDate,
   listenToActiveQuiz, listenToQuizSubmissions, submitQuizSolution,
   showToast, downloadFile, getStudentByCode,
-  submitAssignment, saveFile, updateStudentCharacterType,
+  submitAssignment, saveFile, updateStudentCharacterType, updateStudentPassword,
   getPresentationsByClass,   toggleSharePresentation,
   addStudentPoints,
   createStudentSelfRecord, getStudentSelfRecords,
@@ -553,6 +553,21 @@ export function renderStudentDashboard(container) {
                       ` : '<div class="student-mailbox-waiting">선생님 답장을 기다리는 중</div>'}
                     </div>
                   `).join('')}
+                </div>
+              </div>
+
+              <!-- Account Settings -->
+              <div class="section-card card student-dashboard-compact-card student-account-card">
+                <div class="section-card-header student-dashboard-compact-card__head">
+                  <span style="font-size: 1.1rem;">🔐</span>
+                  <h2 class="section-card-title">계정 관리</h2>
+                </div>
+                <p class="student-dashboard-compact-card__hint">비밀번호는 다른 사람이 알 수 없게 가끔 바꿔 주세요.</p>
+                <div class="student-password-form">
+                  <input type="password" class="input-field" id="student-current-password" placeholder="현재 비밀번호" autocomplete="current-password" />
+                  <input type="password" class="input-field" id="student-new-password" placeholder="새 비밀번호 (4자 이상)" autocomplete="new-password" />
+                  <input type="password" class="input-field" id="student-new-password-confirm" placeholder="새 비밀번호 확인" autocomplete="new-password" />
+                  <button type="button" class="btn btn-secondary w-full" id="btn-change-student-password">비밀번호 변경</button>
                 </div>
               </div>
 
@@ -1258,6 +1273,45 @@ export function renderStudentDashboard(container) {
 
     document.getElementById('btn-send-student-mailbox-note')?.addEventListener('click', async () => {
       await sendStudentNoteFrom('student-mailbox-message', 'btn-send-student-mailbox-note');
+    });
+
+    document.getElementById('btn-change-student-password')?.addEventListener('click', async () => {
+      const currentInput = document.getElementById('student-current-password');
+      const nextInput = document.getElementById('student-new-password');
+      const confirmInput = document.getElementById('student-new-password-confirm');
+      const changeBtn = document.getElementById('btn-change-student-password');
+      const currentPassword = currentInput?.value || '';
+      const nextPassword = nextInput?.value || '';
+      const confirmPassword = confirmInput?.value || '';
+      if (!currentPassword || !nextPassword || !confirmPassword) {
+        showToast('비밀번호를 모두 입력해 주세요.', 'error');
+        return;
+      }
+      if (currentPassword !== String(freshStudent.password || '')) {
+        showToast('현재 비밀번호가 맞지 않습니다.', 'error');
+        return;
+      }
+      if (nextPassword.length < 4) {
+        showToast('새 비밀번호는 4자 이상으로 정해 주세요.', 'error');
+        return;
+      }
+      if (nextPassword !== confirmPassword) {
+        showToast('새 비밀번호 확인이 다릅니다.', 'error');
+        return;
+      }
+      const originalText = changeBtn?.textContent || '비밀번호 변경';
+      if (changeBtn) { changeBtn.disabled = true; changeBtn.textContent = '변경 중...'; }
+      try {
+        await updateStudentPassword(freshStudent.id, nextPassword);
+        const updatedStudent = { ...freshStudent, password: nextPassword };
+        localStorage.setItem('genie_current_student', JSON.stringify(updatedStudent));
+        showToast('비밀번호를 변경했습니다.');
+        render();
+      } catch (err) {
+        console.error(err);
+        showToast('비밀번호 변경에 실패했습니다.', 'error');
+        if (changeBtn) { changeBtn.disabled = false; changeBtn.textContent = originalText; }
+      }
     });
 
     document.querySelectorAll('.btn-open-pres-img').forEach((btn) => {

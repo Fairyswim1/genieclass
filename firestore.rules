@@ -78,6 +78,14 @@ service cloud.firestore {
         && request.resource.data.authUid == resource.data.authUid;
     }
 
+    function studentPasswordChange() {
+      return ownsExistingDoc()
+        && changedOnly(['password', 'updatedAt'])
+        && request.resource.data.classId == resource.data.classId
+        && request.resource.data.authUid == resource.data.authUid
+        && request.resource.data.loginId == resource.data.loginId;
+    }
+
     function classScopedRead() {
       return signedIn();
     }
@@ -109,7 +117,8 @@ service cloud.firestore {
       allow update: if isClassTeacher(resource.data.classId)
         || studentInitialClaim()
         || studentAuthRefresh()
-        || studentSelfProfileUpdate();
+        || studentSelfProfileUpdate()
+        || studentPasswordChange();
       allow delete: if isClassTeacher(resource.data.classId);
     }
 
