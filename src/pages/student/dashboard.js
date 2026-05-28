@@ -8,7 +8,7 @@ import {
   getResourcesByClass, enrichItemsWithValidFiles, getStudentById, formatDate,
   listenToActiveQuiz, listenToQuizSubmissions, submitQuizSolution,
   showToast, downloadFile, getStudentByCode,
-  submitAssignment, saveFile, updateStudentCharacterType, updateStudentPassword,
+  submitAssignment, saveFile, updateStudentCharacterType, changeCurrentStudentPassword,
   getPresentationsByClass,   toggleSharePresentation,
   addStudentPoints,
   createStudentSelfRecord, getStudentSelfRecords,
@@ -291,6 +291,7 @@ export function renderStudentDashboard(container) {
           <div class="student-topbar-user">
             <div class="student-topbar-avatar">${renderCharacter(progress.level, 34, freshStudent.characterType || 'apple', freshStudent.totalPoints)}</div>
             <div class="student-topbar-name">${freshStudent.name}</div>
+            <button type="button" class="btn btn-ghost btn-sm student-topbar-password-btn" id="btn-open-student-password-modal" title="비밀번호 변경">🔐 비번 변경</button>
             <button
               type="button"
               class="btn btn-ghost btn-sm student-topbar-note-btn ${studentNotePanelOpen ? 'student-topbar-note-btn--open' : ''}"
@@ -556,21 +557,6 @@ export function renderStudentDashboard(container) {
                 </div>
               </div>
 
-              <!-- Account Settings -->
-              <div class="section-card card student-dashboard-compact-card student-account-card">
-                <div class="section-card-header student-dashboard-compact-card__head">
-                  <span style="font-size: 1.1rem;">🔐</span>
-                  <h2 class="section-card-title">계정 관리</h2>
-                </div>
-                <p class="student-dashboard-compact-card__hint">비밀번호는 다른 사람이 알 수 없게 가끔 바꿔 주세요.</p>
-                <div class="student-password-form">
-                  <input type="password" class="input-field" id="student-current-password" placeholder="현재 비밀번호" autocomplete="current-password" />
-                  <input type="password" class="input-field" id="student-new-password" placeholder="새 비밀번호 (4자 이상)" autocomplete="new-password" />
-                  <input type="password" class="input-field" id="student-new-password-confirm" placeholder="새 비밀번호 확인" autocomplete="new-password" />
-                  <button type="button" class="btn btn-secondary w-full" id="btn-change-student-password">비밀번호 변경</button>
-                </div>
-              </div>
-
               <!-- Announcements -->
               <div class="section-card card">
                 <div class="section-card-header">
@@ -635,6 +621,24 @@ export function renderStudentDashboard(container) {
             </div>
           </div>
         </main>
+      </div>
+
+      <div id="student-password-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="student-password-modal-title" style="z-index: 1050;">
+        <div class="modal-content animate-up student-password-modal-sheet">
+          <div class="modal-header" style="margin-bottom: var(--s-4);">
+            <h3 class="modal-title" id="student-password-modal-title" style="font-size: 1.25rem; margin-bottom: 0;">🔐 비밀번호 변경</h3>
+            <button type="button" class="modal-close" id="btn-close-student-password-modal" aria-label="닫기">✕</button>
+          </div>
+          <p style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.55; margin-top: 0; margin-bottom: var(--s-4);">
+            ${escapeHtml(freshStudent.name)}님 이름 옆 버튼에서 언제든 바꿀 수 있어요.
+          </p>
+          <div class="student-password-form">
+            <input type="password" class="input-field" id="student-current-password" placeholder="현재 비밀번호" autocomplete="current-password" />
+            <input type="password" class="input-field" id="student-new-password" placeholder="새 비밀번호 (4자 이상)" autocomplete="new-password" />
+            <input type="password" class="input-field" id="student-new-password-confirm" placeholder="새 비밀번호 확인" autocomplete="new-password" />
+            <button type="button" class="btn btn-primary w-full" id="btn-change-student-password">비밀번호 변경</button>
+          </div>
+        </div>
       </div>
 
       <div id="student-note-modal" class="modal-backdrop ${studentNotePanelOpen ? 'active' : ''}" role="dialog" aria-modal="true" aria-labelledby="student-note-modal-title" style="z-index: 1050;">
@@ -1241,6 +1245,18 @@ export function renderStudentDashboard(container) {
       }
     });
 
+    const passwordModal = document.getElementById('student-password-modal');
+    document.getElementById('btn-open-student-password-modal')?.addEventListener('click', () => {
+      passwordModal?.classList.add('active');
+      setTimeout(() => document.getElementById('student-current-password')?.focus(), 50);
+    });
+    document.getElementById('btn-close-student-password-modal')?.addEventListener('click', () => {
+      passwordModal?.classList.remove('active');
+    });
+    passwordModal?.addEventListener('click', (e) => {
+      if (e.target?.id === 'student-password-modal') passwordModal.classList.remove('active');
+    });
+
     async function sendStudentNoteFrom(textareaId, buttonId) {
       const ta = document.getElementById(textareaId);
       if (!cls?.teacherId || !ta) return;
@@ -1287,10 +1303,6 @@ export function renderStudentDashboard(container) {
         showToast('비밀번호를 모두 입력해 주세요.', 'error');
         return;
       }
-      if (currentPassword !== String(freshStudent.password || '')) {
-        showToast('현재 비밀번호가 맞지 않습니다.', 'error');
-        return;
-      }
       if (nextPassword.length < 4) {
         showToast('새 비밀번호는 4자 이상으로 정해 주세요.', 'error');
         return;
@@ -1302,14 +1314,12 @@ export function renderStudentDashboard(container) {
       const originalText = changeBtn?.textContent || '비밀번호 변경';
       if (changeBtn) { changeBtn.disabled = true; changeBtn.textContent = '변경 중...'; }
       try {
-        await updateStudentPassword(freshStudent.id, nextPassword);
-        const updatedStudent = { ...freshStudent, password: nextPassword };
-        localStorage.setItem('genie_current_student', JSON.stringify(updatedStudent));
+        await changeCurrentStudentPassword(freshStudent.id, currentPassword, nextPassword);
         showToast('비밀번호를 변경했습니다.');
         render();
       } catch (err) {
         console.error(err);
-        showToast('비밀번호 변경에 실패했습니다.', 'error');
+        showToast(err?.message || '비밀번호 변경에 실패했습니다.', 'error');
         if (changeBtn) { changeBtn.disabled = false; changeBtn.textContent = originalText; }
       }
     });

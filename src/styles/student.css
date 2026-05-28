@@ -88,9 +88,22 @@
     cursor: not-allowed;
 }
 
+.student-topbar-password-btn {
+    padding: 6px 10px;
+    font-weight: 700;
+    border: 1.5px solid var(--border-subtle);
+    border-radius: var(--r-md);
+    white-space: nowrap;
+}
+
 @media (max-width: 520px) {
     .student-topbar-note-btn-label {
         display: none;
+    }
+
+    .student-topbar-password-btn {
+        padding: 6px 8px;
+        font-size: 0.74rem;
     }
 }
 
@@ -967,8 +980,10 @@
     color: var(--text-dim);
 }
 
-.student-account-card .student-dashboard-compact-card__hint {
-    margin-bottom: var(--s-3);
+#student-password-modal .student-password-modal-sheet {
+    max-width: 420px;
+    width: 92%;
+    padding: var(--s-8) var(--s-10);
 }
 
 .student-password-form {

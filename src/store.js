@@ -21,6 +21,7 @@ import {
     where,
     deleteDoc,
     updateDoc,
+    deleteField,
     increment,
     serverTimestamp,
     orderBy,
@@ -69,6 +70,48 @@ function generateStudentCode() {
 
 function currentAuthUid() {
     return auth.currentUser?.uid || null;
+}
+
+const STUDENT_PASSWORD_HASH_VERSION = 'sha256-v1';
+
+function randomPasswordSalt() {
+    const bytes = new Uint8Array(16);
+    globalThis.crypto.getRandomValues(bytes);
+    return btoa(String.fromCharCode(...bytes));
+}
+
+async function sha256Base64(input) {
+    const data = new TextEncoder().encode(input);
+    const digest = await globalThis.crypto.subtle.digest('SHA-256', data);
+    return btoa(String.fromCharCode(...new Uint8Array(digest)));
+}
+
+async function createStudentPasswordCredential(password, salt = randomPasswordSalt()) {
+    const raw = String(password || '');
+    if (!raw) {
+        throw new Error('비밀번호가 비었습니다.');
+    }
+    return {
+        passwordHash: await sha256Base64(`${salt}:${raw}`),
+        passwordSalt: salt,
+        passwordVersion: STUDENT_PASSWORD_HASH_VERSION,
+        passwordUpdatedAt: new Date().toISOString(),
+    };
+}
+
+async function verifyStudentPassword(student, password) {
+    if (!student) return false;
+    if (student.passwordHash && student.passwordSalt) {
+        const credential = await createStudentPasswordCredential(password, student.passwordSalt);
+        return credential.passwordHash === student.passwordHash;
+    }
+    return String(student.password || '') === String(password || '');
+}
+
+function sanitizeStudentForSession(student) {
+    if (!student) return student;
+    const { password, ...safeStudent } = student;
+    return safeStudent;
 }
 
 // ========== Teacher Auth ==========
@@ -308,9 +351,11 @@ export async function checkLoginIdExists(loginId) {
 export async function setupStudentAuth(studentId, loginId, password) {
     await ensureStudentFirestoreAuth();
     const ref = doc(db, COLLECTIONS.STUDENTS, studentId);
+    const credential = await createStudentPasswordCredential(password);
     await updateDoc(ref, {
         loginId: loginId.trim(),
-        password: password,
+        password: deleteField(),
+        ...credential,
         authUid: currentAuthUid(),
         updatedAt: new Date().toISOString()
     });
@@ -320,38 +365,81 @@ export async function resetStudentAuth(studentId) {
     const ref = doc(db, COLLECTIONS.STUDENTS, studentId);
     await updateDoc(ref, {
         loginId: '',
-        password: '',
+        password: deleteField(),
+        passwordHash: deleteField(),
+        passwordSalt: deleteField(),
+        passwordVersion: deleteField(),
+        passwordUpdatedAt: deleteField(),
+        authUid: deleteField(),
         updatedAt: new Date().toISOString()
     });
 }
 
 export async function updateStudentPassword(studentId, newPassword) {
     const ref = doc(db, COLLECTIONS.STUDENTS, studentId);
+    const credential = await createStudentPasswordCredential(newPassword);
     await updateDoc(ref, {
-        password: newPassword,
+        password: deleteField(),
+        ...credential,
         updatedAt: new Date().toISOString()
     });
+}
+
+export async function changeCurrentStudentPassword(studentId, currentPassword, newPassword) {
+    await ensureStudentFirestoreAuth();
+    const ref = doc(db, COLLECTIONS.STUDENTS, studentId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) {
+        throw new Error('학생 정보를 찾을 수 없습니다.');
+    }
+    const student = snap.data();
+    const ok = await verifyStudentPassword(student, currentPassword);
+    if (!ok) {
+        throw new Error('현재 비밀번호가 맞지 않습니다.');
+    }
+    const credential = await createStudentPasswordCredential(newPassword);
+    const updatedAt = new Date().toISOString();
+    await updateDoc(ref, {
+        password: deleteField(),
+        ...credential,
+        updatedAt,
+    });
+    const updatedStudent = sanitizeStudentForSession({
+        ...student,
+        ...credential,
+        updatedAt,
+    });
+    localStorage.setItem('genie_current_student', JSON.stringify(updatedStudent));
+    return updatedStudent;
 }
 
 export async function loginStudentByIdPw(loginId, password) {
     await ensureStudentFirestoreAuth();
     const q = query(collection(db, COLLECTIONS.STUDENTS),
-        where('loginId', '==', loginId),
-        where('password', '==', password));
+        where('loginId', '==', loginId));
     const snapshot = await getDocs(q);
-    if (!snapshot.empty) {
-        const studentDoc = snapshot.docs[0];
+    for (const studentDoc of snapshot.docs) {
         const student = studentDoc.data();
+        const ok = await verifyStudentPassword(student, password);
+        if (!ok) continue;
+
         const uid = currentAuthUid();
-        if (uid && student.authUid !== uid) {
-            await updateDoc(studentDoc.ref, {
-                authUid: uid,
-                updatedAt: new Date().toISOString()
+        const updates = {};
+        if (uid && student.authUid !== uid) updates.authUid = uid;
+        if (!student.passwordHash || student.password) {
+            Object.assign(updates, await createStudentPasswordCredential(password), {
+                password: deleteField(),
             });
-            student.authUid = uid;
         }
-        localStorage.setItem('genie_current_student', JSON.stringify(student));
-        return student;
+        if (Object.keys(updates).length > 0) {
+            updates.updatedAt = new Date().toISOString();
+            await updateDoc(studentDoc.ref, updates);
+            Object.assign(student, updates);
+            delete student.password;
+        }
+        const safeStudent = sanitizeStudentForSession(student);
+        localStorage.setItem('genie_current_student', JSON.stringify(safeStudent));
+        return safeStudent;
     }
     return null;
 }

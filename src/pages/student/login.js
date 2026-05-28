@@ -177,7 +177,7 @@ export function renderStudentLogin(container) {
             return;
           }
 
-          if (student.loginId && student.password) {
+          if (student.loginId && (student.password || student.passwordHash)) {
             isLoading = false;
             showToast('이미 가입된 학생입니다. 아이디/비밀번호로 로그인해주세요!', 'info');
             mode = 'login';

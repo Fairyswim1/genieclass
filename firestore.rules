@@ -52,11 +52,17 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
     }
 
+    function passwordNotStored() {
+      return !request.resource.data.keys().hasAny(['password']);
+    }
+
     function studentInitialClaim() {
       return signedIn()
         && resource.data.loginId == ''
-        && resource.data.password == ''
-        && changedOnly(['loginId', 'password', 'authUid', 'updatedAt'])
+        && changedOnly(['loginId', 'password', 'passwordHash', 'passwordSalt', 'passwordVersion', 'passwordUpdatedAt', 'authUid', 'updatedAt'])
+        && passwordNotStored()
+        && request.resource.data.passwordHash is string
+        && request.resource.data.passwordSalt is string
         && request.resource.data.authUid == request.auth.uid
         && request.resource.data.classId == resource.data.classId
         && request.resource.data.uniqueCode == resource.data.uniqueCode;
@@ -68,7 +74,8 @@ service cloud.firestore {
         && request.resource.data.authUid == request.auth.uid
         && request.resource.data.classId == resource.data.classId
         && request.resource.data.loginId == resource.data.loginId
-        && request.resource.data.password == resource.data.password;
+        && request.resource.data.passwordHash == resource.data.passwordHash
+        && request.resource.data.passwordSalt == resource.data.passwordSalt;
     }
 
     function studentSelfProfileUpdate() {
@@ -80,7 +87,10 @@ service cloud.firestore {
 
     function studentPasswordChange() {
       return ownsExistingDoc()
-        && changedOnly(['password', 'updatedAt'])
+        && changedOnly(['password', 'passwordHash', 'passwordSalt', 'passwordVersion', 'passwordUpdatedAt', 'updatedAt'])
+        && passwordNotStored()
+        && request.resource.data.passwordHash is string
+        && request.resource.data.passwordSalt is string
         && request.resource.data.classId == resource.data.classId
         && request.resource.data.authUid == resource.data.authUid
         && request.resource.data.loginId == resource.data.loginId;
