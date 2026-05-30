@@ -1,4 +1,11 @@
 {
+    "redirects": [
+        {
+            "source": "/",
+            "destination": "/s",
+            "permanent": false
+        }
+    ],
     "rewrites": [
         {
             "source": "/((?!api/).*)",
