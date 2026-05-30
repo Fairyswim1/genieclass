@@ -14,6 +14,16 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   
+  <!-- 교사 포털 진입 시 hash를 미리 설정 (SPA 라우터보다 먼저 실행) -->
+  <script>
+    (function () {
+      var p = window.location.pathname.replace(/\/+$/, '');
+      if (p === '/teacher-portal' && (!window.location.hash || window.location.hash === '#')) {
+        window.location.hash = '/teacher/login';
+      }
+    })();
+  </script>
+
   <!-- KaTeX for Math Rendering -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
