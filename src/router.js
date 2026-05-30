@@ -86,15 +86,14 @@ export function initRouter() {
             return;
         }
 
-        // 웹에서는 기본 도메인 루트를 학생 전용으로 고정한다.
-        // 교사 화면은 TEACHER_ENTRY_PATH 경로에서만 진입 가능하다.
-        if (isWeb && !isStudentShell) {
-            if (!teacherEntryAllowed) {
-                if (hash === '/' || hash === '' || isTeacherHash) {
-                    window.location.hash = '/student/login';
-                    return;
-                }
-            } else if (hash === '/' || hash === '') {
+        // 웹에서는 교사 진입 경로를 TEACHER_ENTRY_PATH로 고정한다.
+        // (배포가 student 셸로 올라갔더라도 teacher-portal 진입은 교사 페이지로 강제)
+        if (isWeb && teacherEntryAllowed) {
+            if (
+                hash === '/' ||
+                hash === '' ||
+                hash.startsWith('/student')
+            ) {
                 const u = auth.currentUser;
                 window.location.hash =
                     u && !u.isAnonymous ? '/teacher/dashboard' : '/teacher/login';
@@ -102,8 +101,14 @@ export function initRouter() {
             }
         }
 
-        // 학생용 앱 빌드: 루트는 항상 학생 로그인
-        if (isStudentShell && (hash === '/' || hash === '')) {
+        // 웹 기본 도메인에서는 교사 해시 직접 진입을 막고 학생 로그인으로 보낸다.
+        if (isWeb && !teacherEntryAllowed && isTeacherHash) {
+            window.location.hash = '/student/login';
+            return;
+        }
+
+        // 학생용 앱 빌드: 루트는 항상 학생 로그인 (단, teacher-portal은 위에서 예외 처리)
+        if (isStudentShell && !teacherEntryAllowed && (hash === '/' || hash === '')) {
             window.location.hash = '/student/login';
             return;
         }
