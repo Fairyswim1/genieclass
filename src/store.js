@@ -328,6 +328,36 @@ export async function getStudentById(studentId) {
     return docSnap.exists() ? docSnap.data() : null;
 }
 
+/**
+ * 보안 규칙 강화 이후 학생 쓰기 요청은 students/{id}.authUid == request.auth.uid 가 필요하다.
+ * 오래된 세션/기기 변경으로 값이 어긋난 경우 제출 직전에 현재 UID로 정렬한다.
+ */
+async function ensureStudentWriteIdentity(studentId) {
+    const sid = studentId != null ? String(studentId) : '';
+    if (!sid) throw new Error('학생 정보가 없습니다.');
+    await ensureStudentFirestoreAuth();
+    const user = auth.currentUser;
+    const uid = user?.uid || null;
+    if (!uid) {
+        throw new Error('인증이 만료되었습니다. 다시 로그인해 주세요.');
+    }
+    if (!user.isAnonymous) {
+        throw new Error('학생 계정 인증이 필요합니다. 학생 로그아웃 후 다시 로그인해 주세요.');
+    }
+    const studentDocRef = doc(db, COLLECTIONS.STUDENTS, sid);
+    const snap = await getDoc(studentDocRef);
+    if (!snap.exists()) {
+        throw new Error('학생 정보를 찾을 수 없습니다.');
+    }
+    const row = snap.data();
+    if (row.authUid !== uid) {
+        await updateDoc(studentDocRef, {
+            authUid: uid,
+            updatedAt: new Date().toISOString(),
+        });
+    }
+}
+
 export async function getStudentByCode(code) {
     if (!code) return null;
     await ensureStudentFirestoreAuth();
@@ -386,7 +416,7 @@ export async function updateStudentPassword(studentId, newPassword) {
 }
 
 export async function changeCurrentStudentPassword(studentId, currentPassword, newPassword) {
-    await ensureStudentFirestoreAuth();
+    await ensureStudentWriteIdentity(studentId);
     const ref = doc(db, COLLECTIONS.STUDENTS, studentId);
     const snap = await getDoc(ref);
     if (!snap.exists()) {
@@ -530,6 +560,7 @@ export async function deleteStudent(studentId) {
 
 // ========== Presentations ==========
 export async function addPresentation(studentId, classId, data) {
+    await ensureStudentWriteIdentity(studentId);
     const id = generateId();
     const presentation = {
         id,
@@ -938,6 +969,7 @@ export async function submitAssignment(assignmentId, studentId, data) {
     if (!aid || !sid) {
         throw new Error('과제 또는 학생 정보가 없습니다. 로그아웃 후 다시 로그인해 주세요.');
     }
+    await ensureStudentWriteIdentity(sid);
     const q = query(collection(db, COLLECTIONS.SUBMISSIONS),
         where('assignmentId', '==', aid),
         where('studentId', '==', sid));
@@ -1029,6 +1061,7 @@ export async function getSharedSubmissions(assignmentId) {
 
 // ========== Student Self Records ==========
 export async function createStudentSelfRecord(studentId, classId, data) {
+    await ensureStudentWriteIdentity(studentId);
     const id = generateId();
     const record = {
         id,
@@ -1075,6 +1108,7 @@ export async function createStudentNote({
     studentName,
     message,
 }) {
+    await ensureStudentWriteIdentity(studentId);
     const id = generateId();
     const trimmed = String(message || '').trim();
     if (!trimmed) {
@@ -1272,6 +1306,7 @@ export async function getQuizById(quizId) {
 }
 
 export async function submitQuizSolution(quizId, studentId, studentName, solutionImageFile, solutionText = '') {
+    await ensureStudentWriteIdentity(studentId);
     const id = generateId();
     const sub = {
         id,

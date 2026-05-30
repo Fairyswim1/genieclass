@@ -5,6 +5,9 @@ import { auth } from './firebase.js';
 
 const routes = {};
 let currentCleanup = null;
+const TEACHER_ENTRY_PATH = (
+    import.meta.env.VITE_TEACHER_ENTRY_PATH || '/teacher-portal'
+).replace(/\/+$/, '') || '/teacher-portal';
 
 export function addRoute(path, handler) {
     routes[path] = handler;
@@ -70,11 +73,33 @@ export function initRouter() {
         let hash = window.location.hash.slice(1) || '/';
 
         const isStudentShell = import.meta.env.VITE_APP_SHELL === 'student';
+        const isCapacitor = window.Capacitor && window.Capacitor.isNativePlatform;
+        const isElectron = navigator.userAgent.includes('ElectronApp');
+        const isWeb = !(isCapacitor || isElectron);
+        const isTeacherHash = hash.startsWith('/teacher');
+        const teacherEntryAllowed =
+            path === TEACHER_ENTRY_PATH || path.startsWith(`${TEACHER_ENTRY_PATH}/`);
         
         // Handle direct path-based entry (e.g., genieclass.vercel.app/student or /s)
         if ((path === '/student' || path === '/s') && (hash === '/' || hash === '')) {
             window.location.hash = '/student';
             return;
+        }
+
+        // 웹에서는 기본 도메인 루트를 학생 전용으로 고정한다.
+        // 교사 화면은 TEACHER_ENTRY_PATH 경로에서만 진입 가능하다.
+        if (isWeb && !isStudentShell) {
+            if (!teacherEntryAllowed) {
+                if (hash === '/' || hash === '' || isTeacherHash) {
+                    window.location.hash = '/student/login';
+                    return;
+                }
+            } else if (hash === '/' || hash === '') {
+                const u = auth.currentUser;
+                window.location.hash =
+                    u && !u.isAnonymous ? '/teacher/dashboard' : '/teacher/login';
+                return;
+            }
         }
 
         // 학생용 앱 빌드: 루트는 항상 학생 로그인
@@ -95,10 +120,6 @@ export function initRouter() {
         }
 
         // Android(Capacitor) 또는 Electron 앱에서만 교사 모드 강제 진입
-        // 웹 브라우저에서는 이 로직을 타지 않도록 확실히 체크
-        const isCapacitor = window.Capacitor && window.Capacitor.isNativePlatform;
-        const isElectron = navigator.userAgent.includes('ElectronApp');
-        
         if (hash === '/' && path === '/' && (isCapacitor || isElectron) && !isStudentShell) {
             const u = auth.currentUser;
             window.location.hash =
@@ -119,8 +140,8 @@ export function initRouter() {
             app.innerHTML = '';
             currentCleanup = matched.handler(app, matched.params);
         } else {
-            // Default to landing
-            const defaultRoute = routes['/'];
+            // fallback: 학생 로그인 페이지
+            const defaultRoute = routes['/student/login'] || routes['/'];
             if (defaultRoute) {
                 app.innerHTML = '';
                 currentCleanup = defaultRoute(app, {});

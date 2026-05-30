@@ -7,7 +7,6 @@ import './styles/student.css';
 import './styles/quiz-math.css';
 
 import { addRoute, initRouter } from './router.js';
-import { renderLanding } from './pages/landing.js';
 import { renderTeacherLogin } from './pages/teacher/login.js';
 import { renderTeacherDashboard } from './pages/teacher/dashboard.js';
 import { renderLessonMode } from './pages/teacher/lessonMode.js';
@@ -32,7 +31,7 @@ if (import.meta.env.VITE_APP_SHELL === 'student') {
 }
 
 // Register routes
-addRoute('/', (container) => renderLanding(container));
+addRoute('/', (container) => renderStudentLogin(container));
 addRoute('/teacher/login', (container) => renderTeacherLogin(container));
 addRoute('/teacher/dashboard', (container) => renderTeacherDashboard(container));
 addRoute('/teacher/class/:id/lesson', (container, params) => renderLessonMode(container, params));
