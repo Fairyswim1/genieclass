@@ -2,8 +2,11 @@ import { defineConfig } from 'vite';
 
 export default defineConfig(({ mode }) => {
   const isStudent = mode === 'student';
+  // Vercel 환경에서는 절대경로(/)를 써야 /teacher-portal 같은 하위 경로에서도
+  // /assets/... 를 올바르게 찾는다. Electron/Capacitor는 상대경로(./)가 필요하다.
+  const base = process.env.VERCEL ? '/' : './';
   return {
-    base: './',
+    base,
     root: '.',
     publicDir: 'public',
     server: {
