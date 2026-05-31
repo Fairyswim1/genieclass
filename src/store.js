@@ -336,14 +336,19 @@ async function ensureStudentWriteIdentity(studentId) {
     const sid = studentId != null ? String(studentId) : '';
     if (!sid) throw new Error('학생 정보가 없습니다.');
     await ensureStudentFirestoreAuth();
-    const user = auth.currentUser;
-    const uid = user?.uid || null;
-    if (!uid) {
+    let user = auth.currentUser;
+    if (!user?.uid) {
         throw new Error('인증이 만료되었습니다. 다시 로그인해 주세요.');
     }
+    // 공용 기기에서 교사 Google 계정이 남아있는 경우 익명 인증으로 전환한다.
+    // 학생 쓰기 작업(제출·발표 등)은 반드시 익명 UID 기반이어야 한다.
     if (!user.isAnonymous) {
-        throw new Error('학생 계정 인증이 필요합니다. 학생 로그아웃 후 다시 로그인해 주세요.');
+        await signOut(auth);
+        await signInAnonymously(auth);
+        user = auth.currentUser;
+        if (!user?.uid) throw new Error('인증이 만료되었습니다. 다시 로그인해 주세요.');
     }
+    const uid = user.uid;
     const studentDocRef = doc(db, COLLECTIONS.STUDENTS, sid);
     const snap = await getDoc(studentDocRef);
     if (!snap.exists()) {
