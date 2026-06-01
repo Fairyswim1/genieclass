@@ -5,7 +5,8 @@ import {
   getCurrentTeacher, logoutTeacher, getClassesByTeacher,
   createClass, getStudentsByClass, deleteClass, addStudent,
   addStudentsBatch, showToast, formatDate,
-  getStudentNotesForTeacher, markStudentNoteRead, replyToStudentNote, deleteStudentNote
+  getStudentNotesForTeacher, markStudentNoteRead, replyToStudentNote, deleteStudentNote,
+  createTeacherNoteToStudent
 } from '../../store.js';
 import { parseExcelFile, downloadSampleExcel, exportStudentsToExcel } from '../../utils/excelImport.js';
 import { renderCharacter, deriveCharacterLevelFromPoints } from '../../components/characterAvatar.js';
@@ -504,6 +505,7 @@ export function renderTeacherDashboard(container) {
                     <div class="flex gap-xs justify-end">
                       <button class="btn btn-sm btn-ghost reset-btn" data-id="${s.id}" title="계정 초기화">🔄</button>
                       <button class="btn btn-sm btn-ghost pwd-btn" data-id="${s.id}" data-name="${s.name}" title="비번 변경">🔑</button>
+                      <button class="btn btn-sm btn-ghost note-btn" data-id="${s.id}" data-name="${s.name}" title="쪽지 보내기">💬</button>
                       <button class="btn btn-sm btn-ghost del-btn" data-id="${s.id}" style="color:red" title="삭제">✕</button>
                     </div>
                   </td>
@@ -649,6 +651,26 @@ export function renderTeacherDashboard(container) {
           const { updateStudentPassword } = await import('../../store.js');
           await updateStudentPassword(btn.dataset.id, pw);
           showToast('비번 변경됨');
+        }
+      }));
+
+      content.querySelectorAll('.note-btn').forEach(btn => btn.addEventListener('click', async () => {
+        const message = prompt(`${btn.dataset.name} 학생에게 보낼 쪽지`);
+        if (!message || !message.trim()) return;
+        try {
+          await createTeacherNoteToStudent({
+            classId,
+            teacherId: teacher.uid,
+            teacherName: teacher.displayName || teacher.email || '선생님',
+            className: cls.name || '',
+            studentId: btn.dataset.id,
+            studentName: btn.dataset.name || '',
+            message,
+          });
+          showToast('학생에게 쪽지를 보냈습니다.');
+        } catch (err) {
+          console.error(err);
+          showToast('쪽지 전송에 실패했습니다.', 'error');
         }
       }));
 

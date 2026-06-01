@@ -1127,8 +1127,41 @@ export async function createStudentNote({
         studentId,
         studentName,
         message: trimmed,
+        direction: 'student_to_teacher',
         read: false,
         authUid: currentAuthUid(),
+        createdAt: new Date().toISOString(),
+    };
+    await setDoc(doc(db, COLLECTIONS.STUDENT_NOTES, id), note);
+    return note;
+}
+
+export async function createTeacherNoteToStudent({
+    classId,
+    teacherId,
+    teacherName = '',
+    className = '',
+    studentId,
+    studentName = '',
+    message,
+}) {
+    const id = generateId();
+    const trimmed = String(message || '').trim();
+    if (!trimmed) {
+        throw new Error('쪽지 내용이 비었습니다.');
+    }
+    const note = {
+        id,
+        classId,
+        teacherId,
+        teacherName,
+        className,
+        studentId,
+        studentName,
+        message: trimmed,
+        direction: 'teacher_to_student',
+        read: true,
+        studentRead: false,
         createdAt: new Date().toISOString(),
     };
     await setDoc(doc(db, COLLECTIONS.STUDENT_NOTES, id), note);

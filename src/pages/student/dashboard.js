@@ -280,6 +280,9 @@ export function renderStudentDashboard(container) {
     const assignmentEmptyMessage = assignmentsLoadError
       ? ''
       : '<p class="text-center" style="color: var(--text-dim); padding: 20px;">출제된 과제가 없습니다.</p>';
+    const teacherInboxNotes = studentNotes.filter((n) =>
+      n.direction === 'teacher_to_student' || n.replyMessage);
+    const sentStudentNotes = studentNotes.filter((n) => n.direction !== 'teacher_to_student');
 
     container.innerHTML = `
       <div class="student-layout page-enter">
@@ -535,14 +538,30 @@ export function renderStudentDashboard(container) {
                   <span style="font-size: 1.1rem;">💬</span>
                   <h2 class="section-card-title">쪽지함</h2>
                 </div>
-                <p class="student-dashboard-compact-card__hint">선생님께 궁금한 점이나 하고 싶은 말을 바로 보낼 수 있어요.</p>
+                <p class="student-dashboard-compact-card__hint">선생님이 보낸 쪽지를 확인하고, 궁금한 점도 바로 보낼 수 있어요.</p>
                 ${cls && cls.teacherId ? `
                   <textarea class="input-field student-mailbox-input" id="student-mailbox-message" rows="3" placeholder="선생님께 보낼 쪽지를 적어 주세요"></textarea>
                   <button type="button" class="btn btn-primary w-full" id="btn-send-student-mailbox-note">쪽지 보내기</button>
                 ` : '<p style="font-size: 0.88rem; color: var(--text-dim);">클래스에 연결되어 있지 않아 쪽지를 보낼 수 없습니다.</p>'}
                 <div class="divider" style="margin: var(--s-4) 0;"></div>
+                <div class="student-mailbox-section-title">선생님이 보낸 쪽지</div>
+                <div class="student-mailbox-list student-mailbox-list--received">
+                  ${teacherInboxNotes.length === 0 ? '<p class="text-center" style="color: var(--text-dim); padding: 10px;">아직 선생님께 온 쪽지가 없습니다.</p>' : teacherInboxNotes.slice(0, 8).map((n) => `
+                    <div class="student-note-sent-item student-mailbox-thread student-mailbox-thread--received">
+                      ${n.direction === 'teacher_to_student' ? `
+                        <div class="student-note-sent-meta">선생님 · ${formatDate(n.createdAt)}</div>
+                        <div class="student-mailbox-message-text">${escapeHtml(n.message || '')}</div>
+                      ` : `
+                        <div class="student-note-sent-meta">선생님 답장 · ${formatDate(n.repliedAt)}</div>
+                        <div class="student-mailbox-message-text">${escapeHtml(n.replyMessage || '')}</div>
+                        <div class="student-mailbox-original">내가 보낸 쪽지: ${escapeHtml(n.message || '')}</div>
+                      `}
+                    </div>
+                  `).join('')}
+                </div>
+                <div class="student-mailbox-section-title student-mailbox-section-title--sent">내가 보낸 쪽지</div>
                 <div class="student-mailbox-list">
-                  ${studentNotes.length === 0 ? '<p class="text-center" style="color: var(--text-dim); padding: 10px;">아직 주고받은 쪽지가 없습니다.</p>' : studentNotes.slice(0, 8).map((n) => `
+                  ${sentStudentNotes.length === 0 ? '<p class="text-center" style="color: var(--text-dim); padding: 10px;">아직 보낸 쪽지가 없습니다.</p>' : sentStudentNotes.slice(0, 8).map((n) => `
                     <div class="student-note-sent-item student-mailbox-thread">
                       <div class="student-note-sent-meta">나 · ${formatDate(n.createdAt)}</div>
                       <div class="student-mailbox-message-text">${escapeHtml(n.message || '')}</div>
