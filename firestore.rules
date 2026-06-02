@@ -10,6 +10,16 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == uid;
     }
 
+    function isTeacherAuth() {
+      return signedIn()
+        && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
+    function isStudentAuth() {
+      return signedIn()
+        && request.auth.token.firebase.sign_in_provider == 'anonymous';
+    }
+
     function classRef(classId) {
       return /databases/$(database)/documents/classes/$(classId);
     }
@@ -18,12 +28,20 @@ service cloud.firestore {
       return /databases/$(database)/documents/students/$(studentId);
     }
 
+    function assignmentRef(assignmentId) {
+      return /databases/$(database)/documents/assignments/$(assignmentId);
+    }
+
+    function quizRef(quizId) {
+      return /databases/$(database)/documents/quizzes/$(quizId);
+    }
+
     function classExists(classId) {
       return exists(classRef(classId));
     }
 
     function isClassTeacher(classId) {
-      return signedIn()
+      return isTeacherAuth()
         && classId is string
         && classExists(classId)
         && get(classRef(classId)).data.teacherId == request.auth.uid;
@@ -97,7 +115,7 @@ service cloud.firestore {
     }
 
     function classScopedRead() {
-      return signedIn();
+      return isClassTeacher(resource.data.classId) || isStudentAuth();
     }
 
     function classScopedCreate() {
@@ -109,22 +127,63 @@ service cloud.firestore {
       return isClassTeacher(resource.data.classId) || ownsExistingDoc();
     }
 
+    function isAssignmentTeacher(assignmentId) {
+      return signedIn()
+        && assignmentId is string
+        && exists(assignmentRef(assignmentId))
+        && isClassTeacher(get(assignmentRef(assignmentId)).data.classId);
+    }
+
+    function isQuizTeacher(quizId) {
+      return signedIn()
+        && quizId is string
+        && exists(quizRef(quizId))
+        && isClassTeacher(get(quizRef(quizId)).data.classId);
+    }
+
+    function keepsClassScope() {
+      return request.resource.data.classId == resource.data.classId
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    function keepsStudentScope() {
+      return keepsClassScope()
+        && request.resource.data.studentId == resource.data.studentId;
+    }
+
+    function keepsTeacherScope() {
+      return keepsClassScope()
+        && request.resource.data.teacherId == resource.data.teacherId;
+    }
+
     match /teachers/{teacherId} {
       allow read, write: if isTeacherUid(teacherId);
     }
 
     match /classes/{classId} {
-      allow read: if signedIn();
-      allow create: if signedIn() && request.resource.data.teacherId == request.auth.uid;
-      allow update, delete: if isTeacherUid(resource.data.teacherId);
+      allow get: if signedIn();
+      allow list: if isTeacherAuth() && resource.data.teacherId == request.auth.uid;
+      allow create: if isTeacherAuth() && request.resource.data.teacherId == request.auth.uid;
+      allow update: if isTeacherUid(resource.data.teacherId)
+        && request.resource.data.teacherId == resource.data.teacherId
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.createdAt == resource.data.createdAt
+        && changedOnly(['name', 'color', 'order', 'activeQuizId']);
+      allow delete: if isTeacherUid(resource.data.teacherId);
     }
 
     match /students/{studentId} {
       // 기존 학생 로그인 방식(학생코드/아이디 조회) 때문에 읽기는 당장 유지한다.
       // 쓰기는 교사 소유 학급 또는 학생 본인 인증 UID로 제한한다.
-      allow read: if signedIn();
+      allow read: if isClassTeacher(resource.data.classId)
+        || isStudentAuth();
       allow create: if isClassTeacher(request.resource.data.classId);
       allow update: if isClassTeacher(resource.data.classId)
+        && request.resource.data.classId == resource.data.classId
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.createdAt == resource.data.createdAt
+        && changedOnly(['name', 'number', 'loginId', 'password', 'passwordHash', 'passwordSalt', 'passwordVersion', 'passwordUpdatedAt', 'authUid', 'characterLevel', 'characterType', 'praiseCount', 'totalPoints', 'updatedAt'])
         || studentInitialClaim()
         || studentAuthRefresh()
         || studentSelfProfileUpdate()
@@ -135,61 +194,102 @@ service cloud.firestore {
     match /assignments/{assignmentId} {
       allow read: if classScopedRead();
       allow create: if isClassTeacher(request.resource.data.classId);
-      allow update, delete: if isClassTeacher(resource.data.classId);
+      allow update: if isClassTeacher(resource.data.classId)
+        && keepsClassScope()
+        && changedOnly(['title', 'description', 'dueDate', 'files', 'updatedAt']);
+      allow delete: if isClassTeacher(resource.data.classId);
     }
 
     match /announcements/{announcementId} {
       allow read: if classScopedRead();
       allow create: if isClassTeacher(request.resource.data.classId);
-      allow update, delete: if isClassTeacher(resource.data.classId);
+      allow update: if isClassTeacher(resource.data.classId)
+        && keepsClassScope()
+        && changedOnly(['title', 'content', 'files', 'updatedAt']);
+      allow delete: if isClassTeacher(resource.data.classId);
     }
 
     match /resources/{resourceId} {
       allow read: if classScopedRead();
       allow create: if isClassTeacher(request.resource.data.classId);
-      allow update, delete: if isClassTeacher(resource.data.classId);
+      allow update: if isClassTeacher(resource.data.classId)
+        && keepsClassScope()
+        && changedOnly(['title', 'description', 'files', 'updatedAt']);
+      allow delete: if isClassTeacher(resource.data.classId);
     }
 
     match /problem_prompts/{promptId} {
       allow read: if classScopedRead();
       allow create: if isClassTeacher(request.resource.data.classId);
-      allow update, delete: if isClassTeacher(resource.data.classId);
+      allow update: if isClassTeacher(resource.data.classId)
+        && keepsTeacherScope()
+        && changedOnly(['title', 'description', 'files', 'modelAnswerText', 'modelAnswerFiles', 'updatedAt']);
+      allow delete: if isClassTeacher(resource.data.classId);
     }
 
     match /quizzes/{quizId} {
       allow read: if classScopedRead();
       allow create: if isClassTeacher(request.resource.data.classId);
-      allow update, delete: if isClassTeacher(resource.data.classId);
+      allow update: if isClassTeacher(resource.data.classId)
+        && keepsClassScope()
+        && changedOnly(['active', 'galleryRevealed', 'problemImage', 'problemText', 'updatedAt']);
+      allow delete: if isClassTeacher(resource.data.classId);
     }
 
     match /presentations/{presentationId} {
       allow read: if classScopedRead();
       allow create: if classScopedCreate();
-      allow update, delete: if classScopedUpdate();
+      allow update: if classScopedUpdate()
+        && keepsStudentScope()
+        && request.resource.data.authUid == resource.data.authUid
+        && changedOnly(['shared', 'title', 'sharedClassIds', 'feedback', 'updatedAt']);
+      allow delete: if classScopedUpdate();
     }
 
     match /submissions/{submissionId} {
-      allow read: if classScopedRead();
+      allow read: if isAssignmentTeacher(resource.data.assignmentId) || ownsExistingDoc();
       allow create: if ownsIncomingDoc() && isStudentOwner(request.resource.data.studentId);
-      allow update, delete: if ownsExistingDoc();
+      allow update: if ownsExistingDoc()
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.assignmentId == resource.data.assignmentId
+        && request.resource.data.studentId == resource.data.studentId
+        && request.resource.data.authUid == resource.data.authUid
+        && request.resource.data.createdAt == resource.data.createdAt
+        && changedOnly(['files', 'textAnswer', 'audioData', 'shared', 'updatedAt']);
+      allow delete: if ownsExistingDoc();
     }
 
     match /student_self_records/{recordId} {
       allow read: if classScopedRead();
       allow create: if classScopedCreate();
-      allow update, delete: if classScopedUpdate();
+      allow update: if classScopedUpdate()
+        && keepsStudentScope()
+        && request.resource.data.authUid == resource.data.authUid
+        && changedOnly(['title', 'content', 'files', 'updatedAt']);
+      allow delete: if classScopedUpdate();
     }
 
     match /student_notes/{noteId} {
       allow read: if classScopedRead();
       allow create: if classScopedCreate();
-      allow update, delete: if classScopedUpdate();
+      allow update: if classScopedUpdate()
+        && keepsTeacherScope()
+        && request.resource.data.studentId == resource.data.studentId
+        && changedOnly(['read', 'replyMessage', 'repliedAt', 'studentRead', 'updatedAt']);
+      allow delete: if classScopedUpdate();
     }
 
     match /quiz_submissions/{submissionId} {
-      allow read: if classScopedRead();
+      allow read: if isQuizTeacher(resource.data.quizId) || ownsExistingDoc();
       allow create: if ownsIncomingDoc() && isStudentOwner(request.resource.data.studentId);
-      allow update, delete: if ownsExistingDoc();
+      allow update: if ownsExistingDoc()
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.quizId == resource.data.quizId
+        && request.resource.data.studentId == resource.data.studentId
+        && request.resource.data.authUid == resource.data.authUid
+        && request.resource.data.createdAt == resource.data.createdAt
+        && changedOnly(['shared', 'solutionText', 'image', 'updatedAt']);
+      allow delete: if ownsExistingDoc();
     }
 
     match /files/{fileId} {

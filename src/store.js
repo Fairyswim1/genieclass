@@ -1043,7 +1043,10 @@ export async function getSubmissionsByAssignment(assignmentId) {
 export async function getSubmissionsByStudent(studentId) {
     if (studentId == null || studentId === '') return [];
     const sid = String(studentId);
-    const q = query(collection(db, COLLECTIONS.SUBMISSIONS), where('studentId', '==', sid));
+    const uid = currentAuthUid();
+    const q = uid
+        ? query(collection(db, COLLECTIONS.SUBMISSIONS), where('studentId', '==', sid), where('authUid', '==', uid))
+        : query(collection(db, COLLECTIONS.SUBMISSIONS), where('studentId', '==', sid));
     const snapshot = await getDocs(q);
     const list = snapshot.docs.map((d) => d.data());
     const byAssignment = new Map();
