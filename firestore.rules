@@ -270,7 +270,9 @@ service cloud.firestore {
     }
 
     match /student_notes/{noteId} {
-      allow read: if classScopedRead();
+      allow read: if (isTeacherAuth() && resource.data.teacherId == request.auth.uid)
+        || ownsExistingDoc()
+        || (isStudentAuth() && isStudentOwner(resource.data.studentId));
       allow create: if classScopedCreate();
       allow update: if classScopedUpdate()
         && keepsTeacherScope()
