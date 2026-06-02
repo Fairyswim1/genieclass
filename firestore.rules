@@ -247,7 +247,9 @@ service cloud.firestore {
     }
 
     match /submissions/{submissionId} {
-      allow read: if isAssignmentTeacher(resource.data.assignmentId) || ownsExistingDoc();
+      allow read: if isAssignmentTeacher(resource.data.assignmentId)
+        || ownsExistingDoc()
+        || (isStudentAuth() && isStudentOwner(resource.data.studentId));
       allow create: if ownsIncomingDoc() && isStudentOwner(request.resource.data.studentId);
       allow update: if ownsExistingDoc()
         && request.resource.data.id == resource.data.id
