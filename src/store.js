@@ -209,9 +209,10 @@ export function getCurrentStudent() {
  */
 export async function ensureStudentFirestoreAuth() {
     const u = auth.currentUser;
-    // 이미 로그인(익명 또는 실계정)된 사용자는 Firestore 규칙(request.auth != null)을 통과하므로 그대로 사용
-    // 이전에는 Google 로그인 사용자를 강제 로그아웃시켜 교사 세션이 끊기는 버그가 있었음
-    if (u) return;
+    if (u?.isAnonymous) return;
+    // 학생 화면은 Firestore 규칙에서 anonymous 인증을 학생 세션으로 취급한다.
+    // 같은 브라우저에 교사 Google 세션이 남아 있으면 학생 로그인 조회가 거부되므로 전환한다.
+    if (u) await signOut(auth);
 
     await signInAnonymously(auth);
 }
