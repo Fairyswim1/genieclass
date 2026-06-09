@@ -258,9 +258,17 @@ export function renderLessonMode(container, params) {
 
     document.getElementById('btn-history')?.addEventListener('click', async () => {
       showToast('발표 기록을 불러오는 중...', 'info');
-      studentPresentations = await getPresentationsByStudent(selectedStudent.id);
-      activeView = 'presentations';
-      render();
+      try {
+        studentPresentations = await getPresentationsByStudent(
+          selectedStudent.id,
+          selectedStudent.classId || classId,
+        );
+        activeView = 'presentations';
+        render();
+      } catch (err) {
+        console.error('[발표 기록]', err);
+        showToast('발표 기록을 불러오지 못했습니다: ' + (err?.message || '권한 오류'), 'error');
+      }
     });
 
     document.getElementById('btn-subtract-point')?.addEventListener('click', async () => {
@@ -1575,7 +1583,10 @@ export function renderLessonMode(container, params) {
           try {
             await toggleSharePresentation(presentationId, null, []);
             showToast('공유가 중지되었습니다.');
-            studentPresentations = await getPresentationsByStudent(selectedStudent.id);
+            studentPresentations = await getPresentationsByStudent(
+              selectedStudent.id,
+              selectedStudent.classId || classId,
+            );
             render();
           } catch (err) {
             showToast('오류가 발생했습니다.', 'error');
@@ -1634,7 +1645,10 @@ export function renderLessonMode(container, params) {
             showToast(`✨ 공유 완료! (2P 획득)${selectedClassIds.length > 0 ? ` — ${selectedClassIds.length}개 클래스 추가 공유` : ''}`);
             const updated = await addStudentPoints(selectedStudent.id, 2);
             if (updated) selectedStudent = updated;
-            studentPresentations = await getPresentationsByStudent(selectedStudent.id);
+            studentPresentations = await getPresentationsByStudent(
+              selectedStudent.id,
+              selectedStudent.classId || classId,
+            );
             render();
           } catch (err) {
             showToast('오류가 발생했습니다.', 'error');
@@ -1655,7 +1669,10 @@ export function renderLessonMode(container, params) {
             return;
           }
           showToast('발표 기록이 삭제되었습니다.');
-          studentPresentations = await getPresentationsByStudent(selectedStudent.id);
+          studentPresentations = await getPresentationsByStudent(
+            selectedStudent.id,
+            selectedStudent.classId || classId,
+          );
           render();
         } catch (err) {
           console.error('Presentation delete error:', err);

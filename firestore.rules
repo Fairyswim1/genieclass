@@ -114,8 +114,21 @@ service cloud.firestore {
         && request.resource.data.loginId == resource.data.loginId;
     }
 
+    function isStudentClassTeacher(studentId) {
+      return isTeacherAuth()
+        && studentId is string
+        && exists(studentRef(studentId))
+        && isClassTeacher(get(studentRef(studentId)).data.classId);
+    }
+
     function classScopedRead() {
       return isClassTeacher(resource.data.classId) || isStudentAuth();
+    }
+
+    function presentationRead() {
+      return isClassTeacher(resource.data.classId)
+        || isStudentClassTeacher(resource.data.studentId)
+        || (isStudentAuth() && isStudentOwner(resource.data.studentId));
     }
 
     function classScopedCreate() {
@@ -237,7 +250,7 @@ service cloud.firestore {
     }
 
     match /presentations/{presentationId} {
-      allow read: if classScopedRead();
+      allow read: if presentationRead();
       allow create: if classScopedCreate();
       allow update: if classScopedUpdate()
         && keepsStudentScope()

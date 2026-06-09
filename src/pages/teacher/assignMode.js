@@ -192,10 +192,13 @@ export function renderAssignMode(container, params) {
                             + '</li>';
                         }).join('')
                       : '';
+                    const studentDownloadBtn = sub
+                      ? '<button type="button" class="btn btn-secondary btn-sm student-submission-download-btn" style="flex-shrink:0;font-size:0.72rem;padding:5px 12px;" data-assignment-id="' + escapeAttr(String(a.id)) + '" data-assignment-title="' + escapeAttr(a.title || '과제') + '" data-student-id="' + escapeAttr(String(st.id)) + '">📥 제출물 다운로드</button>'
+                      : '';
                     return '<div class="assign-submission-row" data-student-name="' + nameAttr + '" style="padding:10px 12px;background:var(--bg-surface);border-radius:var(--r-sm);border:1px solid var(--border-main);min-width:0;">'
                       + '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:' + (sub ? '8px' : '0') + ';">'
                       + '<span style="font-size:0.95rem;font-weight:600;color:var(--text-main);">' + nameHtml + '</span>'
-                      + statusBadge
+                      + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' + statusBadge + studentDownloadBtn + '</div>'
                       + '</div>'
                       + (hasSubText ? '<div style="font-size:0.82rem;color:var(--text-main);white-space:pre-wrap;max-height:100px;overflow-y:auto;padding:8px 10px;background:var(--bg-main);border-radius:var(--r-sm);border:1px solid var(--border-subtle);line-height:1.45;">' + escapeHtml(String(sub.textAnswer)) + '</div>' : '')
                       + (hasSubAudio ? '<div style="margin-top:8px;"><audio controls style="width:100%;height:40px;" src="' + escapeHtml(sub.audioData.url) + '"></audio></div>' : '')
@@ -832,9 +835,33 @@ export function renderAssignMode(container, params) {
 
     // 학생 제출 파일 다운로드 버튼 (data-file-id 방식)
     document.querySelectorAll('[data-file-id]').forEach((btn) => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const fid = btn.getAttribute('data-file-id');
-        if (fid) window.downloadFile(fid);
+        if (!fid) return;
+        try {
+          await window.downloadFile(fid);
+        } catch (err) {
+          console.error('[파일 다운로드]', err);
+          showToast('파일 다운로드에 실패했습니다.', 'error');
+        }
+      });
+    });
+
+    document.querySelectorAll('.student-submission-download-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const assignmentId = btn.dataset.assignmentId;
+        const assignmentTitle = btn.dataset.assignmentTitle || '과제';
+        const studentId = btn.dataset.studentId;
+        if (!assignmentId || !studentId) return;
+        btn.disabled = true;
+        const prevText = btn.textContent;
+        btn.textContent = '⏳ 준비 중…';
+        try {
+          await handleSubmissionDownload(assignmentId, assignmentTitle, studentId);
+        } finally {
+          btn.disabled = false;
+          btn.textContent = prevText;
+        }
       });
     });
 
@@ -1200,7 +1227,7 @@ export function renderAssignMode(container, params) {
       btn.addEventListener('click', async () => {
         const id = btn.dataset.id;
         const title = btn.dataset.title;
-        await handleBulkDownload(id, title);
+        await handleSubmissionDownload(id, title);
       });
     });
   }
@@ -1241,91 +1268,114 @@ export function renderAssignMode(container, params) {
     document.head.appendChild(style);
   }
 
-  async function handleBulkDownload(assignmentId, assignmentTitle) {
+  async function appendSubmissionToZip(zip, sub, allStudents) {
+    const student = allStudents.find((s) => String(s.id) === String(sub.studentId));
+    const stName = student ? student.name : '알수없음';
+    const stNum = student ? (student.number || '') : '';
+    const prefix = stNum ? `${stNum}_${stName}` : stName;
+    let added = 0;
+
+    if (sub.files && sub.files.length > 0) {
+      for (const f of sub.files) {
+        try {
+          const fileInfo = await import('../../store.js').then((m) => m.getFileById(f.id));
+          if (fileInfo?.url) {
+            const response = await fetch(fileInfo.url);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const blob = await response.blob();
+            zip.file(`${prefix}_${fileInfo.name || f.name || 'file'}`, blob);
+            added += 1;
+          }
+        } catch (err) {
+          console.error(`Failed to download ${f.name}:`, err);
+        }
+      }
+    }
+
+    if (sub.textAnswer && String(sub.textAnswer).trim()) {
+      zip.file(`${prefix}_작성답안.txt`, String(sub.textAnswer));
+      added += 1;
+    }
+
+    if (sub.audioData?.id) {
+      try {
+        const audioInfo = await import('../../store.js').then((m) => m.getFileById(sub.audioData.id));
+        if (audioInfo?.url) {
+          const response = await fetch(audioInfo.url);
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const blob = await response.blob();
+          const an = audioInfo.name || `voice_${sub.studentId}.webm`;
+          zip.file(`${prefix}_음성_${an}`, blob);
+          added += 1;
+        }
+      } catch (err) {
+        console.error('Failed to download submission audio:', err);
+      }
+    } else if (sub.audioData?.url) {
+      try {
+        const response = await fetch(sub.audioData.url);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const blob = await response.blob();
+        zip.file(`${prefix}_음성_${sub.studentId}.webm`, blob);
+        added += 1;
+      } catch (err) {
+        console.error('Failed to download submission audio (url):', err);
+      }
+    }
+
+    return { prefix, added };
+  }
+
+  async function handleSubmissionDownload(assignmentId, assignmentTitle, studentId = null) {
     try {
       const [subs, allStudents] = await Promise.all([
         getSubmissionsByAssignment(assignmentId),
-        getStudentsByClass(classId)
+        getStudentsByClass(classId),
       ]);
 
-      if (!subs || subs.length === 0) {
-        showToast('제출된 과제가 없습니다.', 'info');
+      const targetSubs = studentId
+        ? subs.filter((s) => String(s.studentId) === String(studentId))
+        : subs;
+
+      if (!targetSubs.length) {
+        showToast(studentId ? '이 학생의 제출물이 없습니다.' : '제출된 과제가 없습니다.', 'info');
         return;
       }
 
       showToast('압축 파일 생성 중... 잠시만 기다려주세요.', 'info');
       const zip = new JSZip();
-      
-      // 순차적으로 다운로드하여 브라우저 과부하 방지
-      for (const sub of subs) {
-        const student = allStudents.find(s => s.id === sub.studentId);
-        const stName = student ? student.name : '알수없음';
-        const stNum = student ? (student.number || '') : '';
-        const prefix = stNum ? `${stNum}_${stName}` : stName;
+      let totalAdded = 0;
+      let zipLabel = assignmentTitle;
 
-        if (sub.files && sub.files.length > 0) {
-          for (const f of sub.files) {
-            try {
-              // store.js에서 파일 정보(URL) 가져오기
-              const fileInfo = await import('../../store.js').then(m => m.getFileById(f.id));
-              if (fileInfo && fileInfo.url) {
-                const response = await fetch(fileInfo.url);
-                const blob = await response.blob();
-                zip.file(`${prefix}_${f.name}`, blob);
-              }
-            } catch (err) {
-              console.error(`Failed to download ${f.name}:`, err);
-            }
-          }
-        }
-
-        if (sub.textAnswer && String(sub.textAnswer).trim()) {
-          zip.file(`${prefix}_작성답안.txt`, String(sub.textAnswer));
-        }
-
-        if (sub.audioData?.id) {
-          try {
-            const audioInfo = await import('../../store.js').then(m => m.getFileById(sub.audioData.id));
-            if (audioInfo && audioInfo.url) {
-              const response = await fetch(audioInfo.url);
-              const blob = await response.blob();
-              const an = audioInfo.name || `voice_${sub.studentId}.webm`;
-              zip.file(`${prefix}_음성_${an}`, blob);
-            }
-          } catch (err) {
-            console.error('Failed to download submission audio:', err);
-          }
-        } else if (sub.audioData?.url) {
-          try {
-            const response = await fetch(sub.audioData.url);
-            const blob = await response.blob();
-            zip.file(`${prefix}_음성_${sub.studentId}.webm`, blob);
-          } catch (err) {
-            console.error('Failed to download submission audio (url):', err);
-          }
-        }
+      for (const sub of targetSubs) {
+        const { prefix, added } = await appendSubmissionToZip(zip, sub, allStudents);
+        totalAdded += added;
+        if (studentId) zipLabel = `${assignmentTitle}_${prefix}`;
       }
 
-      const content = await zip.generateAsync({ type: "blob" });
+      if (totalAdded === 0) {
+        showToast('다운로드할 파일이 없습니다. (텍스트·음성·첨부 없음)', 'info');
+        return;
+      }
+
+      const content = await zip.generateAsync({ type: 'blob' });
       const url = window.URL.createObjectURL(content);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `${assignmentTitle}_전체제출물.zip`;
+      link.download = studentId ? `${zipLabel}_제출물.zip` : `${assignmentTitle}_전체제출물.zip`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      
-      showToast('압축 및 다운로드가 완료되었습니다!');
+
+      showToast(studentId ? '학생 제출물 다운로드가 완료되었습니다!' : '압축 및 다운로드가 완료되었습니다!');
     } catch (err) {
-      console.error('Bulk download error:', err);
-      showToast('일괄 다운로드 중 오류가 발생했습니다.', 'error');
+      console.error('Submission download error:', err);
+      showToast('다운로드 중 오류가 발생했습니다.', 'error');
     }
   }
 
-  window.downloadFile = (fileId) => {
-    storeDownloadFile(fileId);
-  };
+  window.downloadFile = (fileId) => storeDownloadFile(fileId);
 
   init();
 

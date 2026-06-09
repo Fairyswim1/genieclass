@@ -601,8 +601,14 @@ function normalizePresentationDoc(docSnap) {
     return { ...data, id: data.id || docSnap.id };
 }
 
-export async function getPresentationsByStudent(studentId) {
-    const q = query(collection(db, COLLECTIONS.PRESENTATIONS), where('studentId', '==', studentId));
+export async function getPresentationsByStudent(studentId, classId = null) {
+    if (studentId == null || studentId === '') return [];
+    const sid = String(studentId);
+    const constraints = [where('studentId', '==', sid)];
+    if (classId != null && classId !== '') {
+        constraints.push(where('classId', '==', String(classId)));
+    }
+    const q = query(collection(db, COLLECTIONS.PRESENTATIONS), ...constraints);
     const snapshot = await getDocs(q);
     return snapshot.docs.map(normalizePresentationDoc);
 }
@@ -1583,16 +1589,33 @@ export async function enrichPresentationsWithImageUrls(presentations) {
 
 export async function downloadFile(fileId) {
     const file = await getFileById(fileId);
-    if (!file || !file.url) return;
+    if (!file || !file.url) {
+        throw new Error('파일을 찾을 수 없습니다.');
+    }
 
-    // For cloud storage URLs, we can just open them in a new tab or use a link
-    const link = document.createElement('a');
-    link.href = file.url;
-    link.target = '_blank';
-    link.download = file.name;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+        const response = await fetch(file.url);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = objectUrl;
+        link.download = file.name || 'download';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(objectUrl);
+    } catch (err) {
+        console.warn('[downloadFile] blob fallback:', err);
+        const link = document.createElement('a');
+        link.href = file.url;
+        link.target = '_blank';
+        link.rel = 'noopener';
+        link.download = file.name || 'download';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
 }
 
 // ========== Utils ==========

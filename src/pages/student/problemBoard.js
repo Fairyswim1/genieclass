@@ -1177,7 +1177,7 @@ export function renderStudentProblemBoard(container, params) {
         savedMedia = await saveFile(new File([recordedBlob], fileName, { type }));
       }
 
-      const mine = await getPresentationsByStudent(student.id);
+      const mine = await getPresentationsByStudent(student.id, student.classId);
       const olds = mine.filter(
         (p) => p.type === 'problem_solution' && String(p.problemPromptId || '') === String(problemPrompt.id)
       );
@@ -1242,7 +1242,7 @@ export function renderStudentProblemBoard(container, params) {
 
   async function hydrateExistingProblemSubmission() {
     try {
-      const mine = await getPresentationsByStudent(student.id);
+      const mine = await getPresentationsByStudent(student.id, student.classId);
       const olds = mine.filter(
         (p) => p.type === 'problem_solution'
           && String(p.problemPromptId || '') === String(problemPrompt.id),
