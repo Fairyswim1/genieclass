@@ -6,6 +6,7 @@ import { Capacitor } from '@capacitor/core';
 import { VoiceRecorder } from 'capacitor-voice-recorder';
 import {
   getCurrentStudent,
+  ensureStudentFirestoreAuth,
   getProblemPromptById,
   addPresentation,
   addStudentPoints,
@@ -1313,6 +1314,7 @@ export function renderStudentProblemBoard(container, params) {
   }
 
   async function init() {
+    await ensureStudentFirestoreAuth();
     problemPrompt = await getProblemPromptById(promptId);
     if (!problemPrompt || problemPrompt.classId !== student.classId) {
       showToast('문제를 찾을 수 없습니다.', 'error');

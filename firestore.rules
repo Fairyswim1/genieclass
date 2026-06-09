@@ -243,7 +243,9 @@ service cloud.firestore {
         && keepsStudentScope()
         && request.resource.data.authUid == resource.data.authUid
         && changedOnly(['shared', 'title', 'sharedClassIds', 'feedback', 'updatedAt']);
-      allow delete: if classScopedUpdate();
+      allow delete: if isClassTeacher(resource.data.classId)
+        || ownsExistingDoc()
+        || (isStudentAuth() && isStudentOwner(resource.data.studentId));
     }
 
     match /submissions/{submissionId} {

@@ -1,6 +1,6 @@
 {
   "name": "genie-class",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Genie Class - 수업 및 과제 관리 플랫폼",
   "type": "module",
   "engines": {

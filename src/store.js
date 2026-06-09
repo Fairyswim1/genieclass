@@ -499,6 +499,10 @@ export async function praiseStudent(studentId) {
 }
 
 export async function addStudentPoints(studentId, pointsToAdd) {
+    const current = getCurrentStudent();
+    if (current?.id && String(current.id) === String(studentId)) {
+        await ensureStudentWriteIdentity(studentId);
+    }
     const studentRef = doc(db, COLLECTIONS.STUDENTS, studentId);
     const snap = await getDoc(studentRef);
     if (snap.exists()) {
@@ -771,6 +775,10 @@ export async function deletePresentationById(presentationId) {
     if (!snap.exists()) return false;
 
     const data = snap.data();
+    const current = getCurrentStudent();
+    if (current?.id && String(data.studentId) === String(current.id)) {
+        await ensureStudentWriteIdentity(current.id);
+    }
     const fileRefs = [data.whiteboardImage, data.audioData].filter(Boolean);
 
     await deleteDoc(refDoc);
@@ -1456,6 +1464,13 @@ export function listenToQuizSubmissions(quizId, callback) {
 
 // ========== Files ==========
 export async function saveFile(file) {
+    const student = getCurrentStudent();
+    if (student?.id) {
+        await ensureStudentWriteIdentity(student.id);
+    } else if (!auth.currentUser) {
+        throw new Error('로그인이 필요합니다.');
+    }
+
     const id = generateId();
     const storageRef = ref(storage, `files/${id}_${file.name}`);
 
