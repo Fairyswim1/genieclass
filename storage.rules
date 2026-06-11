@@ -10,14 +10,6 @@ service firebase.storage {
         && request.auth.token.firebase.sign_in_provider != 'anonymous';
     }
 
-    function ownsIncomingFile() {
-      return signedIn()
-        && (
-          request.resource.metadata.authUid == request.auth.uid
-          || request.resource.metadata.authuid == request.auth.uid
-        );
-    }
-
     function ownsExistingFile() {
       return signedIn()
         && (
@@ -26,11 +18,11 @@ service firebase.storage {
         );
     }
 
+    // 파일 실제 접근 제어는 Firestore files 컬렉션 규칙이 담당한다.
+    // Storage는 로그인 사용자의 업로드·다운로드를 허용한다.
     match /files/{fileName} {
       allow read: if signedIn();
-      allow create: if signedIn()
-        && request.resource.size < 50 * 1024 * 1024
-        && (isTeacherStorageAuth() || ownsIncomingFile());
+      allow create: if signedIn() && request.resource.size < 50 * 1024 * 1024;
       allow update, delete: if isTeacherStorageAuth() || ownsExistingFile();
     }
   }
