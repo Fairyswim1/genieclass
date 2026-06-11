@@ -2,7 +2,10 @@
   "firestore": {
     "rules": "firestore.rules"
   },
-  "storage": {
-    "rules": "storage.rules"
-  }
+  "storage": [
+    {
+      "bucket": "genieclass-296aa.firebasestorage.app",
+      "rules": "storage.rules"
+    }
+  ]
 }

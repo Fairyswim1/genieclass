@@ -1477,26 +1477,45 @@ function storageObjectPath(id, fileName) {
     return `files/${id}${ext || '.bin'}`;
 }
 
-// ========== Files ==========
-export async function saveFile(file) {
-    const teacher = getCurrentTeacher();
-    if (teacher) {
-        if (!auth.currentUser || auth.currentUser.isAnonymous) {
-            throw new Error('교사 로그인이 만료되었습니다. 다시 로그인해 주세요.');
+function isTeacherUploadContext() {
+    if (getCurrentTeacher()) return true;
+    const path = window.location?.pathname || '';
+    const hash = window.location?.hash || '';
+    return path.includes('teacher-portal') || hash.includes('/teacher/');
+}
+
+async function ensureFirebaseUploadAuth() {
+    await auth.authStateReady();
+    const teacherContext = isTeacherUploadContext();
+
+    if (teacherContext) {
+        const teacher = getCurrentTeacher();
+        if (!teacher || !auth.currentUser || auth.currentUser.isAnonymous) {
+            throw new Error('교사 Firebase 로그인이 필요합니다. 다시 로그인해 주세요.');
         }
-    } else {
-        const student = getCurrentStudent();
-        if (student?.id) {
-            await ensureStudentWriteIdentity(student.id);
-        } else if (!auth.currentUser) {
-            throw new Error('로그인이 필요합니다.');
-        }
+        await auth.currentUser.getIdToken(true);
+        return auth.currentUser;
     }
 
-    const uid = currentAuthUid();
-    if (!uid) {
+    const student = getCurrentStudent();
+    if (student?.id) {
+        await ensureStudentWriteIdentity(student.id);
+    } else if (!auth.currentUser) {
+        throw new Error('로그인이 필요합니다.');
+    }
+
+    const user = auth.currentUser;
+    if (!user?.uid) {
         throw new Error('인증이 만료되었습니다. 다시 로그인해 주세요.');
     }
+    await user.getIdToken(true);
+    return user;
+}
+
+// ========== Files ==========
+export async function saveFile(file) {
+    const user = await ensureFirebaseUploadAuth();
+    const uid = user.uid;
 
     const id = generateId();
     const objectPath = storageObjectPath(id, file.name);

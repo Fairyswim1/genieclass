@@ -15,7 +15,6 @@ import { renderStudentLogin } from './pages/student/login.js';
 import { renderStudentDashboard } from './pages/student/dashboard.js';
 import { renderStudentProblemBoard } from './pages/student/problemBoard.js';
 import { auth, ensureFirebaseAuthPersistence } from './firebase.js';
-import { onAuthStateChanged } from 'firebase/auth';
 import { Capacitor } from '@capacitor/core';
 import { trySilentNativeTeacherGoogleRestore } from './store.js';
 
@@ -42,23 +41,21 @@ addRoute('/student/login', (container) => renderStudentLogin(container));
 addRoute('/student/dashboard', (container) => renderStudentDashboard(container));
 addRoute('/student/problem-board/:promptId', (container, params) => renderStudentProblemBoard(container, params));
 
-// 영속 설정 후 Auth 복구·(네이티브 교사만) 무음 구글 재연결까지 고려해 라우터는 한 번만 띄운다.
+// Auth 복구가 끝난 뒤 라우터를 띄운다. (초기 null 콜백만으로 라우터가 열리면 Storage 업로드 시 인증이 비는 경우가 있다)
 void (async () => {
     await ensureFirebaseAuthPersistence();
-    let routerStarted = false;
-    onAuthStateChanged(auth, async (user) => {
-        if (routerStarted) return;
-        const isTeacherShell = import.meta.env.VITE_APP_SHELL !== 'student';
-        if (
-            Capacitor.isNativePlatform?.() &&
-            isTeacherShell &&
-            (!user || user.isAnonymous)
-        ) {
-            await trySilentNativeTeacherGoogleRestore();
-        }
-        if (routerStarted) return;
-        routerStarted = true;
-        initRouter();
-        console.log('✨ Genie Class initialized');
-    });
+    await auth.authStateReady();
+
+    const isTeacherShell = import.meta.env.VITE_APP_SHELL !== 'student';
+    if (
+        Capacitor.isNativePlatform?.() &&
+        isTeacherShell &&
+        (!auth.currentUser || auth.currentUser.isAnonymous)
+    ) {
+        await trySilentNativeTeacherGoogleRestore();
+        await auth.authStateReady();
+    }
+
+    initRouter();
+    console.log('✨ Genie Class initialized');
 })();

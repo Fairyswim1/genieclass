@@ -1,29 +1,13 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    function signedIn() {
-      return request.auth != null;
-    }
-
-    function isTeacherStorageAuth() {
-      return signedIn()
-        && request.auth.token.firebase.sign_in_provider != 'anonymous';
-    }
-
-    function ownsExistingFile() {
-      return signedIn()
-        && (
-          resource.metadata.authUid == request.auth.uid
-          || resource.metadata.authuid == request.auth.uid
-        );
-    }
-
-    // 파일 실제 접근 제어는 Firestore files 컬렉션 규칙이 담당한다.
-    // Storage는 로그인 사용자의 업로드·다운로드를 허용한다.
+    // Firestore files 컬렉션에서 메타데이터 접근을 제어한다.
+    // Storage는 로그인한 사용자의 업로드·읽기를 허용한다.
     match /files/{fileName} {
-      allow read: if signedIn();
-      allow create: if signedIn() && request.resource.size < 50 * 1024 * 1024;
-      allow update, delete: if isTeacherStorageAuth() || ownsExistingFile();
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.size < 50 * 1024 * 1024;
+      allow update, delete: if request.auth != null;
     }
   }
 }
