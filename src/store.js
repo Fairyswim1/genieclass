@@ -27,7 +27,7 @@ import {
     orderBy,
     onSnapshot
 } from 'firebase/firestore';
-import { auth, db, storage, googleProvider } from './firebase.js';
+import { auth, db, storage, googleProvider, FIREBASE_STORAGE_BUCKET } from './firebase.js';
 import { deriveCharacterLevelFromPoints } from './components/characterAvatar.js';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
@@ -1493,7 +1493,10 @@ async function ensureFirebaseUploadAuth() {
         if (!teacher || !auth.currentUser || auth.currentUser.isAnonymous) {
             throw new Error('교사 Firebase 로그인이 필요합니다. 다시 로그인해 주세요.');
         }
-        await auth.currentUser.getIdToken(true);
+        const token = await auth.currentUser.getIdToken(true);
+        if (!token) {
+            throw new Error('인증 토큰을 가져올 수 없습니다. 다시 로그인해 주세요.');
+        }
         return auth.currentUser;
     }
 
@@ -1508,8 +1511,89 @@ async function ensureFirebaseUploadAuth() {
     if (!user?.uid) {
         throw new Error('인증이 만료되었습니다. 다시 로그인해 주세요.');
     }
-    await user.getIdToken(true);
+    const token = await user.getIdToken(true);
+    if (!token) {
+        throw new Error('인증 토큰을 가져올 수 없습니다. 다시 로그인해 주세요.');
+    }
     return user;
+}
+
+function storageDownloadUrl(objectPath, downloadToken) {
+    const bucket = FIREBASE_STORAGE_BUCKET;
+    const encoded = encodeURIComponent(objectPath);
+    if (downloadToken) {
+        return `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encoded}?alt=media&token=${downloadToken}`;
+    }
+    return `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encoded}?alt=media`;
+}
+
+/** SDK가 Storage 요청에 auth 토큰을 안 붙이는 경우가 있어 REST로 명시적 Bearer 업로드 */
+async function uploadFileToStorage(objectPath, file, user) {
+    const idToken = await user.getIdToken();
+    if (!idToken) {
+        throw new Error('인증 토큰이 없습니다. 다시 로그인해 주세요.');
+    }
+
+    const bucket = FIREBASE_STORAGE_BUCKET;
+    const contentType = file.type || 'application/octet-stream';
+    const SIMPLE_UPLOAD_MAX = 5 * 1024 * 1024;
+
+    let uploaded;
+    if (file.size <= SIMPLE_UPLOAD_MAX) {
+        const url = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o?uploadType=media&name=${encodeURIComponent(objectPath)}`;
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${idToken}`,
+                'Content-Type': contentType,
+            },
+            body: file,
+        });
+        if (!res.ok) {
+            const detail = await res.text().catch(() => '');
+            throw new Error(`Storage 업로드 거부 (${res.status}): ${detail || res.statusText}`);
+        }
+        uploaded = await res.json();
+    } else {
+        const startUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o?name=${encodeURIComponent(objectPath)}`;
+        const startRes = await fetch(startUrl, {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${idToken}`,
+                'X-Goog-Upload-Protocol': 'resumable',
+                'X-Goog-Upload-Command': 'start',
+                'X-Goog-Upload-Header-Content-Length': String(file.size),
+                'X-Goog-Upload-Header-Content-Type': contentType,
+                'Content-Type': 'application/json; charset=UTF-8',
+            },
+            body: JSON.stringify({}),
+        });
+        if (!startRes.ok) {
+            const detail = await startRes.text().catch(() => '');
+            throw new Error(`Storage resumable 시작 실패 (${startRes.status}): ${detail || startRes.statusText}`);
+        }
+        const sessionUrl = startRes.headers.get('X-Goog-Upload-URL');
+        if (!sessionUrl) {
+            throw new Error('Storage 업로드 세션을 시작하지 못했습니다.');
+        }
+        const uploadRes = await fetch(sessionUrl, {
+            method: 'PUT',
+            headers: {
+                'X-Goog-Upload-Command': 'upload, finalize',
+                'X-Goog-Upload-Offset': '0',
+                'Content-Type': contentType,
+            },
+            body: file,
+        });
+        if (!uploadRes.ok) {
+            const detail = await uploadRes.text().catch(() => '');
+            throw new Error(`Storage 업로드 실패 (${uploadRes.status}): ${detail || uploadRes.statusText}`);
+        }
+        uploaded = await uploadRes.json();
+    }
+
+    const downloadToken = String(uploaded?.downloadTokens || '').split(',')[0] || '';
+    return storageDownloadUrl(objectPath, downloadToken);
 }
 
 // ========== Files ==========
@@ -1519,15 +1603,18 @@ export async function saveFile(file) {
 
     const id = generateId();
     const objectPath = storageObjectPath(id, file.name);
-    const storageRef = ref(storage, objectPath);
 
-    // Upload to Firebase Storage
-    await uploadBytes(storageRef, file, {
-        customMetadata: {
-            authUid: uid,
-        },
-    });
-    const downloadURL = await getDownloadURL(storageRef);
+    let downloadURL;
+    try {
+        downloadURL = await uploadFileToStorage(objectPath, file, user);
+    } catch (restErr) {
+        console.warn('[saveFile] REST 업로드 실패, SDK 폴백:', restErr?.message ?? restErr);
+        const storageRef = ref(storage, objectPath);
+        await uploadBytes(storageRef, file, {
+            customMetadata: { authUid: uid },
+        });
+        downloadURL = await getDownloadURL(storageRef);
+    }
 
     // Store metadata in Firestore (without the actual file data)
     const fileMetadata = {
