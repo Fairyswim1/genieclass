@@ -534,33 +534,36 @@ export function renderAssignMode(container, params) {
               </div>
             </div>
 
-            <div class="grid" style="grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--s-6);">
+            <div class="grid teacher-resource-grid">
               ${resources.length === 0 ? `
                 <div class="empty-board w-full" style="grid-column: 1 / -1;">
                   <div class="empty-board-icon">📁</div>
                   <p style="font-size: 1.1rem; font-weight: 600; color: var(--text-main); margin-bottom: 8px;">업로드된 학습 자료가 없습니다.</p>
                   <p style="font-size: 0.9rem;">학생들에게 필요한 수업 참고 자료를 공유해보세요.</p>
                 </div>
-              ` : resources.map(res => `
-                <div class="card" style="padding: var(--s-6); display: flex; flex-direction: column; height: 100%;">
+              ` : resources.map(res => {
+                const fileCount = res.files?.length || 0;
+                return `
+                <div class="card teacher-resource-card">
                   <div class="flex justify-between items-start" style="margin-bottom: var(--s-4);">
                     <h3 style="font-size: 1.15rem; font-weight: 700; word-break: keep-all; line-height: 1.3;">${res.title}</h3>
                     <button class="btn btn-ghost btn-sm delete-btn" data-type="res" data-id="${res.id}" style="color: var(--error); padding: 4px;">삭제</button>
                   </div>
-                  <p style="font-size: 0.95rem; color: var(--text-muted); margin-bottom: var(--s-6); flex: 1;">${res.description || '설명 없음'}</p>
+                  <p class="teacher-resource-card__desc">${res.description || '설명 없음'}</p>
                   
-                  <div class="flex flex-col gap-sm" style="border-top: 1px solid var(--border-subtle); padding-top: var(--s-4);">
-                     ${res.files && res.files.length > 0 ? res.files.map(f => `
-                       <div class="flex justify-between items-center interactive-item" style="padding: 8px 12px; background: var(--bg-main); border-radius: var(--r-sm); cursor: pointer;" onclick="window.downloadFile('${f.id}')">
-                         <span style="font-size: 0.85rem; font-weight: 500; color: var(--primary); display: flex; align-items: center; gap: 8px;">
-                           <i>📎</i> <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;">${f.name}</span>
+                  <div class="teacher-resource-card__files" ${fileCount > 4 ? 'title="파일 목록 스크롤"' : ''}>
+                     ${fileCount > 0 ? res.files.map(f => `
+                       <div class="flex justify-between items-center interactive-item teacher-resource-card__file" onclick="window.downloadFile('${f.id}')">
+                         <span style="font-size: 0.85rem; font-weight: 500; color: var(--primary); display: flex; align-items: center; gap: 8px; min-width: 0;">
+                           <i>📎</i> <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${f.name}</span>
                          </span>
-                         <span style="font-size: 1.1rem;">📥</span>
+                         <span style="font-size: 1.1rem; flex-shrink: 0;">📥</span>
                        </div>
                     `).join('') : '<span style="font-size: 0.85rem; color: var(--text-dim);">첨부 파일 없음</span>'}
                   </div>
                 </div>
-              `).join('')}
+              `;
+              }).join('')}
             </div>
           </div>
 
