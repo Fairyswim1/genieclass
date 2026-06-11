@@ -103,7 +103,7 @@ export function renderTeacherDashboard(container) {
                 const students = await getStudentsByClass(cls.id);
                 return `
                   <div class="card card-clickable class-card" data-class-id="${cls.id}" draggable="true">
-                    <div class="class-card-banner" style="background:${cls.color || 'var(--primary)'}">
+                    <div class="class-card-banner" style="background:${cls.color || 'var(--primary)'};min-height:120px;">
                       <button class="btn-edit-color" data-class-id="${cls.id}" title="색상 변경">🎨</button>
                     </div>
                     <div class="class-card-body">
@@ -235,7 +235,6 @@ export function renderTeacherDashboard(container) {
       </div>
 
       <style>
-        .class-card-banner { position: relative; height: 100px; border-radius: var(--radius-md) var(--radius-md) 0 0; }
         .btn-edit-color {
           position: absolute; top: 8px; right: 8px;
           width: 30px; height: 30px; border-radius: 50%;

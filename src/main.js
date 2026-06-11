@@ -6,7 +6,7 @@ import './styles/teacher.css';
 import './styles/student.css';
 import './styles/quiz-math.css';
 
-import { addRoute, initRouter } from './router.js';
+import { addRoute, initRouter, syncAppShellForRoute } from './router.js';
 import { renderTeacherLogin } from './pages/teacher/login.js';
 import { renderTeacherDashboard } from './pages/teacher/dashboard.js';
 import { renderLessonMode } from './pages/teacher/lessonMode.js';
@@ -18,8 +18,7 @@ import { auth, ensureFirebaseAuthPersistence } from './firebase.js';
 import { Capacitor } from '@capacitor/core';
 import { trySilentNativeTeacherGoogleRestore } from './store.js';
 
-document.documentElement.dataset.appShell =
-    import.meta.env.VITE_APP_SHELL === 'student' ? 'student' : 'teacher';
+syncAppShellForRoute(window.location.pathname, window.location.hash.slice(1) || '/');
 
 if (Capacitor.isNativePlatform?.()) {
     document.documentElement.classList.add('is-native');

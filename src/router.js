@@ -67,10 +67,32 @@ function matchRoute(hash) {
     return null;
 }
 
+/** student 셸 빌드에서 teacher-portal 접근 시 student 전용 CSS가 교사 UI를 깨뜨리지 않도록 분리 */
+export function syncAppShellForRoute(pathname, hashRoute) {
+    const path = (pathname || window.location.pathname || '').replace(/\/+$/, '');
+    const hash = hashRoute || window.location.hash.slice(1) || '/';
+    const teacherEntry =
+        path === TEACHER_ENTRY_PATH || path.startsWith(`${TEACHER_ENTRY_PATH}/`);
+    const onTeacher = teacherEntry || hash.startsWith('/teacher');
+    const onStudent =
+        hash.startsWith('/student') || hash === '/s' || hash === '/';
+
+    if (onTeacher && !hash.startsWith('/student')) {
+        document.documentElement.dataset.appShell = 'teacher';
+    } else if (onStudent && !onTeacher) {
+        document.documentElement.dataset.appShell = 'student';
+    } else {
+        document.documentElement.dataset.appShell =
+            import.meta.env.VITE_APP_SHELL === 'student' ? 'student' : 'teacher';
+    }
+}
+
 export function initRouter() {
     const handleRoute = () => {
         const path = window.location.pathname;
         let hash = window.location.hash.slice(1) || '/';
+
+        syncAppShellForRoute(path, hash);
 
         const isStudentShell = import.meta.env.VITE_APP_SHELL === 'student';
         const isCapacitor = window.Capacitor && window.Capacitor.isNativePlatform;
