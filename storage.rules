@@ -1,13 +1,37 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isTeacherStorageAuth() {
+      return signedIn()
+        && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
+    function ownsIncomingFile() {
+      return signedIn()
+        && (
+          request.resource.metadata.authUid == request.auth.uid
+          || request.resource.metadata.authuid == request.auth.uid
+        );
+    }
+
+    function ownsExistingFile() {
+      return signedIn()
+        && (
+          resource.metadata.authUid == request.auth.uid
+          || resource.metadata.authuid == request.auth.uid
+        );
+    }
+
     match /files/{fileName} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null
-        && request.resource.metadata.authUid == request.auth.uid
-        && request.resource.size < 50 * 1024 * 1024;
-      allow update, delete: if request.auth != null
-        && resource.metadata.authUid == request.auth.uid;
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.size < 50 * 1024 * 1024
+        && (isTeacherStorageAuth() || ownsIncomingFile());
+      allow update, delete: if isTeacherStorageAuth() || ownsExistingFile();
     }
   }
 }

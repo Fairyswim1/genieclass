@@ -1167,7 +1167,10 @@ export function renderAssignMode(container, params) {
         resFilesQueue = [];
         document.getElementById('resource-form').classList.add('hidden');
         render();
-      } catch (err) { showToast('오류 발생', 'error'); }
+      } catch (err) {
+        console.error('[수업 자료 등록]', err);
+        showToast('자료 등록 실패: ' + (err?.message || '권한 오류'), 'error');
+      }
     });
 
     // Edit Buttons

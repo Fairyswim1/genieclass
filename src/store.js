@@ -1468,17 +1468,26 @@ export function listenToQuizSubmissions(quizId, callback) {
     });
 }
 
+function safeStorageFileName(name) {
+    return String(name || 'file').replace(/[/\\#?]/g, '_');
+}
+
 // ========== Files ==========
 export async function saveFile(file) {
-    const student = getCurrentStudent();
-    if (student?.id) {
-        await ensureStudentWriteIdentity(student.id);
-    } else if (!auth.currentUser) {
-        throw new Error('로그인이 필요합니다.');
+    const teacher = getCurrentTeacher();
+    if (teacher) {
+        // 교사 화면: localStorage에 남은 학생 세션이 있어도 Google 인증을 유지한다.
+    } else {
+        const student = getCurrentStudent();
+        if (student?.id) {
+            await ensureStudentWriteIdentity(student.id);
+        } else if (!auth.currentUser) {
+            throw new Error('로그인이 필요합니다.');
+        }
     }
 
     const id = generateId();
-    const storageRef = ref(storage, `files/${id}_${file.name}`);
+    const storageRef = ref(storage, `files/${id}_${safeStorageFileName(file.name)}`);
 
     // Upload to Firebase Storage
     await uploadBytes(storageRef, file, {
@@ -1495,7 +1504,7 @@ export async function saveFile(file) {
         type: file.type,
         size: file.size,
         url: downloadURL, // Store the public URL
-        storagePath: `files/${id}_${file.name}`,
+        storagePath: `files/${id}_${safeStorageFileName(file.name)}`,
         authUid: currentAuthUid(),
         createdAt: new Date().toISOString(),
     };
