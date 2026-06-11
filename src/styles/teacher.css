@@ -210,7 +210,6 @@
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: var(--s-6);
-    align-items: start;
 }
 
 /* Class Card OVERRIDE from .card */
@@ -227,13 +226,9 @@
 }
 
 .class-card-banner {
-    position: relative;
     height: 120px;
-    min-height: 120px;
-    flex-shrink: 0;
     background: var(--bg-main);
     border-bottom: 1px solid var(--border-subtle);
-    border-radius: var(--r-md) var(--r-md) 0 0;
 }
 
 .class-card-body {
