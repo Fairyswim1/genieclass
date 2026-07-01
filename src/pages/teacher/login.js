@@ -4,6 +4,8 @@
 import { loginWithGoogle, showToast } from '../../store.js';
 import { auth } from '../../firebase.js';
 
+const MASCOT_URL = `${import.meta.env.BASE_URL || '/'}branding/genie-mascot.png`;
+
 export function renderTeacherLogin(container) {
   function render() {
     if (auth.currentUser?.isAnonymous) {
@@ -13,7 +15,9 @@ export function renderTeacherLogin(container) {
       <div class="auth-page page-enter">
         <div class="auth-card animate-scale-in">
           <div class="auth-logo">
-            <div class="auth-logo-icon">G</div>
+            <div class="auth-logo-icon brand-mark-wrap brand-mark-wrap--auth">
+              <img class="brand-mark" src="${MASCOT_URL}" alt="" width="64" height="64" decoding="async" />
+            </div>
             <h1 class="auth-title">Genie Class</h1>
             <p class="auth-subtitle">교사 계정으로 로그인</p>
           </div>

@@ -11,6 +11,8 @@ import {
 import { parseExcelFile, downloadSampleExcel, exportStudentsToExcel } from '../../utils/excelImport.js';
 import { renderCharacter, deriveCharacterLevelFromPoints } from '../../components/characterAvatar.js';
 
+const MASCOT_URL = `${import.meta.env.BASE_URL || '/'}branding/genie-mascot.png`;
+
 export function renderTeacherDashboard(container) {
   const teacher = getCurrentTeacher();
   if (!teacher) {
@@ -45,7 +47,9 @@ export function renderTeacherDashboard(container) {
         <aside class="sidebar animate-slide-left">
           <div class="sidebar-header">
             <div class="sidebar-logo">
-              <div class="sidebar-logo-icon">G</div>
+              <div class="sidebar-logo-icon brand-mark-wrap">
+                <img class="brand-mark" src="${MASCOT_URL}" alt="" width="36" height="36" decoding="async" />
+              </div>
               <div class="sidebar-logo-text">Genie Class</div>
             </div>
           </div>
@@ -89,8 +93,9 @@ export function renderTeacherDashboard(container) {
         <main class="main-content">
           <div style="max-width: 1600px; margin: 0 auto;">
             <div class="dashboard-header animate-fade-in-down">
-              <h1 class="dashboard-greeting">안녕하세요, <span>${teacher.displayName || '선생님'}</span> 선생님! 👋</h1>
+              <h1 class="dashboard-greeting">안녕하세요, <span>${teacher.displayName || '선생님'}</span> 선생님!</h1>
               <p class="dashboard-subtitle">오늘도 좋은 수업 되세요</p>
+              <img class="dashboard-header__mascot" src="${MASCOT_URL}" alt="" width="72" height="72" decoding="async" aria-hidden="true" />
             </div>
 
             <div class="section-header">
@@ -233,21 +238,6 @@ export function renderTeacherDashboard(container) {
           <div class="mode-selection" id="mode-selection-btns"></div>
         </div>
       </div>
-
-      <style>
-        .class-card-banner { position: relative; height: 100px; border-radius: var(--radius-md) var(--radius-md) 0 0; }
-        .btn-edit-color {
-          position: absolute; top: 8px; right: 8px;
-          width: 30px; height: 30px; border-radius: 50%;
-          background: rgba(255,255,255,0.2); backdrop-filter: blur(4px);
-          border: none; color: white; cursor: pointer;
-          display: flex; align-items: center; justify-content: center;
-          transition: all 0.2s; opacity: 0;
-        }
-        .class-card:hover .btn-edit-color { opacity: 1; }
-        .btn-edit-color:hover { background: rgba(255,255,255,0.4); transform: scale(1.1); }
-        .class-card.dragging { opacity: 0.5; transform: scale(0.95); }
-      </style>
     `;
 
     bindEvents();
