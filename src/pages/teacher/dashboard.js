@@ -10,6 +10,15 @@ import {
 } from '../../store.js';
 import { parseExcelFile, downloadSampleExcel, exportStudentsToExcel } from '../../utils/excelImport.js';
 import { renderCharacter, deriveCharacterLevelFromPoints } from '../../components/characterAvatar.js';
+import {
+  renderTeacherSidebar,
+  renderDashboardHero,
+  renderDashboardStats,
+  renderDashboardPanels,
+  renderPremiumClassCard,
+  renderAddClassCard,
+  renderClassesSectionHeader,
+} from '../../components/teacherDashboardUi.js';
 
 export function renderTeacherDashboard(container) {
   const teacher = getCurrentTeacher();
@@ -39,91 +48,34 @@ export function renderTeacherDashboard(container) {
     const teacherNotes = await getStudentNotesForTeacher(teacher.uid);
     const unreadNoteCount = teacherNotes.filter(n => !n.read).length;
 
+    const classStudentCounts = await Promise.all(
+      classes.map(async (cls) => {
+        const students = await getStudentsByClass(cls.id);
+        return { cls, count: students.length };
+      })
+    );
+    const totalStudents = classStudentCounts.reduce((sum, row) => sum + row.count, 0);
+    const classCardsHtml = classStudentCounts.map(({ cls, count }) => renderPremiumClassCard(cls, count)).join('');
+
     container.innerHTML = `
-      <div class="teacher-layout">
-        <!-- Sidebar -->
-        <aside class="sidebar animate-slide-left">
-          <div class="sidebar-header">
-            <div class="sidebar-logo">
-              <div class="sidebar-logo-icon">G</div>
-              <div class="sidebar-logo-text">Genie Class</div>
-            </div>
-          </div>
-          <div class="sidebar-classes">
-            <div class="sidebar-section-title">내 클래스</div>
-            ${classes.map(cls => `
-              <div class="sidebar-class-item" data-class-id="${cls.id}">
-                <div class="sidebar-class-icon" style="background:${cls.color || 'var(--primary)'}">${cls.name.charAt(0)}</div>
-                <span>${cls.name}</span>
-              </div>
-            `).join('')}
-            <div class="sidebar-class-item" id="sidebar-add-class">
-              <div class="sidebar-class-icon add-class-sidebar-icon">+</div>
-              <span>클래스 추가</span>
-            </div>
+      <div class="teacher-layout teacher-dashboard-page">
+        ${renderTeacherSidebar({ teacher, classes, unreadNoteCount })}
 
-            <div class="sidebar-comm-section">
-              <div class="sidebar-section-title">소통</div>
-              <button type="button" class="sidebar-inbox-trigger ${unreadNoteCount ? 'sidebar-inbox-trigger--unread' : ''}" id="btn-open-notes-inbox" aria-label="학생 쪽지함 열기" title="학생이 보낸 쪽지">
-                <span class="sidebar-inbox-icon" aria-hidden="true">📬</span>
-                <span class="sidebar-inbox-text">쪽지함</span>
-                ${unreadNoteCount ? `<span class="sidebar-new-stack"><span class="sidebar-new-label">NEW</span>${unreadNoteCount > 1 ? `<span class="sidebar-new-count">${unreadNoteCount > 99 ? '99+' : unreadNoteCount}</span>` : ''}</span>` : ''}
-              </button>
-            </div>
-          </div>
-          <div class="sidebar-footer">
-            <div class="sidebar-user-card">
-              <div class="sidebar-user">
-                <div class="sidebar-user-avatar">${(teacher.displayName || teacher.email || 'T').charAt(0)}</div>
-                <div class="sidebar-user-info">
-                  <div class="sidebar-user-name">${teacher.displayName || '선생님'}</div>
-                  <div class="sidebar-user-role">교사 <span style="font-size:0.6rem;opacity:0.5">v1.1.5</span></div>
-                </div>
-              </div>
-              <button class="btn btn-ghost btn-sm w-full" id="btn-logout">로그아웃</button>
-            </div>
-          </div>
-        </aside>
+        <main class="main-content main-content--dashboard">
+          <div class="dashboard-shell">
+            ${renderDashboardHero(teacher.displayName, { unreadNoteCount })}
+            ${renderDashboardStats({
+              classCount: classes.length,
+              studentCount: totalStudents,
+              unreadNoteCount,
+              recentActivityCount: teacherNotes.length,
+            })}
+            ${renderDashboardPanels({ classes, teacherNotes })}
+            ${renderClassesSectionHeader()}
 
-        <!-- Main Content -->
-        <main class="main-content">
-          <div style="max-width: 1600px; margin: 0 auto;">
-            <div class="dashboard-header animate-fade-in-down">
-              <h1 class="dashboard-greeting">안녕하세요, <span>${teacher.displayName || '선생님'}</span> 선생님! 👋</h1>
-              <p class="dashboard-subtitle">오늘도 좋은 수업 되세요</p>
-            </div>
-
-            <div class="section-header">
-              <h2 class="section-title">내 클래스</h2>
-              <button class="btn btn-primary btn-sm" id="btn-add-class">+ 새 클래스</button>
-            </div>
-
-            <div class="class-grid stagger-children" id="class-grid-container">
-              ${(await Promise.all(classes.map(async cls => {
-                const students = await getStudentsByClass(cls.id);
-                return `
-                  <div class="card card-clickable class-card" data-class-id="${cls.id}" draggable="true">
-                    <div class="class-card-banner" style="background:${cls.color || 'var(--primary)'}">
-                      <button class="btn-edit-color" data-class-id="${cls.id}" title="색상 변경">🎨</button>
-                    </div>
-                    <div class="class-card-body">
-                      <div class="class-card-name">${cls.name}</div>
-                      <div class="class-card-info">
-                        <span>👤 ${students.length}명</span>
-                      </div>
-                      <div class="class-card-actions">
-                        <button class="btn btn-primary btn-sm class-enter-btn" data-class-id="${cls.id}">입장</button>
-                        <button class="btn btn-ghost btn-sm class-manage-btn" data-class-id="${cls.id}">학생관리</button>
-                        <button class="btn btn-ghost btn-sm class-delete-btn" data-class-id="${cls.id}" style="color:var(--red)">삭제</button>
-                      </div>
-                    </div>
-                  </div>
-                `;
-              }))).join('')}
-              <div class="add-class-card" id="add-class-card">
-                <div class="add-class-icon">＋</div>
-                <span>새 클래스 만들기</span>
-              </div>
+            <div class="class-grid class-grid--premium stagger-children" id="class-grid-container">
+              ${classCardsHtml}
+              ${renderAddClassCard()}
             </div>
           </div>
         </main>
@@ -233,21 +185,6 @@ export function renderTeacherDashboard(container) {
           <div class="mode-selection" id="mode-selection-btns"></div>
         </div>
       </div>
-
-      <style>
-        .class-card-banner { position: relative; height: 100px; border-radius: var(--radius-md) var(--radius-md) 0 0; }
-        .btn-edit-color {
-          position: absolute; top: 8px; right: 8px;
-          width: 30px; height: 30px; border-radius: 50%;
-          background: rgba(255,255,255,0.2); backdrop-filter: blur(4px);
-          border: none; color: white; cursor: pointer;
-          display: flex; align-items: center; justify-content: center;
-          transition: all 0.2s; opacity: 0;
-        }
-        .class-card:hover .btn-edit-color { opacity: 1; }
-        .btn-edit-color:hover { background: rgba(255,255,255,0.4); transform: scale(1.1); }
-        .class-card.dragging { opacity: 0.5; transform: scale(0.95); }
-      </style>
     `;
 
     bindEvents();
@@ -331,8 +268,21 @@ export function renderTeacherDashboard(container) {
       });
     });
 
-    const addBtns = [document.getElementById('btn-add-class'), document.getElementById('add-class-card'), document.getElementById('sidebar-add-class')];
+    const addBtns = [
+      document.getElementById('btn-add-class'),
+      document.getElementById('add-class-card'),
+      document.getElementById('sidebar-add-class'),
+      document.getElementById('btn-hero-new-class'),
+      document.getElementById('btn-panel-new-class'),
+    ];
     addBtns.forEach(btn => btn?.addEventListener('click', () => openModal('create-class-modal')));
+
+    [document.getElementById('btn-hero-inbox'), document.getElementById('btn-panel-inbox')]
+      .forEach(btn => btn?.addEventListener('click', () => openModal('notes-inbox-modal')));
+
+    document.querySelectorAll('[data-sidebar-enter]').forEach(btn => {
+      btn.addEventListener('click', () => openModeSelection(btn.dataset.classId));
+    });
 
     document.getElementById('close-create-modal')?.addEventListener('click', () => closeModal('create-class-modal'));
     document.getElementById('close-manage-modal')?.addEventListener('click', () => closeModal('student-manage-modal'));
