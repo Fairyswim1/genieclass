@@ -183,21 +183,16 @@
 
 /* Dashboard Header */
 .dashboard-header {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    grid-template-rows: auto auto;
-    align-items: center;
-    column-gap: var(--s-6);
+    position: relative;
     margin-bottom: var(--s-10);
+    padding-right: 80px;
 }
 
 .dashboard-greeting {
-    grid-column: 1;
-    grid-row: 1;
-    font-size: clamp(1.75rem, 2.2vw, 2.15rem);
+    font-size: 2.2rem;
     font-weight: 800;
     margin-bottom: var(--s-2);
-    line-height: 1.25;
+    line-height: 1.2;
     color: var(--text-main);
     letter-spacing: -0.03em;
 }
@@ -207,21 +202,20 @@
 }
 
 .dashboard-subtitle {
-    grid-column: 1;
-    grid-row: 2;
-    font-size: 1.05rem;
+    font-size: 1.1rem;
     color: var(--text-muted);
     margin: 0;
 }
 
 .dashboard-header__mascot {
-    grid-column: 2;
-    grid-row: 1 / 3;
-    width: 72px;
-    height: 72px;
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 64px;
+    height: 64px;
     object-fit: contain;
-    opacity: 0.9;
-    filter: drop-shadow(0 8px 18px rgba(91, 33, 182, 0.12));
+    opacity: 0.95;
     pointer-events: none;
     user-select: none;
 }
@@ -246,7 +240,6 @@
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: var(--s-6);
-    align-items: start;
 }
 
 /* Class Card OVERRIDE from .card */
@@ -269,20 +262,20 @@
 
 .class-card-banner {
     position: relative;
-    height: 100px;
+    height: 120px;
     background: var(--bg-main);
-    border-bottom: none;
+    border-bottom: 1px solid var(--border-subtle);
 }
 
 .class-card-body {
-    padding: var(--s-5) var(--s-6) var(--s-6);
+    padding: var(--s-6);
     flex: 1;
     display: flex;
     flex-direction: column;
 }
 
 .class-card-name {
-    font-size: 1.15rem;
+    font-size: 1.25rem;
     font-weight: 700;
     color: var(--text-main);
     margin-bottom: var(--s-2);
@@ -290,9 +283,9 @@
 }
 
 .class-card-info {
-    font-size: 0.88rem;
+    font-size: 0.9rem;
     color: var(--text-muted);
-    margin-bottom: var(--s-5);
+    margin-bottom: var(--s-6);
     display: flex;
     align-items: center;
     gap: var(--s-2);
@@ -300,7 +293,6 @@
 
 .class-card-actions {
     display: flex;
-    flex-wrap: wrap;
     gap: var(--s-2);
     margin-top: auto;
 }
@@ -320,15 +312,15 @@
 /* Add Class Card */
 .add-class-card {
     border: 2px dashed rgba(124, 58, 237, 0.22);
-    border-radius: var(--r-lg);
+    border-radius: var(--r-md);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: var(--s-3);
+    gap: var(--s-4);
     min-height: 240px;
     cursor: pointer;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.85), rgba(237, 233, 254, 0.25));
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(237, 233, 254, 0.2));
     color: var(--text-muted);
     transition: var(--transition-all);
 }
@@ -342,10 +334,10 @@
 }
 
 .add-class-icon {
-    font-size: 1.75rem;
-    background: #fff;
-    width: 52px;
-    height: 52px;
+    font-size: 2rem;
+    background: var(--bg-surface);
+    width: 48px;
+    height: 48px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1073,12 +1065,17 @@ tr.notes-inbox-row--unread td {
 .brand-mark-wrap {
     padding: 0;
     overflow: hidden;
-    background: linear-gradient(145deg, #ede9fe 0%, #e0e7ff 100%);
-    border: 1px solid rgba(124, 58, 237, 0.12);
+    background: transparent;
+    border: none;
+    box-shadow: none;
 }
 
 .sidebar-logo-icon.brand-mark-wrap {
     border-radius: 50%;
+    background: transparent;
+    box-shadow: none;
+    width: 40px;
+    height: 40px;
 }
 
 .brand-mark-wrap--auth {
@@ -1089,15 +1086,16 @@ tr.notes-inbox-row--unread td {
 }
 
 .auth-logo-icon.brand-mark-wrap--auth {
-    background: linear-gradient(145deg, #ede9fe 0%, #e0e7ff 100%);
-    box-shadow: 0 8px 20px rgba(91, 33, 182, 0.12);
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
 }
 
 .brand-mark {
     width: 100%;
     height: 100%;
-    object-fit: cover;
-    object-position: center 8%;
+    object-fit: contain;
+    object-position: center bottom;
     display: block;
 }
 
@@ -1135,6 +1133,10 @@ tr.notes-inbox-row--unread td {
 }
 
 @media (max-width: 720px) {
+    .dashboard-header {
+        padding-right: 0;
+    }
+
     .dashboard-header__mascot {
         display: none;
     }

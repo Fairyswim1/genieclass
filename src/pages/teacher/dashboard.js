@@ -95,7 +95,7 @@ export function renderTeacherDashboard(container) {
             <div class="dashboard-header animate-fade-in-down">
               <h1 class="dashboard-greeting">안녕하세요, <span>${teacher.displayName || '선생님'}</span> 선생님!</h1>
               <p class="dashboard-subtitle">오늘도 좋은 수업 되세요</p>
-              <img class="dashboard-header__mascot" src="${MASCOT_URL}" alt="" width="72" height="72" decoding="async" aria-hidden="true" />
+              <img class="dashboard-header__mascot" src="${MASCOT_URL}" alt="" width="64" height="64" decoding="async" aria-hidden="true" />
             </div>
 
             <div class="section-header">
