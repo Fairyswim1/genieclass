@@ -1,21 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#7C3AED"/>
-      <stop offset="100%" stop-color="#6366F1"/>
-    </linearGradient>
-    <linearGradient id="shine" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.35"/>
-      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6C5CE7"/>
+      <stop offset="100%" style="stop-color:#A29BFE"/>
     </linearGradient>
   </defs>
-  <circle cx="32" cy="32" r="30" fill="url(#bg)"/>
-  <ellipse cx="32" cy="22" rx="18" ry="14" fill="url(#shine)"/>
-  <circle cx="32" cy="28" r="10" fill="#F5D0A9"/>
-  <path d="M22 18c2-6 8-10 10-10s8 4 10 10" fill="#4A2F23"/>
-  <circle cx="28" cy="28" r="1.6" fill="#3D2318"/>
-  <circle cx="36" cy="28" r="1.6" fill="#3D2318"/>
-  <path d="M29 32c1.5 1.5 4.5 1.5 6 0" stroke="#C97B63" stroke-width="1.2" fill="none" stroke-linecap="round"/>
-  <path d="M18 44c4 10 24 10 28 0" fill="#38BDF8" opacity="0.95"/>
-  <path d="M44 16l4-6 2 5 5 1-4 3 1 5-5-3-5 3 1-5z" fill="#FBBF24"/>
+  <circle cx="32" cy="32" r="30" fill="url(#g)"/>
+  <text x="32" y="42" font-size="28" text-anchor="middle" fill="#FFD93D" font-family="serif" font-weight="bold">G</text>
 </svg>

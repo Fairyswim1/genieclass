@@ -3,7 +3,6 @@
 // ========================================
 import { loginWithGoogle, showToast } from '../../store.js';
 import { auth } from '../../firebase.js';
-import { renderAuthBrand } from '../../components/teacherBrand.js';
 
 export function renderTeacherLogin(container) {
   function render() {
@@ -13,7 +12,11 @@ export function renderTeacherLogin(container) {
     container.innerHTML = `
       <div class="auth-page page-enter">
         <div class="auth-card animate-scale-in">
-          ${renderAuthBrand()}
+          <div class="auth-logo">
+            <div class="auth-logo-icon">G</div>
+            <h1 class="auth-title">Genie Class</h1>
+            <p class="auth-subtitle">교사 계정으로 로그인</p>
+          </div>
           
           <div class="login-methods">
             <button class="btn btn-secondary w-full" id="google-login-btn">
