@@ -36,6 +36,10 @@ export function renderTeacherDashboard(container) {
   ];
 
   async function render() {
+    const prevInbox = document.getElementById('notes-inbox-modal');
+    const restoreInboxOpen = !!prevInbox?.classList.contains('active');
+    const restoreInboxFs = !!prevInbox?.classList.contains('notes-inbox-modal--fullscreen');
+
     classes = await getClassesByTeacher(teacher.uid);
 
     const teacherNotes = await getStudentNotesForTeacher(teacher.uid);
@@ -162,12 +166,15 @@ export function renderTeacherDashboard(container) {
       </div>
 
       <div class="modal-backdrop" id="notes-inbox-modal">
-        <div class="modal-content notes-inbox-modal-content" style="max-width: 920px;">
+        <div class="modal-content notes-inbox-modal-content">
           <div class="modal-header">
             <h3 class="modal-title">💌 학생 쪽지함</h3>
-            <button type="button" class="modal-close" id="close-notes-inbox-modal">✕</button>
+            <div class="notes-inbox-modal-actions">
+              <button type="button" class="notes-inbox-fs-btn" id="btn-notes-inbox-fullscreen" aria-label="전체화면" title="전체화면">⛶</button>
+              <button type="button" class="modal-close" id="close-notes-inbox-modal">✕</button>
+            </div>
           </div>
-          <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: var(--s-4); line-height: 1.5;">
+          <p class="notes-inbox-modal-desc">
             학생이 대시보드에서 보낸 쪽지입니다. 읽음 처리 후에도 목록에 남으며, 삭제하면 영구적으로 지워집니다.
           </p>
           ${teacherNotes.length === 0 ? `
@@ -183,9 +190,9 @@ export function renderTeacherDashboard(container) {
                     <th align="left">학급</th>
                     <th align="left">학생</th>
                     <th align="left">내용</th>
-                    <th align="center" style="width: 88px;">상태</th>
-                    <th align="left" style="width: 240px;">답장</th>
-                    <th align="center" style="width: 72px;">삭제</th>
+                    <th align="center">상태</th>
+                    <th align="left">답장</th>
+                    <th align="center">삭제</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -241,6 +248,10 @@ export function renderTeacherDashboard(container) {
     `;
 
     bindEvents();
+    if (restoreInboxOpen) {
+      openModal('notes-inbox-modal');
+      if (restoreInboxFs) setNotesInboxFullscreen(true);
+    }
   }
 
   function bindEvents() {
@@ -251,9 +262,13 @@ export function renderTeacherDashboard(container) {
     });
 
     document.getElementById('btn-open-notes-inbox')?.addEventListener('click', () => openModal('notes-inbox-modal'));
-    document.getElementById('close-notes-inbox-modal')?.addEventListener('click', () => closeModal('notes-inbox-modal'));
+    document.getElementById('close-notes-inbox-modal')?.addEventListener('click', () => closeNotesInboxModal());
     document.getElementById('notes-inbox-modal')?.addEventListener('click', (e) => {
-      if (e.target.id === 'notes-inbox-modal') closeModal('notes-inbox-modal');
+      if (e.target.id === 'notes-inbox-modal') closeNotesInboxModal();
+    });
+    document.getElementById('btn-notes-inbox-fullscreen')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleNotesInboxFullscreen();
     });
 
     document.querySelectorAll('.btn-delete-student-note').forEach(btn => {
@@ -266,7 +281,7 @@ export function renderTeacherDashboard(container) {
         try {
           await deleteStudentNote(id);
           showToast('쪽지를 삭제했습니다.');
-          closeModal('notes-inbox-modal');
+          closeNotesInboxModal();
           render();
         } catch (err) {
           console.error(err);
@@ -311,7 +326,6 @@ export function renderTeacherDashboard(container) {
           await replyToStudentNote(id, message);
           showToast('학생에게 답장을 보냈습니다.');
           await render();
-          openModal('notes-inbox-modal');
         } catch (err) {
           console.error(err);
           showToast('답장 전송 중 오류가 발생했습니다.', 'error');
@@ -679,6 +693,27 @@ export function renderTeacherDashboard(container) {
 
   function openModal(id) { document.getElementById(id).classList.add('active'); }
   function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+  function closeNotesInboxModal() {
+    setNotesInboxFullscreen(false);
+    closeModal('notes-inbox-modal');
+  }
+
+  function setNotesInboxFullscreen(on) {
+    const modal = document.getElementById('notes-inbox-modal');
+    const fsBtn = document.getElementById('btn-notes-inbox-fullscreen');
+    if (!modal || !fsBtn) return;
+    modal.classList.toggle('notes-inbox-modal--fullscreen', on);
+    fsBtn.textContent = on ? '⤡' : '⛶';
+    fsBtn.setAttribute('aria-label', on ? '전체화면 해제' : '전체화면');
+    fsBtn.setAttribute('title', on ? '전체화면 해제' : '전체화면');
+  }
+
+  function toggleNotesInboxFullscreen() {
+    const modal = document.getElementById('notes-inbox-modal');
+    if (!modal) return;
+    setNotesInboxFullscreen(!modal.classList.contains('notes-inbox-modal--fullscreen'));
+  }
 
   render();
 }
