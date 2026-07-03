@@ -5,7 +5,7 @@ import {
   getCurrentTeacher, getClassById, getStudentsByClass,
   praiseStudent, showToast, getStudentById, addPresentation,
   toggleSharePresentation, startQuiz, stopQuiz, listenToQuizSubmissions,
-  saveFile, getPresentationsByStudent, formatDate, addStudentPoints,
+  saveFile, getLessonPresentationsByStudent, formatDate, addStudentPoints,
   subtractStudentPoints, deletePresentationById, getClassesByTeacher,
   revealQuizGallery, getQuizById, enrichPresentationsWithImageUrls,
   presentationWhiteboardImageUrl,
@@ -262,7 +262,7 @@ export function renderLessonMode(container, params) {
       showToast('발표 기록을 불러오는 중...', 'info');
       try {
         studentPresentations = await enrichPresentationsWithImageUrls(
-          await getPresentationsByStudent(
+          await getLessonPresentationsByStudent(
             selectedStudent.id,
             selectedStudent.classId || classId,
           ),
@@ -1558,7 +1558,7 @@ export function renderLessonMode(container, params) {
           try {
             await toggleSharePresentation(presentationId, null, []);
             showToast('공유가 중지되었습니다.');
-            studentPresentations = await getPresentationsByStudent(
+            studentPresentations = await getLessonPresentationsByStudent(
               selectedStudent.id,
               selectedStudent.classId || classId,
             );
@@ -1621,7 +1621,7 @@ export function renderLessonMode(container, params) {
             showToast(`✨ 공유 완료! (2P 획득)${selectedClassIds.length > 0 ? ` — ${selectedClassIds.length}개 클래스 추가 공유` : ''}`);
             const updated = await addStudentPoints(selectedStudent.id, 2);
             if (updated) selectedStudent = updated;
-            studentPresentations = await getPresentationsByStudent(
+            studentPresentations = await getLessonPresentationsByStudent(
               selectedStudent.id,
               selectedStudent.classId || classId,
             );
@@ -1645,7 +1645,7 @@ export function renderLessonMode(container, params) {
             return;
           }
           showToast('발표 기록이 삭제되었습니다.');
-          studentPresentations = await getPresentationsByStudent(
+          studentPresentations = await getLessonPresentationsByStudent(
             selectedStudent.id,
             selectedStudent.classId || classId,
           );

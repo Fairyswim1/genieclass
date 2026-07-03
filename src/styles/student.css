@@ -299,15 +299,21 @@
 }
 
 .student-problem-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 8px 12px;
-    align-items: center;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
     padding: 10px 12px !important;
     margin-bottom: 0 !important;
     border: 1px solid var(--border-subtle);
     border-radius: var(--r-sm);
     background: rgba(255, 255, 255, 0.92);
+}
+
+.student-problem-row__top {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px 12px;
+    align-items: center;
 }
 
 .student-problem-row__main {
@@ -368,7 +374,6 @@
 }
 
 .student-problem-friends {
-    grid-column: 1 / -1;
     border-top: 1px dashed var(--border-subtle);
     padding-top: 8px;
     margin-top: 2px;

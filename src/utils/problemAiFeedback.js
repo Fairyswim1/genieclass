@@ -9,13 +9,12 @@ import {
   setPresentationFeedbackShared,
   showToast,
 } from '../store.js';
-import { escapeHtml } from './quizMath.js';
+import { formatMarkdownWithMathHtml, renderQuizMath, escapeHtml } from './quizMath.js';
 
-function formatFeedbackHtml(text) {
-  const escaped = escapeHtml(String(text || ''));
-  return escaped
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\n/g, '<br>');
+function renderFeedbackBody(bodyEl, text) {
+  bodyEl.innerHTML = text ? formatMarkdownWithMathHtml(text) : '';
+  bodyEl.classList.add('quiz-math-render-root');
+  renderQuizMath(bodyEl);
 }
 
 async function resolveStudentImageUrl(solution) {
@@ -86,7 +85,7 @@ export async function openProblemAiFeedbackModal({
   let sharedState = isShared;
 
   const renderBody = (text) => {
-    bodyEl.innerHTML = text ? formatFeedbackHtml(text) : '';
+    renderFeedbackBody(bodyEl, text);
   };
 
   const renderActions = () => {

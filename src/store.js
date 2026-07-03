@@ -648,6 +648,21 @@ export async function getPresentationsByStudent(studentId, classId = null) {
     return snapshot.docs.map(normalizePresentationDoc);
 }
 
+/** 수업 발표(칠판·녹화) — 관찰 기록·한 문제 풀이 제외 */
+export function isLessonPresentation(pres) {
+    if (!pres || typeof pres !== 'object') return false;
+    if (pres.type === 'observation') return false;
+    if (pres.type === 'problem_solution') return false;
+    const pid = pres.problemPromptId != null ? String(pres.problemPromptId).trim() : '';
+    if (pid) return false;
+    return true;
+}
+
+export async function getLessonPresentationsByStudent(studentId, classId = null) {
+    const all = await getPresentationsByStudent(studentId, classId);
+    return all.filter(isLessonPresentation);
+}
+
 export async function getPresentationsByClass(classId) {
     const q = query(collection(db, COLLECTIONS.PRESENTATIONS), where('classId', '==', classId));
     const snapshot = await getDocs(q);
@@ -981,7 +996,7 @@ export async function getProblemPromptsByClass(classId) {
     return snapshot.docs
         .map((d) => {
             const data = d.data();
-            return { ...data, id: data.id || d.id };
+            return { ...data, id: d.id || data.id };
         })
         .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 }
@@ -991,7 +1006,7 @@ export async function getProblemPromptById(promptId) {
     const docSnap = await getDoc(doc(db, COLLECTIONS.PROBLEM_PROMPTS, promptId));
     if (!docSnap.exists()) return null;
     const data = docSnap.data();
-    return { ...data, id: data.id || docSnap.id };
+    return { ...data, id: docSnap.id || data.id };
 }
 
 export async function deleteProblemPrompt(promptId) {
@@ -1761,6 +1776,33 @@ export async function enrichItemsWithValidFiles(items, filesKey = 'files') {
     );
 }
 
+/** 발표·풀이 미디어가 영상인지 (recordingMode 누락 시 파일 메타·URL로 추론) */
+export function getPresentationRecordingMode(pres) {
+    if (pres?.recordingMode === 'video') return 'video';
+    if (pres?.recordingMode === 'audio') return 'audio';
+    const ad = pres?.audioData;
+    if (!ad || typeof ad !== 'object') return 'audio';
+    const mime = typeof ad.type === 'string' ? ad.type.toLowerCase() : '';
+    if (mime.startsWith('video/')) return 'video';
+    const name = typeof ad.name === 'string' ? ad.name.toLowerCase() : '';
+    if (/^video[_-]/.test(name) || /\.(mp4|mov|m4v)(\?|$)/i.test(name)) return 'video';
+    const url = typeof ad.url === 'string' ? ad.url.toLowerCase() : '';
+    if (url.includes('video_') || /\/video[_-]/i.test(url) || /\.(mp4|mov|m4v)(\?|$)/i.test(url)) {
+        return 'video';
+    }
+    return 'audio';
+}
+
+/** URL만 있을 때 재생 모드 추론 (data-* 속성 폴백) */
+export function inferRecordingModeFromMediaUrl(mediaUrl, recordingMode = 'audio') {
+    if (recordingMode === 'video') return 'video';
+    if (!mediaUrl || typeof mediaUrl !== 'string') return 'audio';
+    const lower = mediaUrl.toLowerCase();
+    if (lower.includes('video_') || /\/video[_-]/i.test(lower)) return 'video';
+    if (/\.(mp4|mov|m4v)(\?|$)/i.test(lower)) return 'video';
+    return 'audio';
+}
+
 /** 발표·풀이에 붙은 칠판 이미지 공개 URL (동기). */
 export function presentationWhiteboardImageUrl(pres) {
     const w = pres?.whiteboardImage;
@@ -1785,6 +1827,19 @@ export function isProblemSolutionPresentation(pres) {
     return pres.problemPromptId != null && String(pres.problemPromptId).trim() !== '';
 }
 
+/** 특정 출제 문제(prompt)에 속하는 풀이인지 */
+export function presentationMatchesProblemPrompt(pres, prompt, allPrompts = []) {
+    if (!pres || !prompt || !isProblemSolutionPresentation(pres)) return false;
+    const promptId = String(prompt.id || '').trim();
+    if (!promptId) return false;
+    const pid = String(pres.problemPromptId || '').trim();
+    if (pid) return pid === promptId;
+    if (Array.isArray(allPrompts) && allPrompts.length === 1) {
+        return String(allPrompts[0].id) === promptId;
+    }
+    return false;
+}
+
 /** 발표 목록 병합 (id 기준, 뒤쪽 항목 우선) */
 export function mergePresentationsById(...lists) {
     const map = new Map();
@@ -1803,26 +1858,50 @@ export function mergePresentationsById(...lists) {
  */
 export async function enrichPresentationWithImageUrls(pres) {
     if (!pres || typeof pres !== 'object') return pres;
-    if (presentationWhiteboardImageUrl(pres)) return pres;
-    const w = pres.whiteboardImage;
-    if (!w?.id) return pres;
-    try {
-        const meta = await getFileById(String(w.id));
-        if (meta?.url) {
-            return {
-                ...pres,
-                whiteboardImage: {
-                    ...w,
-                    url: meta.url,
-                    name: w.name || meta.name,
-                    type: w.type || meta.type,
-                },
-            };
+    let next = pres;
+    if (presentationWhiteboardImageUrl(next)) {
+        // already has wb url
+    } else {
+        const w = next.whiteboardImage;
+        if (w?.id) {
+            try {
+                const meta = await getFileById(String(w.id));
+                if (meta?.url) {
+                    next = {
+                        ...next,
+                        whiteboardImage: {
+                            ...w,
+                            url: meta.url,
+                            name: w.name || meta.name,
+                            type: w.type || meta.type,
+                        },
+                    };
+                }
+            } catch (e) {
+                console.warn('[enrichPresentationWithImageUrls]', e);
+            }
         }
-    } catch (e) {
-        console.warn('[enrichPresentationWithImageUrls]', e);
     }
-    return pres;
+    const ad = next?.audioData;
+    if (ad?.id && (!ad.type || !ad.name)) {
+        try {
+            const meta = await getFileById(String(ad.id));
+            if (meta) {
+                next = {
+                    ...next,
+                    audioData: {
+                        ...ad,
+                        name: ad.name || meta.name,
+                        type: ad.type || meta.type,
+                        url: ad.url || meta.url,
+                    },
+                };
+            }
+        } catch (e) {
+            console.warn('[enrichPresentationWithImageUrls] audioData', e);
+        }
+    }
+    return next;
 }
 
 export async function enrichPresentationsWithImageUrls(presentations) {
@@ -1944,6 +2023,12 @@ export async function saveObservation(studentId, classId, data) {
         console.error('Save observation error:', err);
         throw err;
     }
+}
+
+export async function deleteObservationById(observationId) {
+    if (!observationId) return false;
+    await ensureTeacherFirebaseAuth();
+    return deletePresentationById(observationId);
 }
 
 export async function getObservationsByClass(classId) {

@@ -1,4 +1,6 @@
 /** 발표·풀이 재생 모달 HTML (음성+칠판/사진 동시 표시) */
+import { inferRecordingModeFromMediaUrl } from '../store.js';
+
 export const PRESENTATION_PLAYBACK_MODAL_HTML = `
   <div class="modal-backdrop" id="video-modal" style="z-index: 2000;">
     <div class="modal-content" style="max-width: 1000px; width: 90%; background: #000; padding: 0; overflow: hidden;">
@@ -76,7 +78,7 @@ export function bindPresentationPlayback(root = document) {
 
     const mediaUrl = btn.dataset.url || '';
     const wbUrl = btn.dataset.wbUrl || '';
-    const mode = btn.dataset.recordingMode || btn.dataset.mode || 'audio';
+    const mode = inferRecordingModeFromMediaUrl(mediaUrl, btn.dataset.recordingMode || btn.dataset.mode || 'audio');
 
     player.pause();
     player.src = '';

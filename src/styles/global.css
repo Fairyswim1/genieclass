@@ -872,6 +872,20 @@ body {
   font-weight: 700;
 }
 
+.prob-ai-feedback-modal__body .katex {
+  font-size: 1.05em;
+}
+
+.prob-ai-feedback-modal__body .katex-display {
+  margin: 0.6em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.prob-ai-feedback-modal__body .katex-display > .katex {
+  text-align: left;
+}
+
 .prob-ai-feedback-modal__loading {
   flex-shrink: 0;
   font-size: 0.85rem;

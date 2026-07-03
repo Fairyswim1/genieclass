@@ -4,7 +4,7 @@ import {
   createAnnouncement, getAnnouncementsByClass, deleteAnnouncement,
   addResource, getResourcesByClass, deleteResource,
   getSubmissionsByAssignment, saveFile, showToast, formatDate,
-  getStudentById, downloadFile as storeDownloadFile, getObservationsByClass,
+  getStudentById, downloadFile as storeDownloadFile, getObservationsByClass, deleteObservationById,
   getStudentSelfRecordsByClass,
   createProblemPrompt, getProblemPromptsByClass, deleteProblemPrompt,
   getPresentationsByClass, toggleSharePresentation, addStudentPoints,
@@ -608,20 +608,24 @@ export function renderAssignMode(container, params) {
                       <th style="width: 100px;">학생명</th>
                       <th>관찰 내용 및 특기사항</th>
                       <th style="width: 80px;">구분</th>
+                      <th style="width: 72px;">삭제</th>
                     </tr>
                   </thead>
                   <tbody>
                     ${observations.map(obs => `
                       <tr>
                         <td style="font-size: 0.85rem; color: var(--text-muted);">${formatDate(obs.createdAt)}</td>
-                        <td><strong style="color: var(--primary);">${obs.studentName || '알 수 없음'}</strong></td>
+                        <td><strong style="color: var(--primary);">${escapeHtml(obs.studentName || '알 수 없음')}</strong></td>
                         <td style="white-space: pre-line; text-align: left; padding: 15px 10px; line-height: 1.6;">
-                          <div>${obs.content || '기록 없음'}</div>
+                          <div>${escapeHtml(obs.content || '기록 없음')}</div>
                           ${obs.audioData?.url ? `
-                            <audio controls src="${obs.audioData.url}" style="width: 100%; max-width: 360px; margin-top: 10px;"></audio>
+                            <audio controls src="${escapeHtml(obs.audioData.url)}" style="width: 100%; max-width: 360px; margin-top: 10px;"></audio>
                           ` : ''}
                         </td>
                         <td><span class="badge ${obs.mode === 'voice' ? 'badge-blue' : 'badge-green'}">${obs.mode === 'voice' ? '음성' : '텍스트'}</span></td>
+                        <td>
+                          <button type="button" class="btn btn-ghost btn-sm delete-btn" data-type="obs" data-id="${escapeHtml(String(obs.id))}" style="color: var(--error); padding: 4px 8px;" title="관찰 기록 삭제">🗑️</button>
+                        </td>
                       </tr>
                     `).join('')}
                   </tbody>
@@ -1234,15 +1238,22 @@ export function renderAssignMode(container, params) {
     // Delete Buttons
     document.querySelectorAll('.delete-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
-        if (!confirm('정말 삭제하시겠습니까?')) return;
         const type = btn.dataset.type;
         const id = btn.dataset.id;
-        if (type === 'ann') await deleteAnnouncement(id);
-        else if (type === 'assign') await deleteAssignment(id);
-        else if (type === 'res') await deleteResource(id);
-        else if (type === 'prob') await deleteProblemPrompt(id);
-        showToast('삭제 완료');
-        render();
+        const label = type === 'obs' ? '이 관찰 기록' : '항목';
+        if (!confirm(`${label}을(를) 영구히 삭제할까요?`)) return;
+        try {
+          if (type === 'ann') await deleteAnnouncement(id);
+          else if (type === 'assign') await deleteAssignment(id);
+          else if (type === 'res') await deleteResource(id);
+          else if (type === 'prob') await deleteProblemPrompt(id);
+          else if (type === 'obs') await deleteObservationById(id);
+          showToast('삭제 완료');
+          render();
+        } catch (err) {
+          console.error('[삭제]', err);
+          showToast(err?.message || '삭제에 실패했습니다.', 'error');
+        }
       });
     });
     // Bulk Download

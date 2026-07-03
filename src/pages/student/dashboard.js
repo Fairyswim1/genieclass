@@ -23,7 +23,10 @@ import {
   isProblemSolutionPresentation,
   mergePresentationsById,
   presentationHasSharedFeedback,
+  presentationMatchesProblemPrompt,
   getClassesByTeacher,
+  getPresentationRecordingMode,
+  inferRecordingModeFromMediaUrl,
 } from '../../store.js';
 import { escapeHtml, renderQuizMath } from '../../utils/quizMath.js';
 import { bindClipboardPasteZone } from '../../utils/clipboardPaste.js';
@@ -38,10 +41,10 @@ const MASCOT_URL = `${import.meta.env.BASE_URL || '/'}branding/genie-mascot.png`
 function buildPlaybackButtonAttrs(p) {
   const wbUrl = presentationWhiteboardImageUrl(p);
   const mediaUrl = typeof p.audioData?.url === 'string' ? p.audioData.url.trim() : '';
-  const mode = p.recordingMode === 'video' ? 'video' : 'audio';
+  const mode = getPresentationRecordingMode(p);
   const parts = [];
   if (mediaUrl) parts.push(`data-url="${escapeHtml(mediaUrl)}"`);
-  if (wbUrl) parts.push(`data-wb-url="${escapeHtml(wbUrl)}"`);
+  if (wbUrl && mode !== 'video') parts.push(`data-wb-url="${escapeHtml(wbUrl)}"`);
   parts.push(`data-recording-mode="${escapeHtml(mode)}"`);
   return parts.join(' ');
 }
@@ -52,9 +55,10 @@ function renderPresentationPlayButton(p, labelOverride = '') {
   if (!wbUrl && !mediaUrl) {
     return '<span class="student-pres-noasset">—</span>';
   }
+  const isVideo = getPresentationRecordingMode(p) === 'video';
   const label = labelOverride
     || (mediaUrl
-      ? (p.recordingMode === 'video' ? '🎬 영상' : '🔊 풀이 듣기')
+      ? (isVideo ? '🎬 영상' : '🔊 풀이 듣기')
       : (p.solutionSource === 'photo' ? '🖼️ 사진 보기' : '🖼️ 보기'));
   return `<button type="button" class="btn btn-secondary btn-sm btn-play-video" ${buildPlaybackButtonAttrs(p)}>${label}</button>`;
 }
@@ -400,34 +404,24 @@ export function renderStudentDashboard(container) {
               ${problemPrompts.length === 0
     ? '<p class="text-center" style="color: var(--text-dim); padding: 12px;">출제된 한 문제가 없습니다.</p>'
     : problemPrompts.map((pr) => {
-      const matchProblemSolution = (p) => {
-        if (String(p.studentId) !== String(freshStudent.id)) return false;
-        if (!isProblemSolutionPresentation(p)) return false;
-        const pid = String(p.problemPromptId || '').trim();
-        if (pid && pid === String(pr.id)) return true;
-        // 구버전: problemPromptId 누락 — 반에 문제가 하나뿐이면 해당 문제 풀이로 간주
-        if (!pid && problemPrompts.length === 1 && String(problemPrompts[0].id) === String(pr.id)) {
-          return true;
-        }
-        return false;
-      };
-      const sols = allPresentations.filter(matchProblemSolution);
+      const sols = allPresentations.filter((p) =>
+        presentationMatchesProblemPrompt(p, pr, problemPrompts)
+        && String(p.studentId) === String(freshStudent.id));
       const sol = sols.length
         ? sols.slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))[0]
         : null;
       const hasSol = !!sol;
       const hasSharedFeedback = hasSol && presentationHasSharedFeedback(sol);
 
-      // 친구들의 공유된 풀이 (problem_solution 타입, 같은 problemPromptId)
       const friendSols = allPresentations.filter((p) =>
-        isProblemSolutionPresentation(p)
-        && String(p.problemPromptId || '') === String(pr.id)
+        presentationMatchesProblemPrompt(p, pr, problemPrompts)
         && String(p.studentId) !== String(freshStudent.id)
         && p.shared === true
       ).slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 
       return `
                     <article class="student-problem-row interactive-item">
+                      <div class="student-problem-row__top">
                       <div class="student-problem-row__main">
                         <div class="student-problem-row__head">
                           <h3 class="student-problem-row__title">${escapeHtml(pr.title || '제목 없음')}</h3>
@@ -457,6 +451,7 @@ export function renderStudentDashboard(container) {
       : '✏️ 칠판 이어 수정')
     : '✍️ 풀이 올리기'}
                         </button>
+                      </div>
                       </div>
                       ${friendSols.length > 0 ? `
                       <div class="student-problem-friends">
@@ -1199,7 +1194,7 @@ export function renderStudentDashboard(container) {
 
       const mediaUrl = btn.dataset.url || '';
       const wbUrl = btn.dataset.wbUrl || '';
-      const mode = btn.dataset.recordingMode || 'audio';
+      const mode = inferRecordingModeFromMediaUrl(mediaUrl, btn.dataset.recordingMode || 'audio');
 
       player.pause();
       player.src = '';

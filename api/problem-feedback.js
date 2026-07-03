@@ -23,6 +23,8 @@ const BASE_SYSTEM_PROMPT = [
   '톤: 격려하되 솔직하게. 문장부호·예시는 과목에 맞게.',
   '이미지의 글씨·기호 일부만 보일 경우 추정임을 간단히 밝히기.',
   '마크다운 굵게(**) 허용. 각 섹션은 충분히 쓰고 중간에 잘리지 않게 완결된 문장으로 마무리.',
+  '수식·분수·근호·벡터 등은 LaTeX로 작성: 한 줄 $...$, 블록 $$...$$ (예: $\\frac{1}{2}$, $$x=\\frac{-b\\pm\\sqrt{b^2-4ac}}{2a}$$).',
+  'Unicode 수식 기호만 쓰지 말고 LaTeX 구분자로 감싸기.',
 ].join('\n');
 
 const VERBAL_FORMAT = [
@@ -35,23 +37,102 @@ const VERBAL_FORMAT = [
 
 const SCORING_FORMAT = [
   '요구 형식 (루브릭·배점·채점 기준이 제공된 경우 — 반드시 점수 포함):',
-  '1. **총점**: 루브릭 만점 대비 획득 점수 (예: **18/20점**). 항목별 만점이 없으면 100점 만점으로 환산.',
-  '2. **항목별 점수**: 루브릭 항목마다 **항목명: 획득/만점** 형식 불릿.',
+  '',
+  '채점 규칙 (필수):',
+  '- 사용자 메시지의 **[루브릭 채점표]**에 적힌 항목명·만점만 사용. 항목 추가·삭제·만점 변경 금지.',
+  '- 각 항목 점수는 0 이상 해당 항목 만점 이하 정수.',
+  '- **총점 = 항목별 점수의 합**. 총점 만점은 루브릭 채점표의 총점 만점과 일치해야 함.',
+  '- 임의로 100점 만점으로 환산하지 말 것. 루브릭에 총점/만점이 없으면 항목별 만점 합을 총점 만점으로 사용.',
+  '',
+  '출력 형식:',
+  '1. **총점**: **획득/만점점** (예: **13/20점**)',
+  '2. **항목별 점수**: 각 항목 **항목명: 획득/만점점** 불릿 (예: **풀이 과정: 4/5점**)',
   '3. **전체 평**: 2~3문장 요약.',
   '4. **잘한 점**: 2~4개 불릿.',
-  '5. **부족한 점·감점 사유**: 2~4개 불릿.',
+  '5. **부족한 점·감점 사유**: 항목별 감점 이유를 구체적으로 2~4개 불릿.',
   '6. **다음 학습 팁**: 2~3문장.',
-  '루브릭에 없는 항목은 임의로 만들지 말 것.',
 ].join('\n');
 
-function detectsScoringRubric(body) {
-  const text = [
+function collectRubricSourceText(body) {
+  return [
     body.problemDescription,
     body.modelAnswerText,
     ...(Array.isArray(body.modelAnswerNonImageNotes) ? body.modelAnswerNonImageNotes : []),
   ]
     .filter((v) => typeof v === 'string' && v.trim())
     .join('\n');
+}
+
+/** 모범답안·문제 설명에서 루브릭 항목·만점 추출 */
+function parseRubricFromText(text) {
+  const src = String(text || '');
+  if (!src.trim()) return null;
+
+  const items = [];
+  let totalMax = null;
+
+  const totalMatch = src.match(/(?:총\s*점|만점|배점\s*합|합계|총점)\s*[:：]?\s*(\d+)\s*점?/i)
+    || src.match(/(\d+)\s*점\s*만점/i);
+  if (totalMatch) totalMax = parseInt(totalMatch[1], 10);
+
+  const lines = src.split(/\n/);
+  for (const raw of lines) {
+    let line = raw.trim();
+    if (!line || line.length < 3) continue;
+    line = line.replace(/^\|+\s*|\s*\|+$/g, '').replace(/\|/g, ' ').trim();
+    if (/^(?:총|만점|합계|루브ric|rubric|배점\s*표|채점\s*표)\b/i.test(line)) continue;
+
+    let name = '';
+    let max = 0;
+
+    let m = line.match(/^(?:\(?\d+[\.\)]\s*)?(?:【|\[)?(.+?)(?:】|\])?\s*[\(（:\-—]\s*(\d+)\s*점\s*[\)）]?\s*$/);
+    if (m) {
+      name = m[1].trim();
+      max = parseInt(m[2], 10);
+    } else {
+      m = line.match(/^(?:\(?\d+[\.\)]\s*)?(?:【|\[)?(.+?)(?:】|\])?\s+(\d+)\s*점\s*$/);
+      if (m) {
+        name = m[1].trim();
+        max = parseInt(m[2], 10);
+      } else {
+        m = line.match(/^(\d+)\s*점\s*[\-—:：]\s*(.+)$/);
+        if (m) {
+          max = parseInt(m[1], 10);
+          name = m[2].trim();
+        }
+      }
+    }
+
+    name = name.replace(/\*+/g, '').replace(/^\d+[\.\)]\s*/, '').trim();
+    if (name && max > 0 && max <= 200 && !/^(?:점수|배점|만점|항목)$/i.test(name)) {
+      const dup = items.some((it) => it.name === name && it.max === max);
+      if (!dup) items.push({ name, max });
+    }
+  }
+
+  if (items.length === 0) return null;
+  const itemSum = items.reduce((s, it) => s + it.max, 0);
+  if (!totalMax || totalMax < itemSum) totalMax = itemSum;
+  return { items, totalMax, itemSum };
+}
+
+function buildRubricSection(body) {
+  const rubric = parseRubricFromText(collectRubricSourceText(body));
+  if (!rubric) return '';
+  const lines = [
+    '[루브릭 채점표 — 아래 항목·만점을 정확히 따를 것. 다른 배점 사용 금지]',
+  ];
+  rubric.items.forEach((item, i) => {
+    lines.push(`${i + 1}. ${item.name}: 만점 ${item.max}점`);
+  });
+  lines.push(`총점 만점: ${rubric.totalMax}점 (항목별 합계 ${rubric.itemSum}점)`);
+  lines.push('');
+  return lines.join('\n');
+}
+
+function detectsScoringRubric(body) {
+  const text = collectRubricSourceText(body);
+  if (parseRubricFromText(text)) return true;
   return /루브릭|rubric|배점|채점\s*기준|평가\s*기준|총\s*점|만점|\d+\s*점\s*[\)\]】]|항목\s*별\s*점|점수\s*배|평가\s*표|기준\s*표|(\d+)\s*\/\s*(\d+)\s*점/i.test(text);
 }
 
@@ -82,6 +163,11 @@ function buildScenarioText(body) {
     lines.push(...body.modelAnswerNonImageNotes);
     lines.push('학생에게는 해당 자료 존재를 언급하고, 피백은 풀이 이미지 중심으로 해 주세요.');
     lines.push('');
+  }
+
+  const rubricSection = buildRubricSection(body);
+  if (rubricSection) {
+    lines.push(rubricSection);
   }
 
   return lines.join('\n');
