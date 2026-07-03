@@ -421,7 +421,6 @@ export function renderStudentDashboard(container) {
 
       return `
                     <article class="student-problem-row interactive-item">
-                      <div class="student-problem-row__top">
                       <div class="student-problem-row__main">
                         <div class="student-problem-row__head">
                           <h3 class="student-problem-row__title">${escapeHtml(pr.title || '제목 없음')}</h3>
@@ -452,13 +451,12 @@ export function renderStudentDashboard(container) {
     : '✍️ 풀이 올리기'}
                         </button>
                       </div>
-                      </div>
                       ${friendSols.length > 0 ? `
                       <div class="student-problem-friends">
-                        <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); margin-bottom: 6px;">친구들의 풀이 (${friendSols.length})</div>
+                        <span class="student-problem-friends__label">친구 풀이 ${friendSols.length}</span>
                         <div class="student-problem-friends__list">
                           ${friendSols.map((fs) => `
-                              <div class="student-bbs-row">
+                              <div class="student-bbs-row student-problem-friend-chip">
                                 <span class="student-bbs-row__who">${escapeHtml(fs.studentName || '친구')}</span>
                                 <span class="student-bbs-row__when">${formatDate(fs.createdAt)}</span>
                                 <span class="student-bbs-row__act">${renderPresentationPlayButton(fs, '보기')}</span>
