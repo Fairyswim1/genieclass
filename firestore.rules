@@ -131,6 +131,11 @@ service cloud.firestore {
         || (isStudentAuth() && isStudentOwner(resource.data.studentId));
     }
 
+    function presentationTeacherWrite() {
+      return isClassTeacher(resource.data.classId)
+        || isStudentClassTeacher(resource.data.studentId);
+    }
+
     function classScopedCreate() {
       return isClassTeacher(request.resource.data.classId)
         || (ownsIncomingDoc() && isStudentOwner(request.resource.data.studentId));
@@ -252,11 +257,11 @@ service cloud.firestore {
     match /presentations/{presentationId} {
       allow read: if presentationRead();
       allow create: if classScopedCreate();
-      allow update: if classScopedUpdate()
+      allow update: if (presentationTeacherWrite() || ownsExistingDoc())
         && keepsStudentScope()
         && request.resource.data.authUid == resource.data.authUid
         && changedOnly(['shared', 'title', 'sharedClassIds', 'feedback', 'updatedAt']);
-      allow delete: if isClassTeacher(resource.data.classId)
+      allow delete: if presentationTeacherWrite()
         || ownsExistingDoc()
         || (isStudentAuth() && isStudentOwner(resource.data.studentId));
     }

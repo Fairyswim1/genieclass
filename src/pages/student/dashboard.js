@@ -17,15 +17,16 @@ import {
   getSharedPresentationsByClassId, getStudentsByClass,
   deletePresentationById,
   problemPromptHasModelAnswer,
-  fetchProblemSolutionFeedback,
-  collectImageUrlsFromModelAnswerFiles,
-  collectNonImageModelAnswerFileNotes,
   enrichPresentationsWithImageUrls,
   presentationWhiteboardImageUrl,
+  presentationHasWhiteboardImage,
+  isProblemSolutionPresentation,
+  mergePresentationsById,
   getClassesByTeacher,
 } from '../../store.js';
 import { escapeHtml, renderQuizMath } from '../../utils/quizMath.js';
 import { bindClipboardPasteZone } from '../../utils/clipboardPaste.js';
+import { openProblemAiFeedbackModal } from '../../utils/problemAiFeedback.js';
 import { renderCharacter, getLevelConfig, PLANT_TYPES, getLevelProgress, renderCharacterPreview } from '../../components/characterAvatar.js';
 import { Capacitor } from '@capacitor/core';
 import { VoiceRecorder } from 'capacitor-voice-recorder';
@@ -176,7 +177,11 @@ export function renderStudentDashboard(container) {
         loadOr(
           '발표',
           cls
-            ? getPresentationsByClass(cls.id).then((arr) => enrichPresentationsWithImageUrls(arr))
+            ? Promise.all([
+              getPresentationsByClass(cls.id),
+              getPresentationsByStudent(freshStudent.id, cls.id),
+            ]).then(([classPres, ownPres]) =>
+              enrichPresentationsWithImageUrls(mergePresentationsById(classPres, ownPres)))
             : Promise.resolve([]),
           [],
         ),
@@ -374,9 +379,18 @@ export function renderStudentDashboard(container) {
               ${problemPrompts.length === 0
     ? '<p class="text-center" style="color: var(--text-dim); padding: 12px;">출제된 한 문제가 없습니다.</p>'
     : problemPrompts.map((pr) => {
-      const sols = allPresentations.filter((p) => p.studentId === freshStudent.id
-        && p.type === 'problem_solution'
-        && String(p.problemPromptId || '') === String(pr.id));
+      const matchProblemSolution = (p) => {
+        if (String(p.studentId) !== String(freshStudent.id)) return false;
+        if (!isProblemSolutionPresentation(p)) return false;
+        const pid = String(p.problemPromptId || '').trim();
+        if (pid && pid === String(pr.id)) return true;
+        // 구버전: problemPromptId 누락 — 반에 문제가 하나뿐이면 해당 문제 풀이로 간주
+        if (!pid && problemPrompts.length === 1 && String(problemPrompts[0].id) === String(pr.id)) {
+          return true;
+        }
+        return false;
+      };
+      const sols = allPresentations.filter(matchProblemSolution);
       const sol = sols.length
         ? sols.slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))[0]
         : null;
@@ -385,13 +399,13 @@ export function renderStudentDashboard(container) {
       const canAiFeedback =
         problemPromptHasModelAnswer(pr)
         && hasSol
-        && !!wbUrlMine;
+        && presentationHasWhiteboardImage(sol);
 
       // 친구들의 공유된 풀이 (problem_solution 타입, 같은 problemPromptId)
       const friendSols = allPresentations.filter((p) =>
-        p.type === 'problem_solution'
+        isProblemSolutionPresentation(p)
         && String(p.problemPromptId || '') === String(pr.id)
-        && p.studentId !== freshStudent.id
+        && String(p.studentId) !== String(freshStudent.id)
         && p.shared === true
       ).slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 
@@ -411,7 +425,7 @@ export function renderStudentDashboard(container) {
                           <button type="button" class="btn btn-ghost btn-sm btn-toggle-share" data-id="${sol.id}" data-shared="${sol.shared ? 'true' : 'false'}">${sol.shared ? '🔒 공유 끄기' : '🌐 공유하기'}</button>` : ''}
                         ${canAiFeedback
     ? `<button type="button" class="btn btn-secondary btn-sm btn-problem-ai-feedback" data-prompt-id="${pr.id}" data-solution-id="${sol.id}" title="모범답안 기준 피드백">✨ 피드백</button>`
-    : (problemPromptHasModelAnswer(pr) && hasSol && !wbUrlMine
+    : (problemPromptHasModelAnswer(pr) && hasSol && !presentationHasWhiteboardImage(sol)
       ? `<span style="font-size:0.72rem;color:var(--text-dim);">풀이 이미지가 필요해 AI 피드백을 쓸 수 없어요</span>`
       : '')}
                         <button type="button" class="btn btn-primary btn-sm btn-open-problem-board" data-prompt-id="${pr.id}">
@@ -1648,73 +1662,12 @@ export function renderStudentDashboard(container) {
         const sid = btn.dataset.solutionId;
         const pr = problemPrompts.find((p) => String(p.id) === String(pid));
         const sol = allPresentations.find((p) => String(p.id) === String(sid));
-        let studentImg = presentationWhiteboardImageUrl(sol);
-        if (!studentImg && sol?.whiteboardImage?.id) {
-          try {
-            const meta = await getFileById(sol.whiteboardImage.id);
-            studentImg = typeof meta?.url === 'string' ? meta.url.trim() : '';
-          } catch (_) {}
-        }
-
-        if (!pr || !sol || !studentImg) {
-          showToast('풀이 이미지를 찾을 수 없습니다.', 'error');
-          return;
-        }
-
-        const backdrop = document.createElement('div');
-        backdrop.className = 'modal-backdrop active page-enter';
-        backdrop.style.zIndex = '2100';
-        backdrop.innerHTML = `
-          <div class="modal-content animate-up" style="max-width: 520px; width: 92%; max-height: min(88dvh, 640px); display: flex; flex-direction: column; background: var(--bg-card);">
-            <div class="modal-header" style="flex-shrink: 0;">
-              <h3 class="modal-title" style="margin: 0;">✨ AI 풀이 피드백</h3>
-              <button type="button" class="modal-close" id="prob-feedback-close" aria-label="닫기">✕</button>
-            </div>
-            <p style="font-size: 0.78rem; color: var(--text-dim); margin: 0 0 var(--s-3); line-height: 1.45; flex-shrink: 0;">
-              선생님이 등록한 모범답안을 참고하여 자동으로 분석합니다. 최종 채점 대신 학습 도움용으로 활용해 주세요.
-            </p>
-            <div id="prob-feedback-body" style="flex: 1; min-height: 120px; overflow-y: auto; font-size: 0.88rem; line-height: 1.6; white-space: pre-wrap; color: var(--text-main); padding: var(--s-2) var(--s-1);"></div>
-            <div id="prob-feedback-loading" style="flex-shrink: 0; font-size: 0.85rem; color: var(--text-muted); margin-top: var(--s-3);"></div>
-          </div>
-        `;
-        document.body.appendChild(backdrop);
-        const bodyEl = backdrop.querySelector('#prob-feedback-body');
-        const loadEl = backdrop.querySelector('#prob-feedback-loading');
-
-        const closeModal = () => {
-          backdrop.classList.remove('active');
-          setTimeout(() => backdrop.remove(), 200);
-        };
-        backdrop.querySelector('#prob-feedback-close')?.addEventListener('click', closeModal);
-        backdrop.addEventListener('click', (e) => {
-          if (e.target === backdrop) closeModal();
+        await openProblemAiFeedbackModal({
+          problemPrompt: pr,
+          solution: sol,
+          triggerButton: btn,
+          audience: 'student',
         });
-
-        btn.disabled = true;
-        loadEl.textContent = '모범답안과 풀이를 분석 중이에요… (10~40초 정도 걸릴 수 있어요)';
-        bodyEl.textContent = '';
-
-        try {
-          const modelAnswerImageUrls = await collectImageUrlsFromModelAnswerFiles(pr.modelAnswerFiles);
-          const modelAnswerNonImageNotes = await collectNonImageModelAnswerFileNotes(pr.modelAnswerFiles);
-          const feedback = await fetchProblemSolutionFeedback({
-            problemTitle: pr.title || '',
-            problemDescription: pr.description || '',
-            modelAnswerText: pr.modelAnswerText || '',
-            modelAnswerImageUrls,
-            modelAnswerNonImageNotes,
-            studentImageUrl: studentImg,
-          });
-          bodyEl.textContent = feedback;
-          loadEl.textContent = '';
-        } catch (err) {
-          console.error(err);
-          bodyEl.textContent = '';
-          loadEl.innerHTML = `<span style="color: var(--error);">${escapeHtml(String(err.message || '오류'))}</span>`;
-          showToast(String(err.message || '피드백 요청 실패'), 'error');
-        } finally {
-          btn.disabled = false;
-        }
       });
     });
   }

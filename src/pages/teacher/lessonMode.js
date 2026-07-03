@@ -1521,7 +1521,7 @@ export function renderLessonMode(container, params) {
       ? `<button type="button" class="btn btn-secondary btn-sm w-full" onclick="window.open('${escapeHtml(wbUrl)}', '_blank')">🖼️ 원본 이미지</button>`
       : `<button type="button" class="btn btn-secondary btn-sm w-full" disabled>🖼️ 원본 이미지 없음</button>`}
                       <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 10px;">
-                        <button class="btn ${p.shared ? 'btn-danger' : 'btn-purple'} btn-sm btn-toggle-share" data-id="${p.id}" data-shared="${p.shared}">
+                        <button class="btn ${p.shared ? 'btn-danger' : 'btn-purple'} btn-sm btn-toggle-share" data-id="${p.id}" data-shared="${p.shared ? 'true' : 'false'}">
                           ${p.shared ? '공유 끄기' : '전체 공유'}
                         </button>
                         <button class="btn btn-ghost btn-sm btn-delete-presentation" data-id="${p.id}" title="발표 기록 삭제" style="color: var(--error); border: 1px solid rgba(239,68,68,0.35);">
@@ -1563,7 +1563,8 @@ export function renderLessonMode(container, params) {
             );
             render();
           } catch (err) {
-            showToast('오류가 발생했습니다.', 'error');
+            console.error('[발표 공유 해제]', err);
+            showToast('공유 해제 실패: ' + (err?.message || '권한 오류'), 'error');
           }
           return;
         }

@@ -9,10 +9,13 @@ import {
   createProblemPrompt, getProblemPromptsByClass, deleteProblemPrompt,
   getPresentationsByClass, toggleSharePresentation, addStudentPoints,
   enrichPresentationsWithImageUrls, presentationWhiteboardImageUrl,
+  problemPromptHasModelAnswer, presentationHasWhiteboardImage,
+  isProblemSolutionPresentation,
 } from '../../store.js';
 import { escapeHtml } from '../../utils/quizMath.js';
 import { bindClipboardPasteZone } from '../../utils/clipboardPaste.js';
 import { bindPresentationPlayback, PRESENTATION_PLAYBACK_MODAL_HTML } from '../../utils/presentationPlayback.js';
+import { openProblemAiFeedbackModal } from '../../utils/problemAiFeedback.js';
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
 
@@ -43,6 +46,8 @@ export function renderAssignMode(container, params) {
   let existingFilesQueue = []; // Array of {id, name} objects for EDITING
   let probFilesQueue = [];
   let probModelFilesQueue = [];
+  let currentProblemPrompts = [];
+  let currentProblemSolutions = [];
 
   /** render → bindEvents마다 교체 전 이전 창 레벨 paste 리스너 제거 */
   let clipboardPasteUnsubs = [];
@@ -73,15 +78,20 @@ export function renderAssignMode(container, params) {
     if (!isActive) return; // 다른 페이지로 이동 후 완료된 stale render 차단
 
     // 한 문제 풀이 타입 필터링 및 문제별 그룹화
-    const problemSolutions = allPresentations.filter(p => p.type === 'problem_solution');
+    const problemSolutions = allPresentations.filter((p) => isProblemSolutionPresentation(p));
     const solutionsByProblem = {};
     problemSolutions.forEach(sol => {
-      const pid = String(sol.problemPromptId || '');
+      let pid = String(sol.problemPromptId || '').trim();
+      if (!pid && problemPrompts.length === 1) {
+        pid = String(problemPrompts[0].id);
+      }
       if (!solutionsByProblem[pid]) solutionsByProblem[pid] = [];
       solutionsByProblem[pid].push(sol);
     });
 
     currentObservations = observations;
+    currentProblemPrompts = problemPrompts;
+    currentProblemSolutions = problemSolutions;
 
     const recordsByStudent = selfRecords.reduce((acc, record) => {
       if (!record.studentId) return acc;
@@ -474,6 +484,7 @@ export function renderAssignMode(container, params) {
                             const wbUrlAttr = wbUrl ? escapeAttr(wbUrl) : '';
                             const avUrl = typeof sol.audioData?.url === 'string' ? escapeAttr(sol.audioData.url) : '';
                             const isVideo = sol.recordingMode === 'video';
+                            const canAiFeedback = problemPromptHasModelAnswer(pr) && presentationHasWhiteboardImage(sol);
                             return `
                               <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:8px 12px;background:var(--bg-main);border-radius:var(--r-sm);border:1px solid var(--border-subtle);">
                                 <span style="font-weight:700;font-size:0.88rem;color:var(--primary);min-width:72px;">${escapeHtml(sol.studentName || '—')}</span>
@@ -482,6 +493,11 @@ export function renderAssignMode(container, params) {
                                 ${sol.solutionSource === 'photo' ? '<span class="badge badge-blue" style="font-size:0.62rem;">📷사진</span>' : ''}
                                 ${wbUrl ? `<button type="button" class="btn btn-ghost btn-sm" style="font-size:0.72rem;" onclick="window.open('${wbUrl}','_blank')">🖼️ 칠판 보기</button>` : ''}
                                 ${avUrl ? `<button type="button" class="btn btn-secondary btn-sm play-video-btn prob-play-btn" style="font-size:0.72rem;" data-url="${avUrl}" data-wb-url="${wbUrlAttr}" data-recording-mode="${escapeAttr(sol.recordingMode || 'audio')}">${isVideo ? '🎬 영상' : '🔊 음성'}</button>` : ''}
+                                ${canAiFeedback
+    ? `<button type="button" class="btn btn-secondary btn-sm btn-teacher-prob-ai-feedback" data-prompt-id="${escapeAttr(pr.id)}" data-solution-id="${escapeAttr(sol.id)}" title="모범답안 기준 AI 피드백">✨ AI 피드백</button>`
+    : (problemPromptHasModelAnswer(pr) && !presentationHasWhiteboardImage(sol)
+      ? '<span style="font-size:0.68rem;color:var(--text-dim);">풀이 이미지 없음</span>'
+      : '')}
                                 <button type="button" class="btn btn-sm ${sol.shared ? 'btn-danger' : 'btn-primary'} btn-toggle-prob-share" data-id="${escapeAttr(sol.id)}" data-shared="${sol.shared ? 'true' : 'false'}" data-student-id="${escapeAttr(sol.studentId || '')}">${sol.shared ? '공유 끄기' : '공유하기'}</button>
                               </div>
                             `;
@@ -870,6 +886,22 @@ export function renderAssignMode(container, params) {
       });
     });
 
+    // 한 문제 풀이 — 교사가 학생 풀이 AI 피드백
+    document.querySelectorAll('.btn-teacher-prob-ai-feedback').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const pid = btn.dataset.promptId;
+        const sid = btn.dataset.solutionId;
+        const pr = currentProblemPrompts.find((p) => String(p.id) === String(pid));
+        const sol = currentProblemSolutions.find((p) => String(p.id) === String(sid));
+        await openProblemAiFeedbackModal({
+          problemPrompt: pr,
+          solution: sol,
+          triggerButton: btn,
+          audience: 'teacher',
+        });
+      });
+    });
+
     // 한 문제 풀이 — 교사가 학생 풀이 공유/해제
     document.querySelectorAll('.btn-toggle-prob-share').forEach((btn) => {
       btn.addEventListener('click', async () => {
@@ -883,7 +915,8 @@ export function renderAssignMode(container, params) {
             showToast('공유가 해제되었습니다.');
             render();
           } catch (err) {
-            showToast('오류가 발생했습니다.', 'error');
+            console.error('[한문제 공유 해제]', err);
+            showToast('공유 해제 실패: ' + (err?.message || '권한 오류'), 'error');
           }
           return;
         }

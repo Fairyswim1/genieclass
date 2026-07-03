@@ -635,6 +635,7 @@ export async function toggleSharePresentation(presentationId, title = null, addi
         } else {
             updates.sharedClassIds = [];
         }
+        updates.updatedAt = new Date().toISOString();
         await updateDoc(ref, updates);
         return { ...data, ...updates };
     }
@@ -890,14 +891,19 @@ export async function getProblemPromptsByClass(classId) {
     const q = query(collection(db, COLLECTIONS.PROBLEM_PROMPTS), where('classId', '==', classId));
     const snapshot = await getDocs(q);
     return snapshot.docs
-        .map((d) => d.data())
+        .map((d) => {
+            const data = d.data();
+            return { ...data, id: data.id || d.id };
+        })
         .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 }
 
 export async function getProblemPromptById(promptId) {
     if (!promptId) return null;
     const docSnap = await getDoc(doc(db, COLLECTIONS.PROBLEM_PROMPTS, promptId));
-    return docSnap.exists() ? docSnap.data() : null;
+    if (!docSnap.exists()) return null;
+    const data = docSnap.data();
+    return { ...data, id: data.id || docSnap.id };
 }
 
 export async function deleteProblemPrompt(promptId) {
@@ -1683,6 +1689,34 @@ export function presentationWhiteboardImageUrl(pres) {
     return '';
 }
 
+/** AI 피드백·미리보기용 — URL 또는 files id만 있어도 true */
+export function presentationHasWhiteboardImage(pres) {
+    if (!pres?.whiteboardImage || typeof pres.whiteboardImage !== 'object') return false;
+    if (presentationWhiteboardImageUrl(pres)) return true;
+    const id = pres.whiteboardImage.id;
+    return id != null && String(id).trim() !== '';
+}
+
+/** 한 문제 풀이 제출물인지 (구버전 type 누락 시 problemPromptId로 판별) */
+export function isProblemSolutionPresentation(pres) {
+    if (!pres || typeof pres !== 'object') return false;
+    if (pres.type === 'problem_solution') return true;
+    return pres.problemPromptId != null && String(pres.problemPromptId).trim() !== '';
+}
+
+/** 발표 목록 병합 (id 기준, 뒤쪽 항목 우선) */
+export function mergePresentationsById(...lists) {
+    const map = new Map();
+    for (const list of lists) {
+        if (!Array.isArray(list)) continue;
+        for (const p of list) {
+            if (!p?.id) continue;
+            map.set(String(p.id), p);
+        }
+    }
+    return [...map.values()];
+}
+
 /**
  * whiteboardImage에 url이 없고 id만 있는 문서 → files 컬렉션에서 url 보강
  */
@@ -1692,7 +1726,7 @@ export async function enrichPresentationWithImageUrls(pres) {
     const w = pres.whiteboardImage;
     if (!w?.id) return pres;
     try {
-        const meta = await getFileById(w.id);
+        const meta = await getFileById(String(w.id));
         if (meta?.url) {
             return {
                 ...pres,

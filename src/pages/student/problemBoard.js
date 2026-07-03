@@ -1164,7 +1164,7 @@ export function renderStudentProblemBoard(container, params) {
         audioData: savedMedia,
         recordingMode: savedMedia ? recordingMode : undefined,
         type: 'problem_solution',
-        problemPromptId: problemPrompt.id,
+        problemPromptId: problemPrompt.id || promptId,
         title: problemPrompt.title || '한 문제 풀이',
         studentName: student.name,
         solutionSource: submitMode === 'photo' ? 'photo' : 'whiteboard',
