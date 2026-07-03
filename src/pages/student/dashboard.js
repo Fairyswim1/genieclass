@@ -2,14 +2,14 @@
 // Student Dashboard (v2.0)
 // ========================================
 import {
-  getCurrentStudent, logoutStudent, ensureStudentFirestoreAuth, getClassById,
+  getCurrentStudent, logoutStudent, ensureStudentFirestoreAuth, ensureStudentWriteIdentity, getClassById,
   getPresentationsByStudent, getAssignmentsByClass,
   getSubmissionsByStudent, getAnnouncementsByClass,
   getResourcesByClass, enrichItemsWithValidFiles, getStudentById, formatDate,
   listenToActiveQuiz, listenToQuizSubmissions, submitQuizSolution,
   showToast, downloadFile, getStudentByCode,
   submitAssignment, saveFile, updateStudentCharacterType, changeCurrentStudentPassword,
-  getPresentationsByClass,   toggleSharePresentation,
+  getSharedPresentationsInClass, toggleSharePresentation,
   addStudentPoints,
   createStudentSelfRecord, getStudentSelfRecords,
   createStudentNote, getStudentNotesByStudent,
@@ -153,6 +153,14 @@ export function renderStudentDashboard(container) {
       progress = getLevelProgress(freshStudent.totalPoints || 0);
       config = getLevelConfig(progress.level, freshStudent.characterType || 'apple');
 
+      if (freshStudent.id) {
+        try {
+          await ensureStudentWriteIdentity(freshStudent.id);
+        } catch (e) {
+          console.warn('[StudentDashboard] 학생 세션 동기화 실패:', e);
+        }
+      }
+
       try {
         if (cls) {
           assignments = await getAssignmentsByClass(cls.id).then((arr) => enrichItemsWithValidFiles(arr));
@@ -178,11 +186,23 @@ export function renderStudentDashboard(container) {
         loadOr(
           '발표',
           cls
-            ? Promise.all([
-              getPresentationsByClass(cls.id),
-              getPresentationsByStudent(freshStudent.id, cls.id),
-            ]).then(([classPres, ownPres]) =>
-              enrichPresentationsWithImageUrls(mergePresentationsById(classPres, ownPres)))
+            ? (async () => {
+              let ownPres = [];
+              try {
+                ownPres = await getPresentationsByStudent(freshStudent.id, cls.id);
+              } catch (ownErr) {
+                console.error('[StudentDashboard] 내 발표 로드 실패:', ownErr);
+              }
+              let sharedInClass = [];
+              try {
+                sharedInClass = await getSharedPresentationsInClass(cls.id);
+              } catch (sharedErr) {
+                console.error('[StudentDashboard] 반 공유 발표 로드 실패:', sharedErr);
+              }
+              return enrichPresentationsWithImageUrls(
+                mergePresentationsById(sharedInClass, ownPres),
+              );
+            })()
             : Promise.resolve([]),
           [],
         ),
@@ -205,7 +225,7 @@ export function renderStudentDashboard(container) {
       const studentNameMap = Object.fromEntries(classStudentsRes.map(s => [s.id, s.name]));
 
       presentations = allPresentations.filter((p) =>
-        p.studentId === freshStudent.id
+        String(p.studentId) === String(freshStudent.id)
         && p.type !== 'observation'
         && p.type !== 'problem_solution');
 

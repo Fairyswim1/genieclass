@@ -221,9 +221,9 @@ export function renderCharacter(level, size = 80, type = 'apple', _totalPoints =
   `;
 }
 
-/** 식물 선택 카드 등 — 성숙(lv8) 미리보기 */
+/** 식물 선택 카드 등 — 열매 1개(lv5) 미리보기 */
 export function renderCharacterPreview(type, size = 56) {
-  return renderCharacter(MAX_CHARACTER_LEVEL, size, type);
+  return renderCharacter(5, size, type);
 }
 
 export function renderPraiseAnimation(container) {

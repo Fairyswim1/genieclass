@@ -46,6 +46,7 @@ const COLLECTIONS = {
     STUDENT_NOTES: 'student_notes',
     FILES: 'files',
     PROBLEM_PROMPTS: 'problem_prompts',
+    STUDENT_AUTH: 'student_auth',
 };
 
 // Internal state
@@ -231,6 +232,21 @@ export async function ensureStudentFirestoreAuth() {
     await signInAnonymously(auth);
 }
 
+/** Firestore 규칙에서 학생 반(classId) 확인용 — auth UID → 학생·반 매핑 */
+export async function syncStudentAuthIndex(studentId, classId) {
+    const sid = studentId != null ? String(studentId) : '';
+    const cid = classId != null ? String(classId) : '';
+    if (!sid || !cid) return;
+    await ensureStudentFirestoreAuth();
+    const uid = currentAuthUid();
+    if (!uid) return;
+    await setDoc(doc(db, COLLECTIONS.STUDENT_AUTH, uid), {
+        studentId: sid,
+        classId: cid,
+        updatedAt: new Date().toISOString(),
+    }, { merge: true });
+}
+
 export async function logoutStudent() {
     localStorage.removeItem('genie_current_student');
     try {
@@ -347,7 +363,7 @@ export async function getStudentById(studentId) {
  * 보안 규칙 강화 이후 학생 쓰기 요청은 students/{id}.authUid == request.auth.uid 가 필요하다.
  * 오래된 세션/기기 변경으로 값이 어긋난 경우 제출 직전에 현재 UID로 정렬한다.
  */
-async function ensureStudentWriteIdentity(studentId) {
+export async function ensureStudentWriteIdentity(studentId) {
     const sid = studentId != null ? String(studentId) : '';
     if (!sid) throw new Error('학생 정보가 없습니다.');
     await ensureStudentFirestoreAuth();
@@ -376,6 +392,7 @@ async function ensureStudentWriteIdentity(studentId) {
             updatedAt: new Date().toISOString(),
         });
     }
+    await syncStudentAuthIndex(sid, row.classId);
 }
 
 export async function getStudentByCode(code) {
@@ -489,6 +506,7 @@ export async function loginStudentByIdPw(loginId, password) {
         }
         const safeStudent = sanitizeStudentForSession(student);
         localStorage.setItem('genie_current_student', JSON.stringify(safeStudent));
+        await syncStudentAuthIndex(safeStudent.id, safeStudent.classId);
         return safeStudent;
     }
     return null;
@@ -634,6 +652,20 @@ export async function getPresentationsByClass(classId) {
     const q = query(collection(db, COLLECTIONS.PRESENTATIONS), where('classId', '==', classId));
     const snapshot = await getDocs(q);
     return snapshot.docs.map(normalizePresentationDoc);
+}
+
+/** 같은 반에서 shared=true 인 발표만 (학생 피어 조회용 — 규칙·쿼리 정합) */
+export async function getSharedPresentationsInClass(classId) {
+    if (classId == null || classId === '') return [];
+    const q = query(
+        collection(db, COLLECTIONS.PRESENTATIONS),
+        where('classId', '==', String(classId)),
+        where('shared', '==', true),
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs
+        .map(normalizePresentationDoc)
+        .filter((p) => p.type !== 'observation');
 }
 
 export async function toggleSharePresentation(presentationId, title = null, additionalClassIds = []) {

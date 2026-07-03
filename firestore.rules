@@ -128,7 +128,31 @@ service cloud.firestore {
     function presentationRead() {
       return isClassTeacher(resource.data.classId)
         || isStudentClassTeacher(resource.data.studentId)
-        || (isStudentAuth() && isStudentOwner(resource.data.studentId));
+        || (isStudentAuth() && isStudentOwner(resource.data.studentId))
+        || presentationSharedToReaderClass();
+    }
+
+    function studentAuthClassId() {
+      return get(/databases/$(database)/documents/student_auth/$(request.auth.uid)).data.classId;
+    }
+
+    function hasStudentAuthIndex() {
+      return isStudentAuth()
+        && exists(/databases/$(database)/documents/student_auth/$(request.auth.uid));
+    }
+
+    /** 같은 반 공유 또는 sharedClassIds에 내 반이 포함된 크로스클래스 공유 */
+    function presentationSharedToReaderClass() {
+      return resource.data.shared == true
+        && hasStudentAuthIndex()
+        && (
+          studentAuthClassId() == resource.data.classId
+          || (
+            resource.data.keys().hasAny(['sharedClassIds'])
+            && resource.data.sharedClassIds is list
+            && studentAuthClassId() in resource.data.sharedClassIds
+          )
+        );
     }
 
     function presentationTeacherWrite() {
@@ -193,6 +217,18 @@ service cloud.firestore {
         && request.resource.data.createdAt == resource.data.createdAt
         && changedOnly(['name', 'color', 'order', 'activeQuizId']);
       allow delete: if isTeacherUid(resource.data.teacherId);
+    }
+
+    match /student_auth/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow create, update: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.studentId is string
+        && request.resource.data.classId is string
+        && exists(studentRef(request.resource.data.studentId))
+        && get(studentRef(request.resource.data.studentId)).data.authUid == request.auth.uid
+        && get(studentRef(request.resource.data.studentId)).data.classId == request.resource.data.classId;
+      allow delete: if false;
     }
 
     match /students/{studentId} {
