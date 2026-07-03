@@ -11,7 +11,7 @@ import {
   enrichPresentationsWithImageUrls, presentationWhiteboardImageUrl,
   problemPromptHasModelAnswer, presentationHasWhiteboardImage,
   isProblemSolutionPresentation, presentationHasSharedFeedback,
-  groupProblemSolutionsByPrompt,
+  groupProblemSolutionsByPrompt, getUnmatchedProblemSolutions,
 } from '../../store.js';
 import { escapeHtml } from '../../utils/quizMath.js';
 import { bindClipboardPasteZone } from '../../utils/clipboardPaste.js';
@@ -81,6 +81,7 @@ export function renderAssignMode(container, params) {
     // 한 문제 풀이 타입 필터링 및 문제별 그룹화 (legacy problemPromptId 호환)
     const problemSolutions = allPresentations.filter((p) => isProblemSolutionPresentation(p));
     const solutionsByProblem = groupProblemSolutionsByPrompt(problemSolutions, problemPrompts);
+    const unmatchedProblemSolutions = getUnmatchedProblemSolutions(solutionsByProblem);
 
     currentObservations = observations;
     currentProblemPrompts = problemPrompts;
@@ -504,6 +505,27 @@ export function renderAssignMode(container, params) {
                   <div style="font-size: 0.78rem; color: var(--text-dim);">등록: ${formatDate(pr.createdAt)}</div>
                 </div>`;
               }).join('')}
+              ${unmatchedProblemSolutions.length > 0 ? `
+                <div class="card" style="padding: var(--s-6); border-top: 4px solid var(--error);">
+                  <h3 style="font-size: 1rem; font-weight: 700; margin-bottom: 8px;">⚠️ 문제와 연결되지 않은 풀이 (${unmatchedProblemSolutions.length}건)</h3>
+                  <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: var(--s-3);">삭제된 문제 id로 저장됐거나 제목이 달라 자동 연결되지 않은 풀이입니다. 데이터는 Firestore에 남아 있습니다.</p>
+                  <div style="display:flex;flex-direction:column;gap:6px;max-height:320px;overflow-y:auto;">
+                    ${unmatchedProblemSolutions.map((sol) => {
+                      const wbUrl = presentationWhiteboardImageUrl(sol);
+                      const avUrl = typeof sol.audioData?.url === 'string' ? escapeAttr(sol.audioData.url) : '';
+                      const wbUrlAttr = wbUrl ? escapeAttr(wbUrl) : '';
+                      return `
+                        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:8px 12px;background:var(--bg-main);border-radius:var(--r-sm);border:1px solid var(--border-subtle);">
+                          <span style="font-weight:700;font-size:0.88rem;color:var(--primary);">${escapeHtml(sol.studentName || '—')}</span>
+                          <span style="font-size:0.72rem;color:var(--text-dim);">${formatDate(sol.createdAt)}</span>
+                          ${sol.title ? `<span style="font-size:0.72rem;color:var(--text-muted);">${escapeHtml(sol.title)}</span>` : ''}
+                          ${sol.problemPromptId ? `<span style="font-size:0.68rem;color:var(--text-dim);">id: ${escapeHtml(String(sol.problemPromptId).slice(0, 12))}…</span>` : ''}
+                          ${wbUrl ? `<button type="button" class="btn btn-ghost btn-sm" style="font-size:0.72rem;" onclick="window.open('${wbUrl}','_blank')">🖼️ 칠판</button>` : ''}
+                          ${avUrl ? `<button type="button" class="btn btn-secondary btn-sm play-video-btn prob-play-btn" style="font-size:0.72rem;" data-url="${avUrl}" data-wb-url="${wbUrlAttr}" data-recording-mode="${escapeAttr(sol.recordingMode || 'audio')}">🔊 재생</button>` : ''}
+                        </div>`;
+                    }).join('')}
+                  </div>
+                </div>` : ''}
             </div>
           </div>
 

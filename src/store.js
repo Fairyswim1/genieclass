@@ -664,7 +664,8 @@ export async function getLessonPresentationsByStudent(studentId, classId = null)
 }
 
 export async function getPresentationsByClass(classId) {
-    const q = query(collection(db, COLLECTIONS.PRESENTATIONS), where('classId', '==', classId));
+    if (classId == null || classId === '') return [];
+    const q = query(collection(db, COLLECTIONS.PRESENTATIONS), where('classId', '==', String(classId)));
     const snapshot = await getDocs(q);
     return snapshot.docs.map(normalizePresentationDoc);
 }
@@ -1008,7 +1009,22 @@ export function problemPromptIdMatches(prompt, problemPromptId) {
     return false;
 }
 
-/** 학생 풀이를 출제 문제 id 기준으로 묶음 (legacy problemPromptId 호환) */
+/** 풀이 제목 ↔ 출제 문제 제목 (삭제 후 재등록·id 불일치 복구용) */
+export function presentationTitleMatchesPrompt(pres, prompt) {
+    const pt = String(prompt?.title || '').trim();
+    const st = String(pres?.title || '').trim();
+    if (!pt || !st || st === '한 문제 풀이') return false;
+    return pt === st;
+}
+
+/** problemPromptId가 현재 반 출제 목록 중 어느 문제와도 맞지 않으면 true (삭제된 문제 id 등) */
+export function isOrphanProblemPromptId(problemPromptId, problemPrompts = []) {
+    const pid = String(problemPromptId || '').trim();
+    if (!pid || !Array.isArray(problemPrompts) || !problemPrompts.length) return false;
+    return !problemPrompts.some((pr) => problemPromptIdMatches(pr, pid));
+}
+
+/** 학생 풀이를 출제 문제 id 기준으로 묶음 (legacy id·제목·단일 문제 폴백) */
 export function groupProblemSolutionsByPrompt(problemSolutions, problemPrompts) {
     const map = {};
     for (const pr of problemPrompts) {
@@ -1026,12 +1042,32 @@ export function groupProblemSolutionsByPrompt(problemSolutions, problemPrompts) 
             orphans.push(sol);
         }
     }
-    if (orphans.length && problemPrompts.length === 1) {
+    let stillOrphans = [];
+    for (const sol of orphans) {
+        const byTitle = problemPrompts.filter((pr) =>
+            presentationTitleMatchesPrompt(sol, pr));
+        if (byTitle.length === 1) {
+            const key = String(byTitle[0].id);
+            if (!map[key]) map[key] = [];
+            map[key].push(sol);
+        } else {
+            stillOrphans.push(sol);
+        }
+    }
+    if (stillOrphans.length && problemPrompts.length === 1) {
         const key = String(problemPrompts[0].id);
         if (!map[key]) map[key] = [];
-        map[key].push(...orphans);
+        map[key].push(...stillOrphans);
+        stillOrphans = [];
     }
+    map.__unmatched = stillOrphans;
     return map;
+}
+
+/** groupProblemSolutionsByPrompt 결과에서 아직 연결되지 않은 풀이 */
+export function getUnmatchedProblemSolutions(solutionsByProblem) {
+    if (!solutionsByProblem || typeof solutionsByProblem !== 'object') return [];
+    return Array.isArray(solutionsByProblem.__unmatched) ? solutionsByProblem.__unmatched : [];
 }
 
 export async function getProblemPromptsByClass(classId) {
@@ -1045,9 +1081,13 @@ export async function getProblemPromptsByClass(classId) {
 
 export async function getProblemPromptById(promptId) {
     if (!promptId) return null;
-    const docSnap = await getDoc(doc(db, COLLECTIONS.PROBLEM_PROMPTS, promptId));
-    if (!docSnap.exists()) return null;
-    return normalizeProblemPromptDoc(docSnap);
+    const pid = String(promptId);
+    const docSnap = await getDoc(doc(db, COLLECTIONS.PROBLEM_PROMPTS, pid));
+    if (docSnap.exists()) return normalizeProblemPromptDoc(docSnap);
+    const q = query(collection(db, COLLECTIONS.PROBLEM_PROMPTS), where('id', '==', pid));
+    const snapshot = await getDocs(q);
+    if (!snapshot.empty) return normalizeProblemPromptDoc(snapshot.docs[0]);
+    return null;
 }
 
 export async function deleteProblemPrompt(promptId) {
@@ -1861,10 +1901,12 @@ export function presentationHasWhiteboardImage(pres) {
     return id != null && String(id).trim() !== '';
 }
 
-/** 한 문제 풀이 제출물인지 (구버전 type 누락 시 problemPromptId로 판별) */
+/** 한 문제 풀이 제출물인지 (구버전 type 누락 시 problemPromptId·solutionSource로 판별) */
 export function isProblemSolutionPresentation(pres) {
     if (!pres || typeof pres !== 'object') return false;
+    if (pres.type === 'observation') return false;
     if (pres.type === 'problem_solution') return true;
+    if (pres.solutionSource === 'photo' || pres.solutionSource === 'whiteboard') return true;
     return pres.problemPromptId != null && String(pres.problemPromptId).trim() !== '';
 }
 
@@ -1873,11 +1915,21 @@ export function presentationMatchesProblemPrompt(pres, prompt, allPrompts = []) 
     if (!pres || !prompt || !isProblemSolutionPresentation(pres)) return false;
     const promptId = String(prompt.id || '').trim();
     if (!promptId) return false;
+    const prompts = Array.isArray(allPrompts) ? allPrompts : [];
     const pid = String(pres.problemPromptId || '').trim();
-    if (pid) return problemPromptIdMatches(prompt, pid);
-    if (Array.isArray(allPrompts) && allPrompts.length === 1) {
-        return String(allPrompts[0].id) === promptId;
+    if (pid) {
+        if (problemPromptIdMatches(prompt, pid)) return true;
+        const matchesOther = prompts.some(
+            (pr) => String(pr.id) !== promptId && problemPromptIdMatches(pr, pid),
+        );
+        if (matchesOther) return false;
+        if (isOrphanProblemPromptId(pid, prompts)) {
+            return presentationTitleMatchesPrompt(pres, prompt);
+        }
+        return false;
     }
+    if (presentationTitleMatchesPrompt(pres, prompt)) return true;
+    if (prompts.length === 1 && String(prompts[0].id) === promptId) return true;
     return false;
 }
 
