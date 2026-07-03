@@ -22,6 +22,7 @@ import {
   presentationHasWhiteboardImage,
   isProblemSolutionPresentation,
   mergePresentationsById,
+  presentationHasSharedFeedback,
   getClassesByTeacher,
 } from '../../store.js';
 import { escapeHtml, renderQuizMath } from '../../utils/quizMath.js';
@@ -395,11 +396,7 @@ export function renderStudentDashboard(container) {
         ? sols.slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))[0]
         : null;
       const hasSol = !!sol;
-      const wbUrlMine = presentationWhiteboardImageUrl(sol);
-      const canAiFeedback =
-        problemPromptHasModelAnswer(pr)
-        && hasSol
-        && presentationHasWhiteboardImage(sol);
+      const hasSharedFeedback = hasSol && presentationHasSharedFeedback(sol);
 
       // 친구들의 공유된 풀이 (problem_solution 타입, 같은 problemPromptId)
       const friendSols = allPresentations.filter((p) =>
@@ -411,7 +408,7 @@ export function renderStudentDashboard(container) {
 
       return `
                     <article class="student-problem-row interactive-item">
-                      <div>
+                      <div class="student-problem-row__main">
                         <div style="font-weight: 700; font-size: 0.95rem;">${escapeHtml(pr.title || '제목 없음')}</div>
                         ${pr.description ? `<div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px; white-space: pre-line;">${escapeHtml(pr.description)}</div>` : ''}
                         ${pr.files && pr.files.length ? `
@@ -419,15 +416,18 @@ export function renderStudentDashboard(container) {
                             ${pr.files.map((f) => `<button type="button" class="btn btn-secondary btn-sm" style="font-size: 0.72rem;" onclick="window.downloadFile('${f.id}')">📎 ${escapeHtml(f.name)}</button>`).join('')}
                           </div>` : ''}
                       </div>
-                      <div class="flex flex-wrap gap-sm items-center justify-end">
+                      <div class="student-problem-row__actions">
                         ${hasSol ? `<span class="badge badge-green">풀이 저장됨</span>
                           <button type="button" class="btn btn-ghost btn-sm btn-delete-my-problem-sol" data-id="${sol.id}" style="color: var(--error);">🗑️ 내 풀이 삭제</button>
                           <button type="button" class="btn btn-ghost btn-sm btn-toggle-share" data-id="${sol.id}" data-shared="${sol.shared ? 'true' : 'false'}">${sol.shared ? '🔒 공유 끄기' : '🌐 공유하기'}</button>` : ''}
-                        ${canAiFeedback
-    ? `<button type="button" class="btn btn-secondary btn-sm btn-problem-ai-feedback" data-prompt-id="${pr.id}" data-solution-id="${sol.id}" title="모범답안 기준 피드백">✨ 피드백</button>`
-    : (problemPromptHasModelAnswer(pr) && hasSol && !presentationHasWhiteboardImage(sol)
-      ? `<span style="font-size:0.72rem;color:var(--text-dim);">풀이 이미지가 필요해 AI 피드백을 쓸 수 없어요</span>`
+                        ${hasSharedFeedback
+    ? `<button type="button" class="btn btn-secondary btn-sm btn-view-problem-feedback" data-solution-id="${sol.id}" title="선생님이 공유한 AI 피드백">✨ 선생님 피드백</button>`
+    : (hasSol
+      ? `<span style="font-size:0.72rem;color:var(--text-dim);">선생님 AI 피드백 대기 중</span>`
       : '')}
+                        ${problemPromptHasModelAnswer(pr) && hasSol && !presentationHasWhiteboardImage(sol)
+      ? `<span style="font-size:0.72rem;color:var(--text-dim);">풀이 이미지 없음</span>`
+      : ''}
                         <button type="button" class="btn btn-primary btn-sm btn-open-problem-board" data-prompt-id="${pr.id}">
                           ${hasSol
     ? (sol.solutionSource === 'photo'
@@ -1656,14 +1656,12 @@ export function renderStudentDashboard(container) {
       });
     });
 
-    document.querySelectorAll('.btn-problem-ai-feedback').forEach((btn) => {
+    document.querySelectorAll('.btn-view-problem-feedback').forEach((btn) => {
       btn.addEventListener('click', async () => {
-        const pid = btn.dataset.promptId;
         const sid = btn.dataset.solutionId;
-        const pr = problemPrompts.find((p) => String(p.id) === String(pid));
         const sol = allPresentations.find((p) => String(p.id) === String(sid));
         await openProblemAiFeedbackModal({
-          problemPrompt: pr,
+          problemPrompt: null,
           solution: sol,
           triggerButton: btn,
           audience: 'student',

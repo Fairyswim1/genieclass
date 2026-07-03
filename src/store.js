@@ -192,6 +192,20 @@ export function getCurrentTeacher() {
     return u;
 }
 
+/** Firestore/Storage 쓰기 전 교사 Google 인증 확인 (발표·관찰·파일 업로드 등) */
+export async function ensureTeacherFirebaseAuth() {
+    await auth.authStateReady();
+    const teacher = getCurrentTeacher();
+    if (!teacher?.uid) {
+        throw new Error('교사 Firebase 로그인이 필요합니다. 페이지를 새로고침한 뒤 Google로 다시 로그인해 주세요.');
+    }
+    const token = await auth.currentUser.getIdToken(true);
+    if (!token) {
+        throw new Error('인증 토큰을 가져올 수 없습니다. 다시 로그인해 주세요.');
+    }
+    return teacher;
+}
+
 export async function logoutTeacher() {
     await signOut(auth);
 }
@@ -570,7 +584,10 @@ export async function deleteStudent(studentId) {
 
 // ========== Presentations ==========
 export async function addPresentation(studentId, classId, data) {
-    await ensureStudentWriteIdentity(studentId);
+    const teacher = getCurrentTeacher();
+    if (!teacher) {
+        await ensureStudentWriteIdentity(studentId);
+    }
     const id = generateId();
     const presentation = {
         id,
@@ -884,6 +901,45 @@ export async function fetchProblemSolutionFeedback(payload) {
         throw new Error('피드백 결과가 비어 있습니다.');
     }
     return data.feedback.trim();
+}
+
+/** 교사가 학생 풀이에 남긴 AI 피드백이 공유된 상태인지 */
+export function presentationHasSharedFeedback(pres) {
+    if (!pres || typeof pres !== 'object') return false;
+    if (!pres.feedbackShared) return false;
+    return String(pres.feedback || '').trim().length > 0;
+}
+
+/** 교사: AI 피드백 텍스트 저장 (풀이 문서 feedback 필드) */
+export async function savePresentationAiFeedback(presentationId, feedbackText) {
+    await ensureTeacherFirebaseAuth();
+    const ref = doc(db, COLLECTIONS.PRESENTATIONS, presentationId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) throw new Error('풀이를 찾을 수 없습니다.');
+    const trimmed = String(feedbackText || '').trim();
+    if (!trimmed) throw new Error('저장할 피드백 내용이 없습니다.');
+    await updateDoc(ref, {
+        feedback: trimmed,
+        feedbackAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+    });
+    return { ...snap.data(), id: snap.data().id || snap.id, feedback: trimmed };
+}
+
+/** 교사: 저장된 AI 피드백을 학생에게 공개 */
+export async function setPresentationFeedbackShared(presentationId, shared = true) {
+    await ensureTeacherFirebaseAuth();
+    const ref = doc(db, COLLECTIONS.PRESENTATIONS, presentationId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) throw new Error('풀이를 찾을 수 없습니다.');
+    const data = snap.data();
+    if (shared && !String(data.feedback || '').trim()) {
+        throw new Error('공유할 피드백이 없습니다. 먼저 AI 채점을 실행해 주세요.');
+    }
+    await updateDoc(ref, {
+        feedbackShared: !!shared,
+        updatedAt: new Date().toISOString(),
+    });
 }
 
 export async function getProblemPromptsByClass(classId) {
@@ -1495,14 +1551,7 @@ async function ensureFirebaseUploadAuth() {
     const teacherContext = isTeacherUploadContext();
 
     if (teacherContext) {
-        const teacher = getCurrentTeacher();
-        if (!teacher || !auth.currentUser || auth.currentUser.isAnonymous) {
-            throw new Error('교사 Firebase 로그인이 필요합니다. 다시 로그인해 주세요.');
-        }
-        const token = await auth.currentUser.getIdToken(true);
-        if (!token) {
-            throw new Error('인증 토큰을 가져올 수 없습니다. 다시 로그인해 주세요.');
-        }
+        await ensureTeacherFirebaseAuth();
         return auth.currentUser;
     }
 
@@ -1841,15 +1890,24 @@ export function showToast(message, type = 'success', durationMs = 3000) {
 
 export async function saveObservation(studentId, classId, data) {
     try {
-        const { addDoc, collection, serverTimestamp } = await import('firebase/firestore');
-        const docRef = await addDoc(collection(db, COLLECTIONS.PRESENTATIONS), {
+        const teacher = await ensureTeacherFirebaseAuth();
+        const id = generateId();
+        const observation = {
+            id,
             studentId,
             classId,
             type: 'observation',
-            createdAt: serverTimestamp(),
-            ...data
-        });
-        return { id: docRef.id, ...data };
+            content: data.content || '',
+            mode: data.mode || 'text',
+            studentName: data.studentName || '',
+            authUid: teacher.uid,
+            shared: false,
+            createdAt: new Date().toISOString(),
+        };
+        if (data.audioData) observation.audioData = data.audioData;
+        if (data.durationSeconds != null) observation.durationSeconds = data.durationSeconds;
+        await setDoc(doc(db, COLLECTIONS.PRESENTATIONS, id), observation);
+        return observation;
     } catch (err) {
         console.error('Save observation error:', err);
         throw err;

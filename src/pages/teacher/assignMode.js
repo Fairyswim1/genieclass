@@ -10,7 +10,7 @@ import {
   getPresentationsByClass, toggleSharePresentation, addStudentPoints,
   enrichPresentationsWithImageUrls, presentationWhiteboardImageUrl,
   problemPromptHasModelAnswer, presentationHasWhiteboardImage,
-  isProblemSolutionPresentation,
+  isProblemSolutionPresentation, presentationHasSharedFeedback,
 } from '../../store.js';
 import { escapeHtml } from '../../utils/quizMath.js';
 import { bindClipboardPasteZone } from '../../utils/clipboardPaste.js';
@@ -485,16 +485,19 @@ export function renderAssignMode(container, params) {
                             const avUrl = typeof sol.audioData?.url === 'string' ? escapeAttr(sol.audioData.url) : '';
                             const isVideo = sol.recordingMode === 'video';
                             const canAiFeedback = problemPromptHasModelAnswer(pr) && presentationHasWhiteboardImage(sol);
+                            const hasSavedFeedback = String(sol.feedback || '').trim().length > 0;
+                            const feedbackShared = !!sol.feedbackShared;
                             return `
                               <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:8px 12px;background:var(--bg-main);border-radius:var(--r-sm);border:1px solid var(--border-subtle);">
                                 <span style="font-weight:700;font-size:0.88rem;color:var(--primary);min-width:72px;">${escapeHtml(sol.studentName || '—')}</span>
                                 <span style="font-size:0.72rem;color:var(--text-dim);">${formatDate(sol.createdAt)}</span>
                                 <span class="badge ${sol.shared ? 'badge-green' : 'badge-main'}" style="font-size:0.62rem;">${sol.shared ? '공개' : '비공개'}</span>
+                                ${hasSavedFeedback ? `<span class="badge ${feedbackShared ? 'badge-green' : 'badge-purple'}" style="font-size:0.62rem;">${feedbackShared ? '피드백 공유됨' : '피드백 저장'}</span>` : ''}
                                 ${sol.solutionSource === 'photo' ? '<span class="badge badge-blue" style="font-size:0.62rem;">📷사진</span>' : ''}
                                 ${wbUrl ? `<button type="button" class="btn btn-ghost btn-sm" style="font-size:0.72rem;" onclick="window.open('${wbUrl}','_blank')">🖼️ 칠판 보기</button>` : ''}
                                 ${avUrl ? `<button type="button" class="btn btn-secondary btn-sm play-video-btn prob-play-btn" style="font-size:0.72rem;" data-url="${avUrl}" data-wb-url="${wbUrlAttr}" data-recording-mode="${escapeAttr(sol.recordingMode || 'audio')}">${isVideo ? '🎬 영상' : '🔊 음성'}</button>` : ''}
-                                ${canAiFeedback
-    ? `<button type="button" class="btn btn-secondary btn-sm btn-teacher-prob-ai-feedback" data-prompt-id="${escapeAttr(pr.id)}" data-solution-id="${escapeAttr(sol.id)}" title="모범답안 기준 AI 피드백">✨ AI 피드백</button>`
+                                ${canAiFeedback || hasSavedFeedback
+    ? `<button type="button" class="btn btn-secondary btn-sm btn-teacher-prob-ai-feedback" data-prompt-id="${escapeAttr(pr.id)}" data-solution-id="${escapeAttr(sol.id)}" title="모범답안 기준 AI 채점">${hasSavedFeedback ? '📋 AI 채점 보기' : '✨ AI 채점'}</button>`
     : (problemPromptHasModelAnswer(pr) && !presentationHasWhiteboardImage(sol)
       ? '<span style="font-size:0.68rem;color:var(--text-dim);">풀이 이미지 없음</span>'
       : '')}
@@ -898,6 +901,7 @@ export function renderAssignMode(container, params) {
           solution: sol,
           triggerButton: btn,
           audience: 'teacher',
+          onUpdated: () => render(),
         });
       });
     });

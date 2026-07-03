@@ -16,21 +16,49 @@
 
 const OPENAI_CHAT = 'https://api.openai.com/v1/chat/completions';
 
-const SYSTEM_PROMPT = [
+const BASE_SYSTEM_PROMPT = [
   '역할: 대한민국의 중등·고등 과정 수학·과학 과목 조교 교사 또는 튜터.',
   '',
   '사용자가 제공하는 [모범답안/참고]와 [학생 풀이 이미지]를 비교하여 피드백합니다.',
-  '',
-  '요구 형식:',
-  '1. **전체 평**: 한 줄로 답 도출 결과·풀이 접근 방향 요약.',
-  '2. **잘한 점**: 구체적으로 2~4개 불릿.',
-  '3. **부족한 점·오개념 가능성**: 구체적으로 2~4개 불릿.',
-  '4. **다음 학습 팁**: 짧게 1~2문장.',
-  '',
   '톤: 격려하되 솔직하게. 문장부호·예시는 과목에 맞게.',
   '이미지의 글씨·기호 일부만 보일 경우 추정임을 간단히 밝히기.',
-  '마크다운 굵게(**) 허용.',
+  '마크다운 굵게(**) 허용. 각 섹션은 충분히 쓰고 중간에 잘리지 않게 완결된 문장으로 마무리.',
 ].join('\n');
+
+const VERBAL_FORMAT = [
+  '요구 형식 (채점·점수 없이 서술형 피드백):',
+  '1. **전체 평**: 2~3문장으로 답 도출 결과·풀이 접근 방향 요약.',
+  '2. **잘한 점**: 구체적으로 2~4개 불릿.',
+  '3. **부족한 점·오개념 가능성**: 구체적으로 2~4개 불릿.',
+  '4. **다음 학습 팁**: 2~3문장.',
+].join('\n');
+
+const SCORING_FORMAT = [
+  '요구 형식 (루브릭·배점·채점 기준이 제공된 경우 — 반드시 점수 포함):',
+  '1. **총점**: 루브릭 만점 대비 획득 점수 (예: **18/20점**). 항목별 만점이 없으면 100점 만점으로 환산.',
+  '2. **항목별 점수**: 루브릭 항목마다 **항목명: 획득/만점** 형식 불릿.',
+  '3. **전체 평**: 2~3문장 요약.',
+  '4. **잘한 점**: 2~4개 불릿.',
+  '5. **부족한 점·감점 사유**: 2~4개 불릿.',
+  '6. **다음 학습 팁**: 2~3문장.',
+  '루브릭에 없는 항목은 임의로 만들지 말 것.',
+].join('\n');
+
+function detectsScoringRubric(body) {
+  const text = [
+    body.problemDescription,
+    body.modelAnswerText,
+    ...(Array.isArray(body.modelAnswerNonImageNotes) ? body.modelAnswerNonImageNotes : []),
+  ]
+    .filter((v) => typeof v === 'string' && v.trim())
+    .join('\n');
+  return /루브릭|rubric|배점|채점\s*기준|평가\s*기준|총\s*점|만점|\d+\s*점\s*[\)\]】]|항목\s*별\s*점|점수\s*배|평가\s*표|기준\s*표|(\d+)\s*\/\s*(\d+)\s*점/i.test(text);
+}
+
+function buildSystemPrompt(body) {
+  const scoring = detectsScoringRubric(body);
+  return [BASE_SYSTEM_PROMPT, '', scoring ? SCORING_FORMAT : VERBAL_FORMAT].join('\n');
+}
 
 function buildScenarioText(body) {
   const lines = [
@@ -253,11 +281,11 @@ async function generateWithGemini(body, geminiKey) {
   parts.push(await fetchUrlAsGeminiInlineImage(body.studentImageUrl, '학생 풀이'));
 
   const payload = {
-    systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+    systemInstruction: { parts: [{ text: buildSystemPrompt(body) }] },
     contents: [{ role: 'user', parts }],
     generationConfig: {
       temperature: 0.5,
-      maxOutputTokens: 2048,
+      maxOutputTokens: 4096,
     },
   };
 
@@ -299,7 +327,7 @@ async function generateWithGemini(body, geminiKey) {
 
 async function generateWithOpenAI(body, openaiKey) {
   const messages = [
-    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'system', content: buildSystemPrompt(body) },
     { role: 'user', content: buildOpenAiUserContent(body) },
   ];
 
@@ -313,7 +341,7 @@ async function generateWithOpenAI(body, openaiKey) {
       model: process.env.PROBLEM_FEEDBACK_MODEL || 'gpt-4o-mini',
       messages,
       temperature: 0.5,
-      max_tokens: 1500,
+      max_tokens: 2800,
     }),
   });
 

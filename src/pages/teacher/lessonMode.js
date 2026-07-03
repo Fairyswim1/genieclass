@@ -339,7 +339,8 @@ export function renderLessonMode(container, params) {
         showToast('성공적으로 기록되었습니다! ✨');
         document.getElementById('observation-modal').classList.remove('active');
       } catch (err) {
-        showToast('저장 실패', 'error');
+        console.error('Save observation error:', err);
+        showToast(err?.message || '저장 실패', 'error');
       } finally {
         saveBtn.disabled = false;
         saveBtn.textContent = '기록 저장하기';
@@ -513,7 +514,7 @@ export function renderLessonMode(container, params) {
       document.getElementById('observation-modal')?.classList.remove('active');
     } catch (err) {
       console.error('[관찰 녹음] 저장 오류:', err);
-      showToast('음성 기록 저장에 실패했습니다.', 'error');
+      showToast(err?.message || '음성 기록 저장에 실패했습니다.', 'error');
     } finally {
       obsIsRecording = false;
       obsNativeRecording = false;

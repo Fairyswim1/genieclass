@@ -299,15 +299,26 @@
 }
 
 .student-problem-row {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 8px 12px;
-    align-items: start;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
     padding: 10px 12px !important;
     margin-bottom: 0 !important;
     border: 1px solid var(--border-subtle);
     border-radius: var(--r-sm);
     background: rgba(255, 255, 255, 0.92);
+}
+
+.student-problem-row__main {
+    min-width: 0;
+}
+
+.student-problem-row__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    justify-content: flex-end;
 }
 
 .student-problem-row__title {

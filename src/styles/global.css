@@ -822,4 +822,81 @@ body {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+/* AI 풀이 피드백 모달 */
+.prob-ai-feedback-backdrop {
+  z-index: 2200;
+  padding: 12px;
+  align-items: center;
+  justify-content: center;
+}
+
+.prob-ai-feedback-modal {
+  width: min(760px, 96vw);
+  max-width: none;
+  max-height: min(92dvh, 900px);
+  padding: var(--s-6) var(--s-8);
+  overflow: hidden;
+}
+
+.prob-ai-feedback-modal__head {
+  margin-bottom: var(--s-3);
+}
+
+.prob-ai-feedback-modal__hint {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  margin: 0 0 var(--s-4);
+  line-height: 1.5;
+  flex-shrink: 0;
+}
+
+.prob-ai-feedback-modal__body {
+  flex: 1 1 auto;
+  min-height: 180px;
+  max-height: none;
+  overflow-y: auto;
+  overflow-x: hidden;
+  font-size: 0.92rem;
+  line-height: 1.65;
+  color: var(--text-main);
+  padding: var(--s-4);
+  background: var(--bg-card, rgba(255, 255, 255, 0.6));
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  word-break: break-word;
+}
+
+.prob-ai-feedback-modal__body strong {
+  font-weight: 700;
+}
+
+.prob-ai-feedback-modal__loading {
+  flex-shrink: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-top: var(--s-3);
+  min-height: 1.2em;
+}
+
+.prob-ai-feedback-modal__actions {
+  flex-shrink: 0;
+  margin-top: var(--s-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.prob-ai-feedback-modal__status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.prob-ai-feedback-modal__btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
 }
