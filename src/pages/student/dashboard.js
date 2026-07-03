@@ -429,12 +429,14 @@ export function renderStudentDashboard(container) {
       return `
                     <article class="student-problem-row interactive-item">
                       <div class="student-problem-row__main">
-                        <div style="font-weight: 700; font-size: 0.95rem;">${escapeHtml(pr.title || '제목 없음')}</div>
-                        ${pr.description ? `<div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px; white-space: pre-line;">${escapeHtml(pr.description)}</div>` : ''}
-                        ${pr.files && pr.files.length ? `
-                          <div class="flex gap-sm flex-wrap" style="margin-top: 8px;">
+                        <div class="student-problem-row__head">
+                          <h3 class="student-problem-row__title">${escapeHtml(pr.title || '제목 없음')}</h3>
+                          ${pr.files && pr.files.length ? `
+                          <div class="student-problem-row__files">
                             ${pr.files.map((f) => `<button type="button" class="btn btn-secondary btn-sm" style="font-size: 0.72rem;" onclick="window.downloadFile('${f.id}')">📎 ${escapeHtml(f.name)}</button>`).join('')}
                           </div>` : ''}
+                        </div>
+                        ${pr.description ? `<p class="student-problem-row__desc">${escapeHtml(pr.description)}</p>` : ''}
                       </div>
                       <div class="student-problem-row__actions">
                         ${hasSol ? `<span class="badge badge-green">풀이 저장됨</span>
@@ -443,10 +445,10 @@ export function renderStudentDashboard(container) {
                         ${hasSharedFeedback
     ? `<button type="button" class="btn btn-secondary btn-sm btn-view-problem-feedback" data-solution-id="${sol.id}" title="선생님이 공유한 AI 피드백">✨ 선생님 피드백</button>`
     : (hasSol
-      ? `<span style="font-size:0.72rem;color:var(--text-dim);">선생님 AI 피드백 대기 중</span>`
+      ? `<span class="student-problem-row__hint">선생님 AI 피드백 대기 중</span>`
       : '')}
                         ${problemPromptHasModelAnswer(pr) && hasSol && !presentationHasWhiteboardImage(sol)
-      ? `<span style="font-size:0.72rem;color:var(--text-dim);">풀이 이미지 없음</span>`
+      ? `<span class="student-problem-row__hint">풀이 이미지 없음</span>`
       : ''}
                         <button type="button" class="btn btn-primary btn-sm btn-open-problem-board" data-prompt-id="${pr.id}">
                           ${hasSol
@@ -457,7 +459,7 @@ export function renderStudentDashboard(container) {
                         </button>
                       </div>
                       ${friendSols.length > 0 ? `
-                      <div style="border-top: 1px solid var(--border-subtle); padding-top: 8px; margin-top: 2px;">
+                      <div class="student-problem-friends">
                         <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); margin-bottom: 6px;">친구들의 풀이 (${friendSols.length})</div>
                         <div class="student-problem-friends__list">
                           ${friendSols.map((fs) => `
