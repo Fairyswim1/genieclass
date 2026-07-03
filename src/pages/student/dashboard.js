@@ -26,7 +26,7 @@ import {
 } from '../../store.js';
 import { escapeHtml, renderQuizMath } from '../../utils/quizMath.js';
 import { bindClipboardPasteZone } from '../../utils/clipboardPaste.js';
-import { renderCharacter, getLevelConfig, PLANT_TYPES, getLevelProgress } from '../../components/characterAvatar.js';
+import { renderCharacter, getLevelConfig, PLANT_TYPES, getLevelProgress, renderCharacterPreview } from '../../components/characterAvatar.js';
 import { Capacitor } from '@capacitor/core';
 import { VoiceRecorder } from 'capacitor-voice-recorder';
 
@@ -728,7 +728,7 @@ export function renderStudentDashboard(container) {
           <div class="grid" style="grid-template-columns: repeat(5, 1fr); gap: var(--s-3); margin-bottom: var(--s-6);">
             ${Object.entries(PLANT_TYPES).map(([id, info]) => `
               <div class="card selection-card ${freshStudent.characterType === id ? 'current' : ''}" data-type="${id}" style="cursor: pointer; padding: var(--s-3) var(--s-2); transition: all 0.3s var(--ease-out); border: 2px solid var(--border-main); min-width: 0;">
-                <div style="font-size: 2rem; margin-bottom: 4px;">${info.icon}</div>
+                <div class="selection-card-preview" style="display: flex; justify-content: center; margin-bottom: 4px;">${renderCharacterPreview(id, 52)}</div>
                 <div style="font-family: var(--font-title); font-size: 0.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${info.name}</div>
               </div>
             `).join('')}

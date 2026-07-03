@@ -3,6 +3,14 @@
 // 성장하는 귀여운 반려 식물들
 // ========================================
 
+const CHAR_BASE = `${import.meta.env.BASE_URL || '/'}characters`;
+
+/** public/characters/{type}/lv1.png … lv8.png 가 있는 과일 */
+const CHARACTER_IMAGE_TYPES = new Set([
+  'apple', 'banana', 'blueberry', 'cherry', 'coconut', 'grape', 'lemon',
+  'mango', 'melon', 'peach', 'pineapple', 'strawberry', 'tangerine', 'watermelon',
+]);
+
 const PLANT_TYPES = {
   apple: { name: '사과나무', icon: '🍎' },
   grape: { name: '포도나무', icon: '🍇' },
@@ -18,7 +26,7 @@ const PLANT_TYPES = {
   lemon: { name: '레몬', icon: '🍋' },
   blueberry: { name: '블루베리', icon: '🫐' },
   coconut: { name: '코코넛', icon: '🥥' },
-  mango: { name: '망고', icon: '🥭' }
+  mango: { name: '망고', icon: '🥭' },
 };
 
 /** Lv1~8 표시용 (씨앗 → 새싹 → 줄기 → 꽃 → 열매×3 → 나무) */
@@ -30,12 +38,10 @@ const GROWTH_STAGES = {
   5: { name: '열매 1개', badge: '✨', glow: 'rgba(255, 204, 102, 0.45)' },
   6: { name: '열매 2개', badge: '✨', glow: 'rgba(255, 204, 102, 0.48)' },
   7: { name: '열매 3개', badge: '✨', glow: 'rgba(255, 204, 102, 0.5)' },
-  8: { name: '우거진 나무', badge: '🌳', glow: 'rgba(120, 180, 140, 0.5)' }
+  8: { name: '우거진 나무', badge: '🌳', glow: 'rgba(120, 180, 140, 0.5)' },
 };
 
-/**
- * 단계별 에셋 인덱스: 0씨앗 1새싹 2줄기 3꽃 456열매(동일 아이콘×단계) 7나무
- */
+/** 이모지 폴백용 (바오밥 등 이미지 없는 타입) */
 const PLANT_LEVEL_ASSETS = {
   apple: ['🌰', '🌱', '🌿', '🌸', '🍎', '🍎', '🍎', '🌳'],
   grape: ['🌰', '🌱', '🌿', '🌸', '🍇', '🍇', '🍇', '🌳'],
@@ -51,16 +57,12 @@ const PLANT_LEVEL_ASSETS = {
   lemon: ['🌰', '🌱', '🌿', '🌸', '🍋', '🍋', '🍋', '🌳'],
   blueberry: ['🌰', '🌱', '🌿', '🌸', '🫐', '🫐', '🫐', '🌳'],
   coconut: ['🌰', '🌱', '🌿', '🌸', '🥥', '🥥', '🥥', '🌳'],
-  mango: ['🌰', '🌱', '🌿', '🌸', '🥭', '🥭', '🥭', '🌳']
+  mango: ['🌰', '🌱', '🌿', '🌸', '🥭', '🥭', '🥭', '🌳'],
 };
 
 /** 최고 단계 (Lv.8 = 나무) */
 export const MAX_CHARACTER_LEVEL = 8;
 
-/**
- * 다음 레벨까지 필요한 포인트(간격): 2→2→1→1→2→2 를 순환
- * 누적 기준 시작점 thresholds[0]=0(Lv1) … thresholds[7]=Lv8 도달점
- */
 const LEVEL_POINT_GAPS = [2, 2, 1, 1, 2, 2];
 
 function buildCumulativeThresholds(maxLevel, gaps) {
@@ -73,10 +75,8 @@ function buildCumulativeThresholds(maxLevel, gaps) {
   return thresholds;
 }
 
-/** 누적 포인트 구간 시작점 [Lv1 … Lv8] — Lv8 도달까지 총 12P 필요 (패턴 간격 합계) */
 export const LEVEL_THRESHOLDS = buildCumulativeThresholds(MAX_CHARACTER_LEVEL, LEVEL_POINT_GAPS);
 
-/** 총 포인트로 레벨 1~8 산정 (Firestore characterLevel 과 맞춤) */
 export function deriveCharacterLevelFromPoints(totalPoints) {
   const pts = Math.max(0, Number(totalPoints) || 0);
   let level = 1;
@@ -100,7 +100,6 @@ export function getLevelProgress(totalPoints) {
     ? (pointsInCurrentLevel / pointsNeededForNext) * 100
     : 100;
   const remainingPoints = level < MAX_CHARACTER_LEVEL ? nextThreshold - pts : 0;
-
   const fruitCount = level >= 5 && level <= 7 ? level - 4 : 0;
 
   return {
@@ -110,6 +109,16 @@ export function getLevelProgress(totalPoints) {
     isMaxLevel: level === MAX_CHARACTER_LEVEL,
     fruitCount,
   };
+}
+
+export function hasCharacterImages(type) {
+  return CHARACTER_IMAGE_TYPES.has(type);
+}
+
+export function getCharacterImageUrl(type, level) {
+  if (!hasCharacterImages(type)) return '';
+  const safeLevel = Math.min(MAX_CHARACTER_LEVEL, Math.max(1, level));
+  return `${CHAR_BASE}/${type}/lv${safeLevel}.png`;
 }
 
 export function getLevelConfig(level, type = 'apple') {
@@ -122,46 +131,54 @@ export function getLevelConfig(level, type = 'apple') {
     ...stage,
     fullName: `${stage.name}(${plantName})`,
     emoji,
+    imageUrl: getCharacterImageUrl(type, safe),
   };
+}
+
+function renderEmojiFallback(type, safeLevel, size) {
+  const assets = PLANT_LEVEL_ASSETS[type] || PLANT_LEVEL_ASSETS.apple;
+  const fontSize = size * 0.6;
+  const fruitEmoji = assets[4] || '🍎';
+  const treeEmoji = assets[7] || '🌳';
+  const plantIcon = PLANT_TYPES[type]?.icon || '🍎';
+  const fruitOnTree = fruitEmoji === treeEmoji ? plantIcon : fruitEmoji;
+
+  if (safeLevel <= 4) {
+    const emoji = assets[safeLevel - 1] || '🌰';
+    return `<div style="font-size: ${fontSize}px;">${emoji}</div>`;
+  }
+  if (safeLevel === 5) {
+    return `<div style="font-size: ${fontSize}px;">${fruitEmoji}</div>`;
+  }
+  if (safeLevel === 6) {
+    return `<div style="font-size: ${fontSize * 0.85}px; display: flex; gap: 4px;">${fruitEmoji}<span>${fruitEmoji}</span></div>`;
+  }
+  if (safeLevel === 7) {
+    return `<div style="display: flex; flex-direction: column; align-items: center; gap: -5px;">
+        <div style="font-size: ${fontSize * 0.65}px; display: flex; gap: 2px;">${fruitEmoji}${fruitEmoji}</div>
+        <div style="font-size: ${fontSize * 0.65}px;">${fruitEmoji}</div>
+      </div>`;
+  }
+  return `<div style="font-size: ${fontSize * 1.08}px; position: relative; display: inline-flex; align-items: center; justify-content: center; line-height: 1;">
+      <span aria-hidden="true">${treeEmoji}</span>
+      <div style="position: absolute; top: 14%; left: 50%; transform: translateX(-50%); width: 78%; display: flex; justify-content: space-around; align-items: flex-start; flex-wrap: wrap; gap: 2px; pointer-events: none;" aria-hidden="true">
+        <span style="font-size: 0.34em; line-height: 1; filter: drop-shadow(1px 1px 1px rgba(0,0,0,0.2));">${fruitOnTree}</span>
+        <span style="font-size: 0.38em; line-height: 1; filter: drop-shadow(1px 1px 1px rgba(0,0,0,0.2)); margin-top: 1px;">${fruitOnTree}</span>
+        <span style="font-size: 0.34em; line-height: 1; filter: drop-shadow(1px 1px 1px rgba(0,0,0,0.2));">${fruitOnTree}</span>
+      </div>
+    </div>`;
 }
 
 export function renderCharacter(level, size = 80, type = 'apple', _totalPoints = 0) {
   if (!PLANT_TYPES[type]) type = 'apple';
   const safeLevel = Math.min(MAX_CHARACTER_LEVEL, Math.max(1, level));
   const config = getLevelConfig(safeLevel, type);
-  const fontSize = size * 0.6;
   const glowSize = size * 0.8;
+  const imageUrl = getCharacterImageUrl(type, safeLevel);
 
-  const assets = PLANT_LEVEL_ASSETS[type] || PLANT_LEVEL_ASSETS.apple;
-  const fruitEmoji = assets[4] || '🍎';
-  const treeEmoji = assets[7] || '🌳';
-  const plantIcon = PLANT_TYPES[type]?.icon || '🍎';
-  /** 나무 꼭대기 장식용: 열매와 나무 이모지가 같을 때(바오밥 등)는 과일 종류 아이콘 */
-  const fruitOnTree = fruitEmoji === treeEmoji ? plantIcon : fruitEmoji;
-
-  let content = '';
-  if (safeLevel <= 4) {
-    const emoji = assets[safeLevel - 1] || '🌰';
-    content = `<div style="font-size: ${fontSize}px;">${emoji}</div>`;
-  } else if (safeLevel === 5) {
-    content = `<div style="font-size: ${fontSize}px;">${fruitEmoji}</div>`;
-  } else if (safeLevel === 6) {
-    content = `<div style="font-size: ${fontSize * 0.85}px; display: flex; gap: 4px;">${fruitEmoji}<span>${fruitEmoji}</span></div>`;
-  } else if (safeLevel === 7) {
-    content = `<div style="display: flex; flex-direction: column; align-items: center; gap: -5px;">
-        <div style="font-size: ${fontSize * 0.65}px; display: flex; gap: 2px;">${fruitEmoji}${fruitEmoji}</div>
-        <div style="font-size: ${fontSize * 0.65}px;">${fruitEmoji}</div>
-      </div>`;
-  } else {
-    content = `<div style="font-size: ${fontSize * 1.08}px; position: relative; display: inline-flex; align-items: center; justify-content: center; line-height: 1;">
-        <span aria-hidden="true">${treeEmoji}</span>
-        <div style="position: absolute; top: 14%; left: 50%; transform: translateX(-50%); width: 78%; display: flex; justify-content: space-around; align-items: flex-start; flex-wrap: wrap; gap: 2px; pointer-events: none;" aria-hidden="true">
-          <span style="font-size: 0.34em; line-height: 1; filter: drop-shadow(1px 1px 1px rgba(0,0,0,0.2));">${fruitOnTree}</span>
-          <span style="font-size: 0.38em; line-height: 1; filter: drop-shadow(1px 1px 1px rgba(0,0,0,0.2)); margin-top: 1px;">${fruitOnTree}</span>
-          <span style="font-size: 0.34em; line-height: 1; filter: drop-shadow(1px 1px 1px rgba(0,0,0,0.2));">${fruitOnTree}</span>
-        </div>
-      </div>`;
-  }
+  const inner = imageUrl
+    ? `<img class="character-avatar-img" src="${imageUrl}" alt="" width="${size}" height="${size}" decoding="async" style="width: ${size}px; height: ${size}px; object-fit: contain; display: block;" />`
+    : renderEmojiFallback(type, safeLevel, size);
 
   return `
     <div class="character-avatar" style="
@@ -172,7 +189,6 @@ export function renderCharacter(level, size = 80, type = 'apple', _totalPoints =
       justify-content: center; 
       position: relative;
     ">
-      <!-- Glow Effect -->
       <div style="
         position: absolute;
         width: ${glowSize}px;
@@ -182,8 +198,6 @@ export function renderCharacter(level, size = 80, type = 'apple', _totalPoints =
         filter: blur(${size * 0.15}px);
         animation: pulse 3s infinite ease-in-out;
       "></div>
-      
-      <!-- Character Emoji -->
       <div style="
         z-index: 2;
         filter: drop-shadow(2px 4px 4px rgba(62, 54, 46, 0.1));
@@ -195,9 +209,8 @@ export function renderCharacter(level, size = 80, type = 'apple', _totalPoints =
         width: 100%;
         height: 100%;
       ">
-        ${content}
+        ${inner}
       </div>
-      
       <style>
         @keyframes pulse {
           0%, 100% { transform: scale(0.9); opacity: 0.5; }
@@ -206,6 +219,11 @@ export function renderCharacter(level, size = 80, type = 'apple', _totalPoints =
       </style>
     </div>
   `;
+}
+
+/** 식물 선택 카드 등 — 성숙(lv8) 미리보기 */
+export function renderCharacterPreview(type, size = 56) {
+  return renderCharacter(MAX_CHARACTER_LEVEL, size, type);
 }
 
 export function renderPraiseAnimation(container) {
