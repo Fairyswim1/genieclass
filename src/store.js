@@ -696,7 +696,7 @@ export async function toggleSharePresentation(presentationId, title = null, addi
         }
         // 공유 켤 때 추가 클래스 저장, 끌 때 초기화
         if (!currentShared) {
-            updates.sharedClassIds = additionalClassIds.length > 0 ? additionalClassIds : [];
+            updates.sharedClassIds = normalizeSharedClassIds(additionalClassIds);
         } else {
             updates.sharedClassIds = [];
         }
@@ -707,16 +707,42 @@ export async function toggleSharePresentation(presentationId, title = null, addi
     return null;
 }
 
+function normalizeSharedClassIds(classIds) {
+    if (!Array.isArray(classIds)) return [];
+    return [...new Set(classIds.map((id) => String(id).trim()).filter(Boolean))];
+}
+
+/** 공유 상태·크로스클래스 대상 업데이트 (이미 공유 중일 때 반 추가/변경) */
+export async function updatePresentationShareSettings(presentationId, { shared, sharedClassIds, title } = {}) {
+    const ref = doc(db, COLLECTIONS.PRESENTATIONS, presentationId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return null;
+    const data = snap.data();
+    const updates = { updatedAt: new Date().toISOString() };
+    if (typeof shared === 'boolean') updates.shared = shared;
+    if (sharedClassIds !== undefined) {
+        updates.sharedClassIds = normalizeSharedClassIds(sharedClassIds);
+    }
+    if (title != null && String(title).trim()) {
+        updates.title = String(title).trim();
+    }
+    await updateDoc(ref, updates);
+    return { ...data, ...updates, id: data.id || snap.id };
+}
+
 /** 다른 클래스에서 이 classId로 공유된 발표(크로스클래스 공유) 조회 */
 export async function getSharedPresentationsByClassId(classId) {
+    const cid = classId != null ? String(classId).trim() : '';
+    if (!cid) return [];
     const q = query(
         collection(db, COLLECTIONS.PRESENTATIONS),
-        where('sharedClassIds', 'array-contains', classId)
+        where('sharedClassIds', 'array-contains', cid),
+        where('shared', '==', true),
     );
     const snapshot = await getDocs(q);
     return snapshot.docs
         .map(normalizePresentationDoc)
-        .filter(p => p.shared === true && p.type !== 'observation');
+        .filter((p) => p.type !== 'observation' && isLessonPresentation(p));
 }
 
 /** Firestore에 배열·맵으로 저장된 첨부 목록 통일 */

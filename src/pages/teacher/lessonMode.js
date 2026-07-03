@@ -4,7 +4,7 @@
 import {
   getCurrentTeacher, getClassById, getStudentsByClass,
   praiseStudent, showToast, getStudentById, addPresentation,
-  toggleSharePresentation, startQuiz, stopQuiz, listenToQuizSubmissions,
+  toggleSharePresentation, updatePresentationShareSettings, startQuiz, stopQuiz, listenToQuizSubmissions,
   saveFile, getLessonPresentationsByStudent, formatDate, addStudentPoints,
   subtractStudentPoints, deletePresentationById, getClassesByTeacher,
   revealQuizGallery, getQuizById, enrichPresentationsWithImageUrls,
@@ -1523,7 +1523,7 @@ export function renderLessonMode(container, params) {
       : `<button type="button" class="btn btn-secondary btn-sm w-full" disabled>🖼️ 원본 이미지 없음</button>`}
                       <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 10px;">
                         <button class="btn ${p.shared ? 'btn-danger' : 'btn-purple'} btn-sm btn-toggle-share" data-id="${p.id}" data-shared="${p.shared ? 'true' : 'false'}">
-                          ${p.shared ? '공유 끄기' : '전체 공유'}
+                          ${p.shared ? '공유 설정' : '전체 공유'}
                         </button>
                         <button class="btn btn-ghost btn-sm btn-delete-presentation" data-id="${p.id}" title="발표 기록 삭제" style="color: var(--error); border: 1px solid rgba(239,68,68,0.35);">
                           삭제
@@ -1552,26 +1552,12 @@ export function renderLessonMode(container, params) {
       btn.addEventListener('click', async () => {
         const presentationId = btn.dataset.id;
         const isShared = btn.dataset.shared === 'true';
+        const pres = studentPresentations.find((p) => String(p.id) === String(presentationId));
+        const currentSharedClassIds = Array.isArray(pres?.sharedClassIds)
+          ? pres.sharedClassIds.map((id) => String(id))
+          : [];
 
-        if (isShared) {
-          // 공유 끄기
-          try {
-            await toggleSharePresentation(presentationId, null, []);
-            showToast('공유가 중지되었습니다.');
-            studentPresentations = await getLessonPresentationsByStudent(
-              selectedStudent.id,
-              selectedStudent.classId || classId,
-            );
-            render();
-          } catch (err) {
-            console.error('[발표 공유 해제]', err);
-            showToast('공유 해제 실패: ' + (err?.message || '권한 오류'), 'error');
-          }
-          return;
-        }
-
-        // 공유 켜기 — 모달로 제목 + 다른 클래스 선택
-        const otherClasses = teacherClasses.filter(c => c.id !== classId);
+        const otherClasses = teacherClasses.filter((c) => c.id !== classId);
         const modalId = 'share-modal-' + Date.now();
         const modal = document.createElement('div');
         modal.className = 'modal-backdrop active';
@@ -1583,24 +1569,25 @@ export function renderLessonMode(container, params) {
               <button class="modal-close" id="${modalId}-close">✕</button>
             </div>
             <p style="font-size: 0.88rem; color: var(--text-muted); margin: 0 0 var(--s-4); line-height: 1.45;">
-              저장된 제목으로 공유됩니다.
+              ${isShared ? '같은 반 공유 중입니다. 다른 클래스 공유 대상을 변경할 수 있어요.' : '저장된 제목으로 같은 반에 공유됩니다.'}
             </p>
             ${otherClasses.length > 0 ? `
             <div class="form-group" style="margin-bottom: var(--s-6);">
               <label class="input-label" style="margin-bottom: var(--s-2);">다른 클래스에도 공유 (선택)</label>
               <div style="display: flex; flex-direction: column; gap: 8px; background: var(--bg-main); border-radius: var(--r-sm); padding: var(--s-3);">
-                ${otherClasses.map(c => `
+                ${otherClasses.map((c) => `
                   <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 0.9rem;">
-                    <input type="checkbox" class="share-class-check" value="${c.id}" style="width:16px; height:16px; cursor:pointer;" />
-                    <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${c.color || 'var(--primary)'}; flex-shrink:0;"></span>
-                    ${c.name}
+                    <input type="checkbox" class="share-class-check" value="${escapeHtml(String(c.id))}" ${currentSharedClassIds.includes(String(c.id)) ? 'checked' : ''} style="width:16px; height:16px; cursor:pointer;" />
+                    <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${escapeHtml(String(c.color || 'var(--primary)'))}; flex-shrink:0;"></span>
+                    ${escapeHtml(c.name || '클래스')}
                   </label>
                 `).join('')}
               </div>
             </div>
             ` : ''}
-            <div class="flex gap-sm">
-              <button class="btn btn-primary flex-1" id="${modalId}-confirm">✨ 공유하기</button>
+            <div class="flex gap-sm flex-wrap">
+              <button class="btn btn-primary flex-1" id="${modalId}-confirm">${isShared ? '💾 설정 저장' : '✨ 공유하기'}</button>
+              ${isShared ? `<button class="btn btn-danger" id="${modalId}-off">공유 끄기</button>` : ''}
               <button class="btn btn-ghost" id="${modalId}-cancel">취소</button>
             </div>
           </div>
@@ -1612,21 +1599,48 @@ export function renderLessonMode(container, params) {
         document.getElementById(`${modalId}-cancel`).addEventListener('click', closeModal);
         modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
 
-        document.getElementById(`${modalId}-confirm`).addEventListener('click', async () => {
-          const selectedClassIds = [...document.querySelectorAll(`#${modalId} .share-class-check:checked`)]
-            .map(cb => cb.value);
+        const reloadPres = async () => {
+          studentPresentations = await getLessonPresentationsByStudent(
+            selectedStudent.id,
+            selectedStudent.classId || classId,
+          );
+          render();
+        };
+
+        document.getElementById(`${modalId}-off`)?.addEventListener('click', async () => {
           closeModal();
           try {
-            await toggleSharePresentation(presentationId, null, selectedClassIds);
-            showToast(`✨ 공유 완료! (2P 획득)${selectedClassIds.length > 0 ? ` — ${selectedClassIds.length}개 클래스 추가 공유` : ''}`);
-            const updated = await addStudentPoints(selectedStudent.id, 2);
-            if (updated) selectedStudent = updated;
-            studentPresentations = await getLessonPresentationsByStudent(
-              selectedStudent.id,
-              selectedStudent.classId || classId,
-            );
-            render();
+            await toggleSharePresentation(presentationId, null, []);
+            showToast('공유가 중지되었습니다.');
+            await reloadPres();
           } catch (err) {
+            console.error('[발표 공유 해제]', err);
+            showToast('공유 해제 실패: ' + (err?.message || '권한 오류'), 'error');
+          }
+        });
+
+        document.getElementById(`${modalId}-confirm`).addEventListener('click', async () => {
+          const selectedClassIds = [...document.querySelectorAll(`#${modalId} .share-class-check:checked`)]
+            .map((cb) => cb.value);
+          closeModal();
+          try {
+            if (isShared) {
+              await updatePresentationShareSettings(presentationId, {
+                shared: true,
+                sharedClassIds: selectedClassIds,
+              });
+              showToast(selectedClassIds.length > 0
+                ? `다른 ${selectedClassIds.length}개 클래스에도 공유했습니다.`
+                : '다른 클래스 공유를 해제했습니다. (같은 반 공유는 유지)');
+            } else {
+              await toggleSharePresentation(presentationId, null, selectedClassIds);
+              showToast(`✨ 공유 완료! (2P 획득)${selectedClassIds.length > 0 ? ` — ${selectedClassIds.length}개 클래스 추가 공유` : ''}`);
+              const updated = await addStudentPoints(selectedStudent.id, 2);
+              if (updated) selectedStudent = updated;
+            }
+            await reloadPres();
+          } catch (err) {
+            console.error('[발표 공유]', err);
             showToast('오류가 발생했습니다.', 'error');
           }
         });
