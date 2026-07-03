@@ -886,20 +886,7 @@ export function renderStudentProblemBoard(container, params) {
                 sampleRate: 44100,
               },
             });
-            let audioStream = rawAudioStream;
-            try {
-              const AudioCtx = window.AudioContext || window.webkitAudioContext;
-              const audioContext = new AudioCtx();
-              const source = audioContext.createMediaStreamSource(rawAudioStream);
-              const gainNode = audioContext.createGain();
-              gainNode.gain.value = 3.0;
-              const dest = audioContext.createMediaStreamDestination();
-              source.connect(gainNode);
-              gainNode.connect(dest);
-              audioStream = dest.stream;
-            } catch (gainErr) {
-              console.warn('[풀이 녹음] Web Audio 증폭 실패:', gainErr);
-            }
+            const audioStream = rawAudioStream;
             const audioMimeTypes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
             const audioMime = audioMimeTypes.find((m) => MediaRecorder.isTypeSupported(m)) || '';
             mediaRecorder = new MediaRecorder(audioStream, audioMime ? { mimeType: audioMime } : undefined);
@@ -924,19 +911,6 @@ export function renderStudentProblemBoard(container, params) {
             });
 
             audioStream = rawAudioStream;
-            try {
-              const AudioCtx = window.AudioContext || window.webkitAudioContext;
-              const audioContext = new AudioCtx();
-              const source = audioContext.createMediaStreamSource(rawAudioStream);
-              const gainNode = audioContext.createGain();
-              gainNode.gain.value = 3.0;
-              const dest = audioContext.createMediaStreamDestination();
-              source.connect(gainNode);
-              gainNode.connect(dest);
-              audioStream = dest.stream;
-            } catch (gainErr) {
-              console.warn('[풀이 녹음] Web Audio 증폭 실패:', gainErr);
-            }
 
             recordingCanvas = document.createElement('canvas');
 

@@ -6,6 +6,8 @@ import {
   showToast, getClassById
 } from '../../store.js';
 
+const MASCOT_URL = `${import.meta.env.BASE_URL || '/'}branding/genie-mascot.png`;
+
 export function renderStudentLogin(container) {
   let mode = 'login'; // 'login' (ID/PW), 'code' (First time), 'setup' (ID/PW Creation)
   let pendingStudent = null;
@@ -22,7 +24,9 @@ export function renderStudentLogin(container) {
       <div class="auth-page page-enter">
         <div class="auth-card">
           <div class="auth-logo">
-            <div class="auth-logo-icon">G</div>
+            <div class="auth-logo-icon brand-mark-wrap brand-mark-wrap--auth">
+              <img class="brand-mark" src="${MASCOT_URL}" alt="" width="64" height="64" decoding="async" />
+            </div>
             <h1 class="auth-title">Genie Class</h1>
             <p class="auth-subtitle">학생용 학습 서비스</p>
           </div>

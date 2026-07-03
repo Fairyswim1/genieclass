@@ -28,8 +28,8 @@
 }
 
 .student-topbar-logo-icon {
-    width: 38px;
-    height: 38px;
+    width: 40px;
+    height: 40px;
     background: var(--primary);
     border-radius: 10px 4px 10px 4px;
     display: flex;
@@ -39,6 +39,14 @@
     font-size: 1.2rem;
     color: white;
     box-shadow: 2px 2px 0 0 var(--primary-dark);
+}
+
+.student-topbar-logo-icon.brand-mark-wrap {
+    background: transparent;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 0;
+    overflow: hidden;
 }
 
 .student-topbar-title {
@@ -193,12 +201,11 @@
 .student-dashboard-assignments-card.section-card {
     flex: 0 0 auto;
     height: auto !important;
-    padding: var(--s-5) var(--s-6) !important;
 }
 
 .student-dashboard-assignments-card__head {
-    margin-bottom: var(--s-2) !important;
-    padding-bottom: var(--s-2) !important;
+    margin-bottom: var(--s-4);
+    padding-bottom: var(--s-3);
 }
 
 .student-dashboard-assignments-list {
@@ -206,7 +213,7 @@
     overflow-y: auto;
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
-    padding-right: 2px;
+    padding: var(--s-2) var(--s-1) var(--s-2) 0;
 }
 
 .student-dashboard--compact .student-dashboard-assignments-list {
@@ -394,9 +401,8 @@
     max-height: min(100px, 12vh) !important;
 }
 
-/* 하단 보조: 수업 자료실 · 나의 기록 — 컴팩트 */
+/* 하단 보조: 수업 자료실 · 나의 기록 — 공지사항과 동일한 카드 여백 */
 .student-dashboard-compact-card {
-    padding: var(--s-4) var(--s-5) !important;
     box-shadow: 3px 3px 0 0 var(--border-subtle);
 }
 
@@ -405,8 +411,8 @@
 }
 
 .student-dashboard-compact-card__head {
-    margin-bottom: var(--s-2) !important;
-    padding-bottom: var(--s-2) !important;
+    margin-bottom: var(--s-4);
+    padding-bottom: var(--s-3);
 }
 
 .student-dashboard-compact-card__head .section-card-title {
@@ -430,19 +436,15 @@
     flex-direction: column;
 }
 
-.student-dashboard-resources-card {
-    padding: var(--s-5) var(--s-6) !important;
-}
-
 .student-dashboard-resources-card__head {
-    margin-bottom: var(--s-2) !important;
-    padding-bottom: var(--s-2) !important;
+    margin-bottom: var(--s-4);
+    padding-bottom: var(--s-3);
 }
 
 .student-dashboard-resources-card__hint {
     font-size: 0.75rem;
     color: var(--text-dim);
-    margin: 0 0 var(--s-3);
+    margin: 0 var(--s-1) var(--s-3);
     line-height: 1.4;
 }
 
@@ -459,7 +461,7 @@
     max-height: min(320px, 36vh);
     overflow-y: auto;
     overflow-x: hidden;
-    padding-right: 4px;
+    padding: var(--s-1) var(--s-1) var(--s-1) 0;
     -webkit-overflow-scrolling: touch;
     scrollbar-gutter: stable;
 }
@@ -474,7 +476,7 @@
 
 .student-resources-bbs__empty {
     color: var(--text-dim);
-    padding: 16px 8px;
+    padding: 16px var(--s-3);
     font-size: 0.88rem;
 }
 
@@ -1045,7 +1047,7 @@
 }
 
 .student-dashboard--compact .section-card {
-    padding: var(--s-6);
+    padding: var(--s-6) var(--s-8);
 }
 
 .student-dashboard--compact .section-card-header {
@@ -1065,6 +1067,71 @@
 .student-welcome {
     margin-bottom: var(--s-4);
     text-align: left;
+}
+
+.student-welcome-aside {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: var(--s-2);
+    flex-shrink: 0;
+}
+
+.student-welcome__mascot {
+    width: 56px;
+    height: 56px;
+    object-fit: contain;
+    opacity: 0.95;
+    pointer-events: none;
+    user-select: none;
+}
+
+/* 학생 사이트 마스코트 */
+.brand-mark-wrap {
+    padding: 0;
+    overflow: hidden;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+}
+
+.brand-mark-wrap--auth {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    margin: 0 auto var(--s-4);
+}
+
+.auth-logo-icon.brand-mark-wrap--auth {
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+}
+
+.brand-mark {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    object-position: center bottom;
+    display: block;
+}
+
+/* 쪽지함 · 나의 기록 — 카드 안쪽 여백 */
+.student-mailbox-card .student-dashboard-compact-card__hint,
+.student-mailbox-card .student-mailbox-input,
+.student-mailbox-card .btn,
+.student-mailbox-card .divider,
+.student-mailbox-card .student-mailbox-section-title,
+.student-mailbox-card .student-mailbox-list,
+.student-dashboard-self-record-card .student-dashboard-compact-card__hint,
+.student-dashboard-self-record-card .form-group,
+.student-dashboard-self-record-card .drop-zone,
+.student-dashboard-self-record-card .file-queue-list,
+.student-dashboard-self-record-card #btn-save-self-record,
+.student-dashboard-self-record-card .divider,
+.student-dashboard-self-record-card #self-record-list {
+    margin-left: var(--s-1);
+    margin-right: var(--s-1);
 }
 
 .student-welcome-title {

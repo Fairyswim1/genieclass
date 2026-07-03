@@ -8,9 +8,11 @@ import {
   getStudentSelfRecordsByClass,
   createProblemPrompt, getProblemPromptsByClass, deleteProblemPrompt,
   getPresentationsByClass, toggleSharePresentation, addStudentPoints,
+  enrichPresentationsWithImageUrls, presentationWhiteboardImageUrl,
 } from '../../store.js';
 import { escapeHtml } from '../../utils/quizMath.js';
 import { bindClipboardPasteZone } from '../../utils/clipboardPaste.js';
+import { bindPresentationPlayback, PRESENTATION_PLAYBACK_MODAL_HTML } from '../../utils/presentationPlayback.js';
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
 
@@ -66,7 +68,7 @@ export function renderAssignMode(container, params) {
     const observations = await getObservationsByClass(classId);
     const selfRecords = await getStudentSelfRecordsByClass(classId);
     const problemPrompts = await getProblemPromptsByClass(classId);
-    const allPresentations = await getPresentationsByClass(classId);
+    const allPresentations = await enrichPresentationsWithImageUrls(await getPresentationsByClass(classId));
 
     if (!isActive) return; // 다른 페이지로 이동 후 완료된 stale render 차단
 
@@ -468,7 +470,8 @@ export function renderAssignMode(container, params) {
                       ? '<p style="font-size:0.82rem;color:var(--text-dim);">아직 제출한 학생이 없습니다.</p>'
                       : `<div style="display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto;padding-right:4px;">
                           ${sols.map(sol => {
-                            const wbUrl = typeof sol.whiteboardImage?.url === 'string' ? escapeAttr(sol.whiteboardImage.url) : '';
+                            const wbUrl = presentationWhiteboardImageUrl(sol);
+                            const wbUrlAttr = wbUrl ? escapeAttr(wbUrl) : '';
                             const avUrl = typeof sol.audioData?.url === 'string' ? escapeAttr(sol.audioData.url) : '';
                             const isVideo = sol.recordingMode === 'video';
                             return `
@@ -478,7 +481,7 @@ export function renderAssignMode(container, params) {
                                 <span class="badge ${sol.shared ? 'badge-green' : 'badge-main'}" style="font-size:0.62rem;">${sol.shared ? '공개' : '비공개'}</span>
                                 ${sol.solutionSource === 'photo' ? '<span class="badge badge-blue" style="font-size:0.62rem;">📷사진</span>' : ''}
                                 ${wbUrl ? `<button type="button" class="btn btn-ghost btn-sm" style="font-size:0.72rem;" onclick="window.open('${wbUrl}','_blank')">🖼️ 칠판 보기</button>` : ''}
-                                ${avUrl ? `<button type="button" class="btn btn-secondary btn-sm prob-play-btn" style="font-size:0.72rem;" data-url="${avUrl}" data-mode="${sol.recordingMode || ''}">${isVideo ? '🎬 영상' : '🔊 음성'}</button>` : ''}
+                                ${avUrl ? `<button type="button" class="btn btn-secondary btn-sm play-video-btn prob-play-btn" style="font-size:0.72rem;" data-url="${avUrl}" data-wb-url="${wbUrlAttr}" data-recording-mode="${escapeAttr(sol.recordingMode || 'audio')}">${isVideo ? '🎬 영상' : '🔊 음성'}</button>` : ''}
                                 <button type="button" class="btn btn-sm ${sol.shared ? 'btn-danger' : 'btn-primary'} btn-toggle-prob-share" data-id="${escapeAttr(sol.id)}" data-shared="${sol.shared ? 'true' : 'false'}" data-student-id="${escapeAttr(sol.studentId || '')}">${sol.shared ? '공유 끄기' : '공유하기'}</button>
                               </div>
                             `;
@@ -645,9 +648,11 @@ export function renderAssignMode(container, params) {
           </div>
         </main>
       </div>
+      ${PRESENTATION_PLAYBACK_MODAL_HTML}
     `;
 
     bindEvents();
+    bindPresentationPlayback(container);
   }
 
   function updateFileListUI(type) {
@@ -960,28 +965,6 @@ export function renderAssignMode(container, params) {
             showToast('오류가 발생했습니다.', 'error');
           }
         });
-      });
-    });
-
-    // 한 문제 풀이 학생 음성·영상 재생
-    document.querySelectorAll('.prob-play-btn').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const url = btn.getAttribute('data-url');
-        const mode = btn.getAttribute('data-mode');
-        if (!url) return;
-        if (mode === 'video') {
-          const win = window.open('', '_blank');
-          if (win) {
-            win.document.write(`<video src="${url}" controls autoplay style="max-width:100%;max-height:100vh;"></video>`);
-            win.document.close();
-          }
-        } else {
-          const win = window.open('', '_blank');
-          if (win) {
-            win.document.write(`<audio src="${url}" controls autoplay></audio>`);
-            win.document.close();
-          }
-        }
       });
     });
 

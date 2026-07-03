@@ -30,6 +30,8 @@ import { renderCharacter, getLevelConfig, PLANT_TYPES, getLevelProgress } from '
 import { Capacitor } from '@capacitor/core';
 import { VoiceRecorder } from 'capacitor-voice-recorder';
 
+const MASCOT_URL = `${import.meta.env.BASE_URL || '/'}branding/genie-mascot.png`;
+
 /** 칠판 URL · 음성/영상 URL로 재생 버튼 data 속성 생성 */
 function buildPlaybackButtonAttrs(p) {
   const wbUrl = presentationWhiteboardImageUrl(p);
@@ -288,7 +290,9 @@ export function renderStudentDashboard(container) {
       <div class="student-layout page-enter">
         <header class="student-topbar">
           <div class="student-topbar-logo">
-            <div class="student-topbar-logo-icon">G</div>
+            <div class="student-topbar-logo-icon brand-mark-wrap">
+              <img class="brand-mark" src="${MASCOT_URL}" alt="" width="40" height="40" decoding="async" />
+            </div>
             <div class="student-topbar-title">Genie Class</div>
           </div>
           <div class="student-topbar-user">
@@ -318,7 +322,10 @@ export function renderStudentDashboard(container) {
               <h1 class="student-welcome-title">반가워요, <span>${freshStudent.name}</span>님!</h1>
               <p class="student-welcome-subtitle">${cls?.name || '클래스 정보 없음'} · ${config.name} (Lv.${progress.level})</p>
             </div>
-            <div class="badge badge-purple animate-up" style="padding: 8px 16px; font-size: 0.9rem;">포인트: ${freshStudent.totalPoints}P</div>
+            <div class="student-welcome-aside">
+              <img class="student-welcome__mascot" src="${MASCOT_URL}" alt="" width="56" height="56" decoding="async" aria-hidden="true" />
+              <div class="badge badge-purple animate-up" style="padding: 8px 16px; font-size: 0.9rem;">포인트: ${freshStudent.totalPoints}P</div>
+            </div>
           </section>
 
           <section class="student-stats-row">

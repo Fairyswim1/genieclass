@@ -7,11 +7,13 @@ import {
   toggleSharePresentation, startQuiz, stopQuiz, listenToQuizSubmissions,
   saveFile, getPresentationsByStudent, formatDate, addStudentPoints,
   subtractStudentPoints, deletePresentationById, getClassesByTeacher,
-  revealQuizGallery, getQuizById
+  revealQuizGallery, getQuizById, enrichPresentationsWithImageUrls,
+  presentationWhiteboardImageUrl,
 } from '../../store.js';
 import { escapeHtml, renderQuizMath } from '../../utils/quizMath.js';
 import { bindClipboardPasteZone } from '../../utils/clipboardPaste.js';
 import { renderQuizLatexKeyboardHtml } from '../../utils/quizLatexKeyboard.js';
+import { bindPresentationPlayback, PRESENTATION_PLAYBACK_MODAL_HTML } from '../../utils/presentationPlayback.js';
 import { renderCharacter, getLevelConfig, renderPraiseAnimation, deriveCharacterLevelFromPoints } from '../../components/characterAvatar.js';
 import { getStroke } from 'perfect-freehand';
 import { eraseSegmentDisk, WHITEBOARD_ERASER_ICON_HTML } from '../../utils/eraserCanvas.js';
@@ -259,9 +261,11 @@ export function renderLessonMode(container, params) {
     document.getElementById('btn-history')?.addEventListener('click', async () => {
       showToast('발표 기록을 불러오는 중...', 'info');
       try {
-        studentPresentations = await getPresentationsByStudent(
-          selectedStudent.id,
-          selectedStudent.classId || classId,
+        studentPresentations = await enrichPresentationsWithImageUrls(
+          await getPresentationsByStudent(
+            selectedStudent.id,
+            selectedStudent.classId || classId,
+          ),
         );
         activeView = 'presentations';
         render();
@@ -1206,20 +1210,8 @@ export function renderLessonMode(container, params) {
               }
             });
 
+            // Web Audio 증폭은 에코 캔슬(AEC)을 무력화하고 클리핑·울림(하울링)을 유발하므로 원본 스트림 사용
             audioStream = rawAudioStream;
-            try {
-              const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-              const source = audioContext.createMediaStreamSource(rawAudioStream);
-              const gainNode = audioContext.createGain();
-              gainNode.gain.value = 3.0;
-              const dest = audioContext.createMediaStreamDestination();
-              source.connect(gainNode);
-              gainNode.connect(dest);
-              audioStream = dest.stream;
-              console.log('[녹음] 오디오 볼륨 증폭 적용 (3x)');
-            } catch (gainErr) {
-              console.warn('[녹음] Web Audio API 증폭 실패, 원본 오디오 사용:', gainErr);
-            }
 
             recordingCanvas = document.createElement('canvas');
 
@@ -1503,28 +1495,30 @@ export function renderLessonMode(container, params) {
             <div class="grid" style="grid-template-columns: repeat(auto-fill, minmax(460px, 1fr)); gap: var(--s-8);">
               ${studentPresentations.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map(p => {
                 const isVideo = p.recordingMode === 'video';
+                const wbUrl = presentationWhiteboardImageUrl(p);
+                const mediaUrl = typeof p.audioData?.url === 'string' ? p.audioData.url.trim() : '';
                 return `
                 <div class="card presentation-card animate-up" style="padding: var(--s-4); position: relative;">
                   <div class="badge badge-main" style="position: absolute; top: 15px; left: 15px; z-index: 2;">
                     ${formatDate(p.createdAt)}
                   </div>
                   <div class="presentation-media" style="position: relative; background: #000; border-radius: var(--r-md); overflow: hidden; margin-bottom: var(--s-4); border: 2px solid var(--border-light); min-height: 120px;">
-                    ${p.whiteboardImage?.url
-      ? `<img src="${escapeHtml(p.whiteboardImage.url)}" alt="" style="width: 100%; aspect-ratio: 16/9; object-fit: contain;" />`
+                    ${wbUrl
+      ? `<img src="${escapeHtml(wbUrl)}" alt="" style="width: 100%; aspect-ratio: 16/9; object-fit: contain;" />`
       : `<div style="display:flex;align-items:center;justify-content:center;aspect-ratio:16/9;color:rgba(255,255,255,0.5);font-size:0.9rem;">발표판 이미지 없음</div>`}
                     ${p.audioData ? `<div style="position: absolute; bottom: 100px; right: 20px; font-size: 2rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));">${isVideo ? '📹' : '🎙️'}</div>` : ''}
                   </div>
                   <div class="flex flex-col gap-sm">
                     ${p.audioData ? `
-                      <button class="btn ${isVideo ? 'btn-primary' : 'btn-blue'} w-full play-video-btn" data-url="${escapeHtml(p.audioData.url)}" data-mode="${p.recordingMode}">
+                      <button class="btn ${isVideo ? 'btn-primary' : 'btn-blue'} w-full play-video-btn" data-url="${escapeHtml(mediaUrl)}" data-wb-url="${escapeHtml(wbUrl)}" data-recording-mode="${escapeHtml(p.recordingMode || 'audio')}">
                         ${isVideo ? '🎬 발표 영상 재생' : '🔊 발표 음성 듣기'}
                       </button>
                     ` : `
                       <button class="btn btn-ghost w-full" disabled>기록 없음</button>
                     `}
                     <div class="flex flex-col gap-xs">
-                      ${p.whiteboardImage?.url
-      ? `<button type="button" class="btn btn-secondary btn-sm w-full" onclick="window.open('${escapeHtml(p.whiteboardImage.url)}', '_blank')">🖼️ 원본 이미지</button>`
+                      ${wbUrl
+      ? `<button type="button" class="btn btn-secondary btn-sm w-full" onclick="window.open('${escapeHtml(wbUrl)}', '_blank')">🖼️ 원본 이미지</button>`
       : `<button type="button" class="btn btn-secondary btn-sm w-full" disabled>🖼️ 원본 이미지 없음</button>`}
                       <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 10px;">
                         <button class="btn ${p.shared ? 'btn-danger' : 'btn-purple'} btn-sm btn-toggle-share" data-id="${p.id}" data-shared="${p.shared}">
@@ -1543,18 +1537,7 @@ export function renderLessonMode(container, params) {
         </main>
       </div>
 
-      <!-- Video Modal -->
-      <div class="modal-backdrop" id="video-modal" style="z-index: 2000;">
-        <div class="modal-content" style="max-width: 1000px; width: 90%; background: #000; padding: 0;">
-          <div class="modal-header" style="background: rgba(0,0,0,0.5); position: absolute; top: 0; left: 0; right: 0; z-index: 10;">
-             <h3 class="modal-title" style="color: #fff;">발표 영상</h3>
-             <button class="modal-close" style="color: #fff; background: rgba(255,255,255,0.1);" id="close-video-modal">✕</button>
-          </div>
-          <video id="player" controls style="width: 100%; aspect-ratio: 16/9; display: block; border-radius: var(--r-lg);">
-            소스가 없습니다.
-          </video>
-        </div>
-      </div>
+      ${PRESENTATION_PLAYBACK_MODAL_HTML}
     `;
 
     document.getElementById('history-back')?.addEventListener('click', () => {
@@ -1562,16 +1545,7 @@ export function renderLessonMode(container, params) {
       render();
     });
 
-    const videoModal = document.getElementById('video-modal');
-    const player = document.getElementById('player');
-    
-    document.querySelectorAll('.play-video-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        player.src = btn.dataset.url;
-        videoModal.classList.add('active');
-        player.play();
-      });
-    });
+    bindPresentationPlayback(container);
 
     document.querySelectorAll('.btn-toggle-share').forEach(btn => {
       btn.addEventListener('click', async () => {
@@ -1679,20 +1653,6 @@ export function renderLessonMode(container, params) {
           showToast('삭제 중 오류가 발생했습니다.', 'error');
         }
       });
-    });
-
-    document.getElementById('close-video-modal')?.addEventListener('click', () => {
-      player.pause();
-      player.src = "";
-      videoModal.classList.remove('active');
-    });
-
-    videoModal.addEventListener('click', (e) => {
-      if (e.target === videoModal) {
-        player.pause();
-        player.src = "";
-        videoModal.classList.remove('active');
-      }
     });
   }
 
