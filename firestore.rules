@@ -164,6 +164,34 @@ service cloud.firestore {
       return changedOnly(['shared', 'title', 'sharedClassIds', 'feedback', 'feedbackShared', 'feedbackAt', 'updatedAt']);
     }
 
+    function shareLinkWrite(data) {
+      return data.keys().hasAll(['presentationId', 'targetClassId', 'sourceClassId', 'studentId', 'shared'])
+        && data.presentationId is string
+        && data.targetClassId is string
+        && data.sourceClassId is string
+        && data.studentId is string
+        && data.shared == true
+        && (
+          (isTeacherAuth() && isClassTeacher(data.sourceClassId))
+          || (
+            isStudentAuth()
+            && hasStudentAuthIndex()
+            && isStudentOwner(data.studentId)
+            && studentAuthClassId() == data.sourceClassId
+          )
+        );
+    }
+
+    function shareLinkDelete() {
+      return (isTeacherAuth() && isClassTeacher(resource.data.sourceClassId))
+        || (
+          isStudentAuth()
+          && hasStudentAuthIndex()
+          && isStudentOwner(resource.data.studentId)
+          && studentAuthClassId() == resource.data.sourceClassId
+        );
+    }
+
     function classScopedCreate() {
       return isClassTeacher(request.resource.data.classId)
         || (ownsIncomingDoc() && isStudentOwner(request.resource.data.studentId));
@@ -292,6 +320,19 @@ service cloud.firestore {
         && keepsClassScope()
         && changedOnly(['active', 'galleryRevealed', 'problemImage', 'problemText', 'updatedAt']);
       allow delete: if isClassTeacher(resource.data.classId);
+    }
+
+    match /presentation_share_links/{linkId} {
+      allow read: if (isStudentAuth()
+        && hasStudentAuthIndex()
+        && resource.data.targetClassId == studentAuthClassId())
+        || (isTeacherAuth() && isClassTeacher(resource.data.sourceClassId));
+      allow create: if shareLinkWrite(request.resource.data);
+      allow update: if shareLinkWrite(request.resource.data)
+        && request.resource.data.presentationId == resource.data.presentationId
+        && request.resource.data.sourceClassId == resource.data.sourceClassId
+        && request.resource.data.targetClassId == resource.data.targetClassId;
+      allow delete: if shareLinkDelete();
     }
 
     match /presentations/{presentationId} {

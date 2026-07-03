@@ -47,6 +47,7 @@ const COLLECTIONS = {
     FILES: 'files',
     PROBLEM_PROMPTS: 'problem_prompts',
     STUDENT_AUTH: 'student_auth',
+    PRESENTATION_SHARE_LINKS: 'presentation_share_links',
 };
 
 // Internal state
@@ -702,7 +703,9 @@ export async function toggleSharePresentation(presentationId, title = null, addi
         }
         updates.updatedAt = new Date().toISOString();
         await updateDoc(ref, updates);
-        return { ...data, ...updates };
+        const merged = { ...data, ...updates, id: data.id || snap.id };
+        await syncPresentationShareLinks(merged);
+        return merged;
     }
     return null;
 }
@@ -710,6 +713,62 @@ export async function toggleSharePresentation(presentationId, title = null, addi
 function normalizeSharedClassIds(classIds) {
     if (!Array.isArray(classIds)) return [];
     return [...new Set(classIds.map((id) => String(id).trim()).filter(Boolean))];
+}
+
+/** 크로스클래스 공유 조회용 인덱스 (Firestore 규칙·쿼리 정합) */
+async function syncPresentationShareLinks(presentationData) {
+    const presId = String(presentationData?.id || '').trim();
+    const sourceClassId = String(presentationData?.classId || '').trim();
+    if (!presId || !sourceClassId) return;
+
+    const teacher = getCurrentTeacher();
+    if (teacher) {
+        await ensureTeacherFirebaseAuth();
+    } else if (presentationData.studentId) {
+        await ensureStudentWriteIdentity(presentationData.studentId);
+    }
+
+    const existingQ = query(
+        collection(db, COLLECTIONS.PRESENTATION_SHARE_LINKS),
+        where('presentationId', '==', presId),
+    );
+    const existingSnap = await getDocs(existingQ);
+    await Promise.all(existingSnap.docs.map((d) => deleteDoc(d.ref)));
+
+    const isShared = !!presentationData.shared;
+    const targets = normalizeSharedClassIds(presentationData.sharedClassIds || []);
+    if (!isShared || targets.length === 0) return;
+
+    const base = {
+        presentationId: presId,
+        sourceClassId,
+        studentId: String(presentationData.studentId || ''),
+        studentName: presentationData.studentName || '',
+        title: presentationData.title || '',
+        shared: true,
+        updatedAt: new Date().toISOString(),
+    };
+
+    await Promise.all(targets.map((targetClassId) => {
+        const linkId = `${presId}_${targetClassId}`;
+        return setDoc(doc(db, COLLECTIONS.PRESENTATION_SHARE_LINKS, linkId), {
+            id: linkId,
+            targetClassId,
+            createdAt: presentationData.createdAt || new Date().toISOString(),
+            ...base,
+        });
+    }));
+}
+
+async function deletePresentationShareLinks(presentationId) {
+    const presId = String(presentationId || '').trim();
+    if (!presId) return;
+    const existingQ = query(
+        collection(db, COLLECTIONS.PRESENTATION_SHARE_LINKS),
+        where('presentationId', '==', presId),
+    );
+    const existingSnap = await getDocs(existingQ);
+    await Promise.all(existingSnap.docs.map((d) => deleteDoc(d.ref)));
 }
 
 /** 공유 상태·크로스클래스 대상 업데이트 (이미 공유 중일 때 반 추가/변경) */
@@ -727,22 +786,61 @@ export async function updatePresentationShareSettings(presentationId, { shared, 
         updates.title = String(title).trim();
     }
     await updateDoc(ref, updates);
-    return { ...data, ...updates, id: data.id || snap.id };
+    const merged = { ...data, ...updates, id: data.id || snap.id };
+    await syncPresentationShareLinks(merged);
+    return merged;
 }
 
 /** 다른 클래스에서 이 classId로 공유된 발표(크로스클래스 공유) 조회 */
 export async function getSharedPresentationsByClassId(classId) {
     const cid = classId != null ? String(classId).trim() : '';
     if (!cid) return [];
-    const q = query(
-        collection(db, COLLECTIONS.PRESENTATIONS),
-        where('sharedClassIds', 'array-contains', cid),
+
+    const linkQ = query(
+        collection(db, COLLECTIONS.PRESENTATION_SHARE_LINKS),
+        where('targetClassId', '==', cid),
         where('shared', '==', true),
     );
-    const snapshot = await getDocs(q);
-    return snapshot.docs
-        .map(normalizePresentationDoc)
-        .filter((p) => p.type !== 'observation' && isLessonPresentation(p));
+    const linkSnap = await getDocs(linkQ);
+    const seen = new Set();
+    const fromLinks = [];
+
+    for (const linkDoc of linkSnap.docs) {
+        const link = linkDoc.data();
+        const pid = String(link.presentationId || '').trim();
+        if (!pid || seen.has(pid)) continue;
+        seen.add(pid);
+        try {
+            const presSnap = await getDoc(doc(db, COLLECTIONS.PRESENTATIONS, pid));
+            if (!presSnap.exists()) continue;
+            const pres = normalizePresentationDoc(presSnap);
+            if (!pres.shared || !isLessonPresentation(pres)) continue;
+            fromLinks.push({
+                ...pres,
+                studentName: pres.studentName || link.studentName || null,
+                title: pres.title || link.title || null,
+            });
+        } catch (e) {
+            console.warn('[getSharedPresentationsByClassId] presentation read failed:', pid, e);
+        }
+    }
+
+    if (fromLinks.length > 0) return fromLinks;
+
+    try {
+        const legacyQ = query(
+            collection(db, COLLECTIONS.PRESENTATIONS),
+            where('sharedClassIds', 'array-contains', cid),
+            where('shared', '==', true),
+        );
+        const snapshot = await getDocs(legacyQ);
+        return snapshot.docs
+            .map(normalizePresentationDoc)
+            .filter((p) => p.type !== 'observation' && isLessonPresentation(p));
+    } catch (e) {
+        console.warn('[getSharedPresentationsByClassId] legacy query failed:', e);
+        return [];
+    }
 }
 
 /** Firestore에 배열·맵으로 저장된 첨부 목록 통일 */
@@ -880,6 +978,7 @@ export async function deletePresentationById(presentationId) {
     const fileRefs = [data.whiteboardImage, data.audioData].filter(Boolean);
 
     await deleteDoc(refDoc);
+    await deletePresentationShareLinks(presentationId);
     await deleteOrphanFilesFromRefs(fileRefs);
     return true;
 }

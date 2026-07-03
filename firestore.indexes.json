@@ -1,0 +1,21 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "presentation_share_links",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "targetClassId", "order": "ASCENDING" },
+        { "fieldPath": "shared", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "presentations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "sharedClassIds", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "shared", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
