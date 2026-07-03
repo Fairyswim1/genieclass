@@ -989,15 +989,57 @@ export async function setPresentationFeedbackShared(presentationId, shared = tru
     });
 }
 
+function normalizeProblemPromptDoc(docSnap) {
+    const data = docSnap.data();
+    const docId = String(docSnap.id || data.id || '');
+    const bodyId = data.id != null ? String(data.id) : '';
+    return {
+        ...data,
+        id: docId,
+        legacyPromptId: bodyId && bodyId !== docId ? bodyId : null,
+    };
+}
+
+export function problemPromptIdMatches(prompt, problemPromptId) {
+    const pid = String(problemPromptId || '').trim();
+    if (!pid || !prompt) return false;
+    if (pid === String(prompt.id || '')) return true;
+    if (prompt.legacyPromptId && pid === String(prompt.legacyPromptId)) return true;
+    return false;
+}
+
+/** 학생 풀이를 출제 문제 id 기준으로 묶음 (legacy problemPromptId 호환) */
+export function groupProblemSolutionsByPrompt(problemSolutions, problemPrompts) {
+    const map = {};
+    for (const pr of problemPrompts) {
+        map[String(pr.id)] = [];
+    }
+    const orphans = [];
+    for (const sol of problemSolutions) {
+        const matched = problemPrompts.find((pr) =>
+            presentationMatchesProblemPrompt(sol, pr, problemPrompts));
+        if (matched) {
+            const key = String(matched.id);
+            if (!map[key]) map[key] = [];
+            map[key].push(sol);
+        } else {
+            orphans.push(sol);
+        }
+    }
+    if (orphans.length && problemPrompts.length === 1) {
+        const key = String(problemPrompts[0].id);
+        if (!map[key]) map[key] = [];
+        map[key].push(...orphans);
+    }
+    return map;
+}
+
 export async function getProblemPromptsByClass(classId) {
     if (!classId) return [];
     const q = query(collection(db, COLLECTIONS.PROBLEM_PROMPTS), where('classId', '==', classId));
     const snapshot = await getDocs(q);
     return snapshot.docs
-        .map((d) => {
-            const data = d.data();
-            return { ...data, id: d.id || data.id };
-        })
+        .map((d) => normalizeProblemPromptDoc(d))
         .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 }
 
@@ -1005,8 +1047,7 @@ export async function getProblemPromptById(promptId) {
     if (!promptId) return null;
     const docSnap = await getDoc(doc(db, COLLECTIONS.PROBLEM_PROMPTS, promptId));
     if (!docSnap.exists()) return null;
-    const data = docSnap.data();
-    return { ...data, id: docSnap.id || data.id };
+    return normalizeProblemPromptDoc(docSnap);
 }
 
 export async function deleteProblemPrompt(promptId) {
@@ -1833,7 +1874,7 @@ export function presentationMatchesProblemPrompt(pres, prompt, allPrompts = []) 
     const promptId = String(prompt.id || '').trim();
     if (!promptId) return false;
     const pid = String(pres.problemPromptId || '').trim();
-    if (pid) return pid === promptId;
+    if (pid) return problemPromptIdMatches(prompt, pid);
     if (Array.isArray(allPrompts) && allPrompts.length === 1) {
         return String(allPrompts[0].id) === promptId;
     }

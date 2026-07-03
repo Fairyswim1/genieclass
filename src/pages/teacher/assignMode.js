@@ -11,6 +11,7 @@ import {
   enrichPresentationsWithImageUrls, presentationWhiteboardImageUrl,
   problemPromptHasModelAnswer, presentationHasWhiteboardImage,
   isProblemSolutionPresentation, presentationHasSharedFeedback,
+  groupProblemSolutionsByPrompt,
 } from '../../store.js';
 import { escapeHtml } from '../../utils/quizMath.js';
 import { bindClipboardPasteZone } from '../../utils/clipboardPaste.js';
@@ -77,17 +78,9 @@ export function renderAssignMode(container, params) {
 
     if (!isActive) return; // 다른 페이지로 이동 후 완료된 stale render 차단
 
-    // 한 문제 풀이 타입 필터링 및 문제별 그룹화
+    // 한 문제 풀이 타입 필터링 및 문제별 그룹화 (legacy problemPromptId 호환)
     const problemSolutions = allPresentations.filter((p) => isProblemSolutionPresentation(p));
-    const solutionsByProblem = {};
-    problemSolutions.forEach(sol => {
-      let pid = String(sol.problemPromptId || '').trim();
-      if (!pid && problemPrompts.length === 1) {
-        pid = String(problemPrompts[0].id);
-      }
-      if (!solutionsByProblem[pid]) solutionsByProblem[pid] = [];
-      solutionsByProblem[pid].push(sol);
-    });
+    const solutionsByProblem = groupProblemSolutionsByPrompt(problemSolutions, problemPrompts);
 
     currentObservations = observations;
     currentProblemPrompts = problemPrompts;

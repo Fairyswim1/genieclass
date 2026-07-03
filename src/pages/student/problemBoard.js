@@ -19,6 +19,7 @@ import {
   getFileById,
   enrichPresentationWithImageUrls,
   presentationWhiteboardImageUrl,
+  presentationMatchesProblemPrompt,
 } from '../../store.js';
 import { escapeHtml } from '../../utils/quizMath.js';
 import { bindClipboardPasteZone } from '../../utils/clipboardPaste.js';
@@ -1153,7 +1154,7 @@ export function renderStudentProblemBoard(container, params) {
 
       const mine = await getPresentationsByStudent(student.id, student.classId);
       const olds = mine.filter(
-        (p) => p.type === 'problem_solution' && String(p.problemPromptId || '') === String(problemPrompt.id)
+        (p) => presentationMatchesProblemPrompt(p, problemPrompt, [problemPrompt]),
       );
       for (const p of olds) {
         await deletePresentationById(p.id);
@@ -1218,8 +1219,7 @@ export function renderStudentProblemBoard(container, params) {
     try {
       const mine = await getPresentationsByStudent(student.id, student.classId);
       const olds = mine.filter(
-        (p) => p.type === 'problem_solution'
-          && String(p.problemPromptId || '') === String(problemPrompt.id),
+        (p) => presentationMatchesProblemPrompt(p, problemPrompt, [problemPrompt]),
       );
       if (!olds.length) return;
       const latest = olds.slice().sort(
