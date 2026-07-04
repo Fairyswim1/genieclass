@@ -686,10 +686,15 @@ export async function getSharedPresentationsInClass(classId) {
 }
 
 export async function toggleSharePresentation(presentationId, title = null, additionalClassIds = []) {
+    const teacher = getCurrentTeacher();
+    if (teacher) {
+        await ensureTeacherFirebaseAuth();
+    }
     const ref = doc(db, COLLECTIONS.PRESENTATIONS, presentationId);
     const snap = await getDoc(ref);
     if (snap.exists()) {
         const data = snap.data();
+        const previousTargets = normalizeSharedClassIds(data.sharedClassIds);
         const currentShared = data.shared;
         const updates = { shared: !currentShared };
         if (!currentShared && title) {
@@ -704,7 +709,7 @@ export async function toggleSharePresentation(presentationId, title = null, addi
         updates.updatedAt = new Date().toISOString();
         await updateDoc(ref, updates);
         const merged = { ...data, ...updates, id: data.id || snap.id };
-        await syncPresentationShareLinks(merged);
+        await syncPresentationShareLinks(merged, previousTargets);
         return merged;
     }
     return null;
@@ -715,8 +720,26 @@ function normalizeSharedClassIds(classIds) {
     return [...new Set(classIds.map((id) => String(id).trim()).filter(Boolean))];
 }
 
+function shareLinkDocId(presentationId, targetClassId) {
+    return `${String(presentationId).trim()}_${String(targetClassId).trim()}`;
+}
+
+/** 알려진 targetClassId 목록의 링크 문서 삭제 (목록 쿼리 없이 — 규칙 permission 회피) */
+async function deleteShareLinksByTargetIds(presentationId, targetClassIds) {
+    const presId = String(presentationId || '').trim();
+    if (!presId) return;
+    const ids = normalizeSharedClassIds(targetClassIds);
+    await Promise.all(ids.map(async (targetClassId) => {
+        try {
+            await deleteDoc(doc(db, COLLECTIONS.PRESENTATION_SHARE_LINKS, shareLinkDocId(presId, targetClassId)));
+        } catch (e) {
+            console.warn('[deleteShareLinksByTargetIds]', presId, targetClassId, e);
+        }
+    }));
+}
+
 /** 크로스클래스 공유 조회용 인덱스 (Firestore 규칙·쿼리 정합) */
-async function syncPresentationShareLinks(presentationData) {
+async function syncPresentationShareLinks(presentationData, previousTargets = []) {
     const presId = String(presentationData?.id || '').trim();
     const sourceClassId = String(presentationData?.classId || '').trim();
     if (!presId || !sourceClassId) return;
@@ -728,12 +751,7 @@ async function syncPresentationShareLinks(presentationData) {
         await ensureStudentWriteIdentity(presentationData.studentId);
     }
 
-    const existingQ = query(
-        collection(db, COLLECTIONS.PRESENTATION_SHARE_LINKS),
-        where('presentationId', '==', presId),
-    );
-    const existingSnap = await getDocs(existingQ);
-    await Promise.all(existingSnap.docs.map((d) => deleteDoc(d.ref)));
+    await deleteShareLinksByTargetIds(presId, previousTargets);
 
     const isShared = !!presentationData.shared;
     const targets = normalizeSharedClassIds(presentationData.sharedClassIds || []);
@@ -750,7 +768,7 @@ async function syncPresentationShareLinks(presentationData) {
     };
 
     await Promise.all(targets.map((targetClassId) => {
-        const linkId = `${presId}_${targetClassId}`;
+        const linkId = shareLinkDocId(presId, targetClassId);
         return setDoc(doc(db, COLLECTIONS.PRESENTATION_SHARE_LINKS, linkId), {
             id: linkId,
             targetClassId,
@@ -760,23 +778,21 @@ async function syncPresentationShareLinks(presentationData) {
     }));
 }
 
-async function deletePresentationShareLinks(presentationId) {
-    const presId = String(presentationId || '').trim();
-    if (!presId) return;
-    const existingQ = query(
-        collection(db, COLLECTIONS.PRESENTATION_SHARE_LINKS),
-        where('presentationId', '==', presId),
-    );
-    const existingSnap = await getDocs(existingQ);
-    await Promise.all(existingSnap.docs.map((d) => deleteDoc(d.ref)));
+async function deletePresentationShareLinks(presentationId, knownTargets = []) {
+    await deleteShareLinksByTargetIds(presentationId, knownTargets);
 }
 
 /** 공유 상태·크로스클래스 대상 업데이트 (이미 공유 중일 때 반 추가/변경) */
 export async function updatePresentationShareSettings(presentationId, { shared, sharedClassIds, title } = {}) {
+    const teacher = getCurrentTeacher();
+    if (teacher) {
+        await ensureTeacherFirebaseAuth();
+    }
     const ref = doc(db, COLLECTIONS.PRESENTATIONS, presentationId);
     const snap = await getDoc(ref);
     if (!snap.exists()) return null;
     const data = snap.data();
+    const previousTargets = normalizeSharedClassIds(data.sharedClassIds);
     const updates = { updatedAt: new Date().toISOString() };
     if (typeof shared === 'boolean') updates.shared = shared;
     if (sharedClassIds !== undefined) {
@@ -787,7 +803,7 @@ export async function updatePresentationShareSettings(presentationId, { shared, 
     }
     await updateDoc(ref, updates);
     const merged = { ...data, ...updates, id: data.id || snap.id };
-    await syncPresentationShareLinks(merged);
+    await syncPresentationShareLinks(merged, previousTargets);
     return merged;
 }
 
@@ -977,8 +993,8 @@ export async function deletePresentationById(presentationId) {
     }
     const fileRefs = [data.whiteboardImage, data.audioData].filter(Boolean);
 
+    await deletePresentationShareLinks(presentationId, data.sharedClassIds);
     await deleteDoc(refDoc);
-    await deletePresentationShareLinks(presentationId);
     await deleteOrphanFilesFromRefs(fileRefs);
     return true;
 }
